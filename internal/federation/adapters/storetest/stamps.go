@@ -41,6 +41,59 @@ func RunStamps(t *testing.T, newStore func(*testing.T) StampsStore) {
 	t.Run("StampsReplace", func(t *testing.T) { stampsReplace(t, newStore(t).Stamps()) })
 	t.Run("StampsPending", func(t *testing.T) { stampsPending(t, newStore(t).Stamps()) })
 	t.Run("StampsPrune", func(t *testing.T) { stampsPrune(t, newStore(t)) })
+	t.Run("StampsList", func(t *testing.T) { stampsList(t, newStore(t).Stamps()) })
+}
+
+// stampsList pages one repository's records in byte order of path, which
+// puts "a-b" before "a/b" as the items' full path order does, and Remove
+// takes one record, or a folder's with every record below it.
+func stampsList(t *testing.T, st port.ItemStampStore) {
+	t.Helper()
+	ctx := t.Context()
+	for _, p := range []string{"a/b", "a", "a-b", "a/b/c", "b", "a0"} {
+		if err := st.Record(ctx, model.ItemStamp{RepoKey: "fed", Path: p, Stamp: at(1, 0, "jfrt@a"), Deleted: p == "b"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := st.Record(ctx, model.ItemStamp{RepoKey: "other", Path: "a", Stamp: at(1, 0, "jfrt@a")}); err != nil {
+		t.Fatal(err)
+	}
+	paths := func(after string, limit int) string {
+		t.Helper()
+		got, err := st.List(ctx, "fed", after, limit)
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := make([]string, 0, len(got))
+		for _, v := range got {
+			out = append(out, v.Path)
+		}
+		return strings.Join(out, " ")
+	}
+	if got := paths("", 3); got != "a a-b a/b" {
+		t.Fatalf("first page %q", got)
+	}
+	if got := paths("a/b", 10); got != "a/b/c a0 b" {
+		t.Fatalf("next page %q", got)
+	}
+	if err := st.Remove(ctx, "fed", "a", true); err != nil {
+		t.Fatal(err)
+	}
+	if got := paths("", 10); got != "a-b a0 b" {
+		t.Fatalf("after removing a and below %q", got)
+	}
+	if err := st.Remove(ctx, "fed", "a-b", false); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Remove(ctx, "fed", "missing", true); err != nil {
+		t.Fatal(err)
+	}
+	if got := paths("", 10); got != "a0 b" {
+		t.Fatalf("after removing a-b %q", got)
+	}
+	if got, err := st.List(ctx, "other", "", 10); err != nil || len(got) != 1 {
+		t.Fatalf("another repository's records %+v, %v", got, err)
+	}
 }
 
 func stampsReplace(t *testing.T, st port.ItemStampStore) {

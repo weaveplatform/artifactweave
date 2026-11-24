@@ -9,7 +9,8 @@
 //
 // # Inputs
 //
-//   - Start's Options: how many instances, and SQLite or PostgreSQL.
+//   - Start's Options: how many instances, SQLite or PostgreSQL, and the
+//     outbox retention window when a scenario outlasts it.
 //   - The test binary itself: every instance is a process of it running
 //     InstanceTest, which the binary declares by calling RunInstance.
 //   - Docker, for a PostgreSQL cluster's own container.
@@ -33,8 +34,11 @@
 //     configuration sync (federated_test.go), and change propagation
 //     (federated_sync_test.go): convergence of every kind of change, the
 //     conflict rule, catch-up after a partition, a disabled member, and
-//     Maven, npm and Docker metadata recomputed on each member; the other
-//     P13 tickets add theirs.
+//     Maven, npm and Docker metadata recomputed on each member; and full
+//     sync (federated_fullsync_test.go): members partitioned past the
+//     retention window repaired by full and forced full sync, ?mirror,
+//     recovery and reconnect, propagateCreatedTime and removeMember; the
+//     other P13 tickets add theirs.
 //
 // # References
 //
@@ -59,6 +63,6 @@
 //
 // Implemented P13 (QUA-01, issue 1924): the harness and the acceptance-peers
 // job; issue 1946 gave each instance one ingress address and moved PEER-02's
-// pairing scenarios here; FED-01 (issue 1930) and FED-02 (issue 1931) added
-// theirs. The other peer and federation scenarios come with their tickets.
+// pairing scenarios here; FED-01 (issue 1930), FED-02 (issue 1931) and
+// FED-04 (issue 1932) added theirs. The other peer and federation scenarios come with their tickets.
 package peers

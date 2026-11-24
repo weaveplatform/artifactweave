@@ -1675,6 +1675,18 @@ func (s peerService) GetSnapshot(
 	return s.streams.GetSnapshot(ctx, req) //nolint:wrapcheck // as RedeemPairing
 }
 
+// RequestResync starts a full sync a peer asks for (FED-04); without a
+// delivery engine it keeps the 501 stub.
+func (s peerService) RequestResync(
+	ctx context.Context,
+	req peergen.RequestResyncRequestObject,
+) (peergen.RequestResyncResponseObject, error) {
+	if s.streams.Streams == nil {
+		return s.UnimplementedStrict.RequestResync(ctx, req) //nolint:wrapcheck // the generated 501
+	}
+	return s.streams.RequestResync(ctx, req) //nolint:wrapcheck // as RedeemPairing
+}
+
 // GetBlob serves content a peer's stream refers to (PEER-04); without a
 // delivery engine it keeps the 501 stub.
 func (s peerService) GetBlob(

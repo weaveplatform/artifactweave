@@ -270,6 +270,14 @@ func testPeerCursors(t *testing.T, s Store) {
 		storekit.Get[outbox.PeerCursor](t)(ob.Cursor(ctx, peerID(1), "repo:a")),
 	)
 
+	storekit.Must(t, ob.DeleteCursor(ctx, peerID(1), "repo:b"))
+	storekit.Same(
+		t,
+		"Cursors after one is deleted",
+		[]outbox.PeerCursor{p1a},
+		storekit.Get[[]outbox.PeerCursor](t)(ob.Cursors(ctx, peerID(1))),
+	)
+	storekit.Must(t, ob.DeleteCursor(ctx, peerID(1), "repo:none"))
 	storekit.Must(t, ob.DeleteCursors(ctx, peerID(1)))
 	storekit.Same(
 		t,

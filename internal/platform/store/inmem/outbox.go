@@ -163,6 +163,13 @@ func (o outboxStore) DeleteCursors(ctx context.Context, peer string) error {
 	})
 }
 
+func (o outboxStore) DeleteCursor(ctx context.Context, peer, stream string) error {
+	return o.s.Do(ctx, func() error {
+		o.cursors().DeleteWhere(func(k peersPair, _ outbox.PeerCursor) bool { return k == peersPair{peer, stream} })
+		return nil
+	})
+}
+
 func (o outboxStore) Applied(
 	ctx context.Context,
 	origin, stream string,

@@ -47,3 +47,29 @@ func (f federatedItems) Delete(ctx context.Context, repoKey, path string, folder
 	}
 	return f.items.DeleteFederated(ctx, cfg, path, folder) //nolint:wrapcheck // the item service names the item
 }
+
+func (f federatedItems) Discard(ctx context.Context, repoKey, path string) error {
+	cfg, err := f.repository(ctx, repoKey)
+	if err != nil {
+		return err
+	}
+	return f.items.DiscardFederated(ctx, cfg, path) //nolint:wrapcheck // the item service names the item
+}
+
+func (f federatedItems) List(
+	ctx context.Context, repoKey, after string, limit int, properties bool,
+) ([]artifactsapi.ItemChange, error) {
+	cfg, err := f.repository(ctx, repoKey)
+	if err != nil {
+		return nil, err
+	}
+	return f.items.ListFederated(ctx, cfg, after, limit, properties) //nolint:wrapcheck // the item service names the list
+}
+
+func (f federatedItems) Holds(ctx context.Context, repoKey, sha256 string) (bool, error) {
+	cfg, err := f.repository(ctx, repoKey)
+	if err != nil {
+		return false, err
+	}
+	return f.items.HoldsFederated(ctx, cfg, sha256) //nolint:wrapcheck // the item service names the lookup
+}

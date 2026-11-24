@@ -72,7 +72,7 @@ func (st stampStore) Replace(ctx context.Context, prev *model.Stamp, next model.
 func (st stampStore) list(ctx context.Context, op, where string, args ...any) ([]model.ItemStamp, error) {
 	var out []model.ItemStamp
 	err := st.s.Rows(ctx, op,
-		"SELECT "+stampCols+" FROM federation_item_stamps WHERE "+where+" ORDER BY path", args,
+		"SELECT "+stampCols+" FROM federation_item_stamps WHERE "+where, args,
 		func(r *sql.Rows) error {
 			v, err := scanStamp(r)
 			out = append(out, v)
@@ -83,7 +83,7 @@ func (st stampStore) list(ctx context.Context, op, where string, args ...any) ([
 
 func (st stampStore) PendingOn(ctx context.Context, repoKey, sha256 string) ([]model.ItemStamp, error) {
 	return st.list(ctx, "list item stamps pending a blob",
-		"repo_key = ? AND sha256 = ? AND pending IS NOT NULL", repoKey, sha256)
+		"repo_key = ? AND sha256 = ? AND pending IS NOT NULL ORDER BY path", repoKey, sha256)
 }
 
 func (st stampStore) Holds(ctx context.Context, repoKey, sha256 string) (bool, error) {
@@ -101,5 +101,24 @@ func (st stampStore) PruneTombstones(ctx context.Context, before outbox.HLC) (in
 
 func (st stampStore) Clear(ctx context.Context, repoKey string) error {
 	_, err := st.s.Exec(ctx, "clear item stamps", "DELETE FROM federation_item_stamps WHERE repo_key = ?", repoKey)
+	return err
+}
+
+func (st stampStore) List(ctx context.Context, repoKey, after string, limit int) ([]model.ItemStamp, error) {
+	// path is COLLATE "C" on PostgreSQL (0015), so this order is the items'
+	// full path order, byte by byte, as SQLite's is.
+	return st.list(ctx, "list item stamps", "repo_key = ? AND path > ? ORDER BY path LIMIT ?", repoKey, after, limit)
+}
+
+// Remove deletes the record at path and, with below, those of the paths
+// from "<path>/" up to, not including, "<path>0": '0' follows '/', so the
+// range is exactly what lies under the folder.
+func (st stampStore) Remove(ctx context.Context, repoKey, path string, below bool) error {
+	q, args := "DELETE FROM federation_item_stamps WHERE repo_key = ? AND (path = ?", []any{repoKey, path}
+	if below {
+		q += " OR path > ? AND path < ?"
+		args = append(args, path+"/", path+"0")
+	}
+	_, err := st.s.Exec(ctx, "remove item stamp", q+")", args...)
 	return err
 }

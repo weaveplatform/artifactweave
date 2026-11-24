@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"maps"
 	"net/http"
 	"slices"
@@ -20,6 +21,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
+	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 	platforminmem "github.com/weaveplatform/artifactweave/internal/platform/store/inmem"
 	"github.com/weaveplatform/artifactweave/internal/platform/tx/memtx"
 	"github.com/weaveplatform/artifactweave/internal/platform/work"
@@ -41,8 +43,9 @@ type store struct {
 	platform *platforminmem.Store
 }
 
-func (s store) Configs() configdoc.ConfigStore { return s.platform.Configs() }
-func (s store) WorkQueue() work.WorkQueue      { return s.platform.WorkQueue() }
+func (s store) Configs() configdoc.ConfigStore   { return s.platform.Configs() }
+func (s store) WorkQueue() work.WorkQueue        { return s.platform.WorkQueue() }
+func (s store) Settings() settings.SettingsStore { return s.platform.Settings() }
 
 func newStore(t *testing.T) store {
 	t.Helper()
@@ -385,6 +388,13 @@ type remote struct {
 	err  error
 	sent []string
 	cfg  map[string]any
+	// asked lists the full syncs asked for, as "<peer> <stream> <forced>".
+	asked []string
+}
+
+func (r *remote) RequestResync(_ context.Context, p model.Peer, stream string, forced bool) error {
+	r.asked = append(r.asked, fmt.Sprintf("%s %s %t", p.InstanceID, stream, forced))
+	return r.err
 }
 
 func (r *remote) PutConfiguration(_ context.Context, p model.Peer, key, stream string, cfg map[string]any) error {
@@ -452,6 +462,11 @@ func TestUnitSenderSend(t *testing.T) {
 	rem.err = federated.ErrUnavailable
 	if err := send.Send(t.Context(), item("b/fed")); !errors.Is(err, work.ErrUnsettled) || errors.Is(err, work.ErrPermanent) {
 		t.Fatalf("unavailable: %v", err)
+	}
+	// A member's own failure is retried, not parked as a refusal.
+	rem.err = &federated.RemoteRefusal{Status: http.StatusServiceUnavailable, Message: "busy"}
+	if err := send.Send(t.Context(), item("b/fed")); !errors.Is(err, work.ErrUnsettled) || errors.Is(err, work.ErrPermanent) {
+		t.Fatalf("member failure: %v", err)
 	}
 	repos.getErr = kernel.ErrStore
 	if err := send.Send(t.Context(), item("b/fed")); !errors.Is(err, kernel.ErrStore) {

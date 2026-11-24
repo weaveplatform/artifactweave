@@ -25,9 +25,9 @@
 //     full sync.
 //   - Remote: the signed peer client's push, pull, snapshot and blob fetch
 //     (adapters/peer); blob.Store for content; the work queue.
-//   - Batches, pull, snapshot and blob requests from verified peers,
-//     through the peer API's handlers (adapters/peer), and FED-04's
-//     operator requests through FullSync.
+//   - Batches, pull, snapshot, resync and blob requests from verified
+//     peers, through the peer API's handlers (adapters/peer), and FED-04's
+//     operator requests through FullSync, QueueRecovery and Forget.
 //   - Retention, the window after which entries are pruned even if not
 //     acknowledged (federation.outbox_retention, seven days by default), and
 //     Priority, FED-04's dispatch order.
@@ -37,15 +37,18 @@
 //   - Append, which a producer calls in its change's transaction: the entry
 //     with its sequence and clock time, and the dispatchers it starts.
 //   - Dispatch (SendKind), PullFrom (PullKind), RetryFetch (FetchKind),
-//     Sweep (SweepKind), Prune (PruneKind) and Resync (FullSyncKind) on the
-//     durable work queue, registered by Register.
+//     Sweep (SweepKind), Prune (PruneKind), Resync (FullSyncKind) and
+//     Recover (RecoverKind) on the durable work queue, registered by
+//     Register. A stream of higher Priority queues its dispatchers and
+//     pulls PriorityLead earlier, so they are leased first.
 //   - Receive, Events, Snapshot and Blob for the peer API's POST and GET
 //     streams/{stream}/events, GET streams/{stream}/snapshot and GET
 //     blobs/{sha256}, with ErrNoStream (404), ErrRefused (403),
 //     ErrNoSnapshot (404), *ConflictError (409), ErrGone (410), ErrBusy
 //     (503) and kernel.ErrInvalid (400).
-//   - FullSync, FED-04's fullSync and forceFullSync, and the full-sync runs
-//     it records in full_sync_runs with their status.
+//   - FullSync, run on the member a sender's fullSync or forceFullSync
+//     asks through POST streams/{stream}/resync, and the full-sync runs it
+//     records in full_sync_runs with their status.
 //   - Acknowledged cursors (FED-05 reads lag from them) and failed binaries
 //     (FED-06 lists and replays them through RetryFetch).
 //
@@ -99,8 +102,7 @@
 // # Status
 //
 // Implemented P13 (PEER-04, PEER-05); Pauser, Observe and Wake for the
-// repository stream (FED-02). The repository stream's snapshot items are
-// FED-04's.
+// repository stream (FED-02); recovery, Forget and priority (FED-04).
 //
 // # Testing
 //

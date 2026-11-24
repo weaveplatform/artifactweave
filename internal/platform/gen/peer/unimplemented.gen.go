@@ -42,6 +42,10 @@ func (UnimplementedStrict) PushEvents(context.Context, PushEventsRequestObject) 
 	return nil, apierror.ErrNotImplemented
 }
 
+func (UnimplementedStrict) RequestResync(context.Context, RequestResyncRequestObject) (RequestResyncResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
 func (UnimplementedStrict) GetSnapshot(context.Context, GetSnapshotRequestObject) (GetSnapshotResponseObject, error) {
 	return nil, apierror.ErrNotImplemented
 }

@@ -559,6 +559,7 @@ var Table = []Operation{
 	{Service: "peer", Method: "GET", Pattern: "/artifactweave/peer/v1/status", OperationID: "getPeerStatus", Cost: "ordinary", Idempotency: "safe"},
 	{Service: "peer", Method: "GET", Pattern: "/artifactweave/peer/v1/streams/{stream}/events", OperationID: "pullEvents", Cost: "ordinary", Idempotency: "natural", Pagination: "cursor"},
 	{Service: "peer", Method: "POST", Pattern: "/artifactweave/peer/v1/streams/{stream}/events", OperationID: "pushEvents", Cost: "ordinary", Idempotency: "natural"},
+	{Service: "peer", Method: "POST", Pattern: "/artifactweave/peer/v1/streams/{stream}/resync", OperationID: "requestResync", Cost: "expensive", Idempotency: "natural"},
 	{Service: "peer", Method: "GET", Pattern: "/artifactweave/peer/v1/streams/{stream}/snapshot", OperationID: "getSnapshot", Cost: "ordinary", Idempotency: "safe", Pagination: "cursor"},
 	{Service: "distribution", Method: "POST", Pattern: "/distribution/api/release/import", OperationID: "importReleaseBundleV1Version", Cost: "expensive", Idempotency: "natural"},
 	{Service: "distribution", Method: "GET", Pattern: "/distribution/api/v1/distribution/edge_nodes", OperationID: "getDistributionEdgeNodes", Cost: "ordinary", Idempotency: "safe", Pagination: "complete"},

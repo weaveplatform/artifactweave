@@ -186,6 +186,11 @@ func (o outboxStore) DeleteCursors(ctx context.Context, peer string) error {
 	return err
 }
 
+func (o outboxStore) DeleteCursor(ctx context.Context, peer, stream string) error {
+	_, err := o.s.Exec(ctx, "delete peer cursor", "DELETE FROM peer_cursors WHERE peer = ? AND stream = ?", peer, stream)
+	return err
+}
+
 func (o outboxStore) Applied(
 	ctx context.Context,
 	origin, stream string,

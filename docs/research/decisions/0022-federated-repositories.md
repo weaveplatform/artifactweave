@@ -10,7 +10,11 @@ member checks against paired peers, `federatedRepoUrlBase`, configSync over the
 peer API, `migrate`, `convertToLocal`, `replaceUrl` and `updateMemberUrl`. Change
 propagation is implemented (FED-02, [#1931](https://github.com/weaveplatform/artifactweave/issues/1931)):
 the `repo:<key>` stream kind (`internal/federation/core/federated`, `Stream`), its
-producer in the item service's transaction and its applier under the conflict rule. The
+producer in the item service's transaction and its applier under the conflict rule.
+Full sync and the member operations are implemented (FED-04,
+[#1932](https://github.com/weaveplatform/artifactweave/issues/1932)): the repository's
+snapshot and reconciler, `fullSync`, `forceFullSync`, `recovery`, `reconnect`,
+`removeMember`, `prioritization` and `propagateCreatedTime`. The
 rest of the decision below describes intended behavior that later P13 tasks
 implement; their generated API stubs and storage models do not implement it yet.
 A `receiver` member is refused until FED-03.
@@ -144,6 +148,46 @@ them against a live 7.x in P19):
 - `removeMember` removes a member everywhere; `prioritization` sets HIGH or STANDARD,
   which orders the scheduler's dispatch of outbox batches; `propagateCreatedTime` makes
   full sync carry original creation times instead of the receiver's.
+
+How FED-04 carries these out, where no 7.x source fixes the detail [I] (#216 compares
+them against a live 7.x in P19):
+
+- A full sync runs from the instance it is called on towards its members, as 7.x's full
+  sync runs from the sender (research 40 §6): the instance queues, per member, a request
+  that the member resynchronise from it (`POST /streams/{stream}/resync`, 0021), and the
+  member runs and records the run. `?mirror` takes a member's base URL or member URL;
+  one that names no member is 400. Both answer 200 with the documented object and
+  neither of its optional fields, which jfrog-client-go ignores.
+- The snapshot is the repository's files and folders in byte order of path, each under
+  the stamp of the change that left it so, and the tombstones still kept. A file no
+  change stamped, such as one stored before the repository was federated, is stamped
+  with its modification time and the sending instance, and its content may be fetched.
+  A normal run settles what both hold by the conflict rule and keeps what only the
+  member holds; a forced run discards that too, with everything below a discarded
+  folder. A tombstone pruned past the retention window is no longer in the snapshot,
+  so only a forced run removes the members' copies of an item deleted during a
+  partition longer than the window.
+- `propagateCreatedTime` is the sender's instance-wide setting: while it is off, a
+  snapshot carries no creation time, and the member gives an item a full sync creates
+  the time it arrives; an item it already holds keeps its own.
+- `recovery` queues, per repository in scope, a retry of delivery to each member whose
+  last push failed, or to every member and from every member pulled from with
+  `force=true`, run at once from the work queue; delivery resumes from each member's
+  acknowledged cursor, so nothing applies twice. `reconnect` is `recovery` with
+  `force` for every federated repository, as the peer client holds no session to
+  re-establish, and answers `true`. Both, `removeMember`, `prioritization` and
+  `propagateCreatedTime` answer messages of artifactweave's own wording.
+- `removeMember` takes a base URL or member URL as its body, removes that member from
+  every federated repository on the instance and sends each changed configuration to
+  the remaining members. Every instance that drops a member forgets its cursor and any
+  full sync with it on the repository's stream. The removed instance is not contacted:
+  it keeps its copies and its configuration, and its events are refused as a
+  non-member's.
+- `prioritization` keeps at most ten HIGH repositories, in an instance setting; a HIGH
+  repository's dispatchers and pulls are queued an hour ahead of now, so under
+  contention they go before every STANDARD repository's queued within that hour.
+- A receiver member added by FED-03 is sent a full sync through the same request
+  (`Membership.QueueFullSync`).
 - Status endpoints are computed from the outbox cursors, the peer records and the failed
   binary tasks: `SYNCING` when every member's cursor is within the lag threshold,
   `OUT_OF_SYNC` when one is behind, `FULL_SYNC_RUNNING` during a snapshot, `DISABLED`
@@ -162,9 +206,11 @@ is complete. `GET federation/rtfs` answers `true`, `GET federation/migration/sta
 answers `MIGRATION_COMPLETED`, and the migration tool's writes answer every caller 400 with
 7.x's message for a caller that is not the tool. The internal calls between Artifactory,
 RTFS, HA nodes and the tool answer 404, as the peer protocol carries what they carry.
-`fullSync?isDry` is refused with 400, as RTFS's comparison files have no public format.
+`fullSync?isDry` is refused with 400, as RTFS's comparison files have no public format,
+and `compareResult` answers 404, as no comparison file exists (FED-04,
+[DV-206 and DV-207](../../implementation/deviations.md#api-behaviour)).
 [Research 40 §7](../40-federated-repositories-7x.md#7-federation-endpoints-and-how-artifactweave-answers-them)
-classifies every path, and FED-05 registers the deviations.
+classifies every path, and FED-05 registers the other deviations.
 
 **Package types.** Federation is available for every package type artifactweave
 implements as a local repository, except `terraformbackend`: 7.161.26 excludes it

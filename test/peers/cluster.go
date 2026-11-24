@@ -71,6 +71,11 @@ type Options struct {
 	Instances int
 	// Driver is SQLite (the default) or Postgres.
 	Driver Driver
+	// Retention is each instance's federation.outbox_retention; zero
+	// keeps the default of seven days. A scenario that partitions a member
+	// past the window sets the minimum, a minute, and the instance then
+	// prunes every ten seconds.
+	Retention time.Duration
 }
 
 // Cluster is a set of artifactweave instances, each in its own OS process
@@ -142,6 +147,9 @@ func Start(t *testing.T, opts Options) *Cluster {
 			// They serve once the instances have their final addresses.
 			ingress: listenRelay(t),
 			egress:  listenRelay(t),
+		}
+		if opts.Retention > 0 {
+			in.federation = map[string]string{"outbox_retention": opts.Retention.String()}
 		}
 		in.URL = "http://" + in.ingress.addr
 		c.ingresses[in.ingress.addr] = i
@@ -400,12 +408,14 @@ type Instance struct {
 	via             *http.Client
 	// masterKey survives a retried start, which reopens the same database.
 	masterKey string
-	addr      string
-	logPath   string
-	stdin     io.WriteCloser
-	done      chan struct{}
-	exit      error
-	kill      func()
+	// federation is the configuration's federation section, if any.
+	federation map[string]string
+	addr       string
+	logPath    string
+	stdin      io.WriteCloser
+	done       chan struct{}
+	exit       error
+	kill       func()
 }
 
 // Do sends a request to the instance as its administrator and returns the
@@ -515,6 +525,8 @@ type instanceConfig struct {
 	Bootstrap map[string]string `yaml:"bootstrap"`
 	Log       map[string]string `yaml:"log"`
 	Remote    map[string]any    `yaml:"remote"`
+	// Federation is set only when Options.Retention is.
+	Federation map[string]string `yaml:"federation,omitempty"`
 }
 
 func (in *Instance) start(origins []string) error {
@@ -541,11 +553,12 @@ func (in *Instance) startOnce(origins []string) error {
 	}
 	data, err := yaml.Marshal(instanceConfig{
 		Listen: addr, BaseURL: in.URL, DataDir: in.DataDir,
-		MasterKey: in.masterKey,
-		Database:  database,
-		Bootstrap: map[string]string{"admin_password": in.AdminPassword},
-		Log:       map[string]string{"level": "debug", "format": "text"},
-		Remote:    map[string]any{"allowed_private_origins": origins},
+		MasterKey:  in.masterKey,
+		Database:   database,
+		Bootstrap:  map[string]string{"admin_password": in.AdminPassword},
+		Log:        map[string]string{"level": "debug", "format": "text"},
+		Remote:     map[string]any{"allowed_private_origins": origins},
+		Federation: in.federation,
 	})
 	if err != nil {
 		return err

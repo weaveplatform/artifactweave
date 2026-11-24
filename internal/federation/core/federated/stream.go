@@ -16,6 +16,7 @@ import (
 	streamsync "github.com/weaveplatform/artifactweave/internal/federation/core/sync"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/outbox"
+	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 )
 
 // The event types of a repo:<key> stream (decision 0022, What
@@ -55,6 +56,7 @@ type StreamStore interface {
 	Peers() port.PeerStore
 	Federation() port.FederationStore
 	Stamps() port.ItemStampStore
+	Settings() settings.SettingsStore
 }
 
 // Stream is the repo:<key> stream kind (decision 0022): which members
@@ -76,6 +78,9 @@ type Stream struct {
 	// (Membership.SelfBase).
 	SelfBase func(ctx context.Context) (string, error)
 	Log      *slog.Logger
+	// Now dates the items a full sync creates without their original
+	// creation time; nil is time.Now.
+	Now func() time.Time
 }
 
 var (
@@ -191,13 +196,25 @@ func (s Stream) selfDisabled(ctx context.Context, k string) (bool, error) {
 }
 
 // References reports whether an item of the stream's repository holds
-// the content here, so its members may fetch it.
+// the content here, so its members may fetch it: one a change of the
+// stream wrote, or one a full sync's snapshot lists although no change
+// stamped it, such as a file stored before the repository was federated.
 func (s Stream) References(ctx context.Context, stream, sha256 string) (bool, error) {
 	k, ok := key(stream)
 	if !ok {
 		return false, nil
 	}
 	held, err := s.Store.Stamps().Holds(ctx, k, sha256)
+	if err != nil {
+		return false, fmt.Errorf("content of %s: %w", k, err)
+	}
+	if held {
+		return true, nil
+	}
+	held, err = s.Items.Holds(ctx, k, sha256)
+	if errors.Is(err, kernel.ErrNotFound) {
+		return false, nil
+	}
 	if err != nil {
 		return false, fmt.Errorf("content of %s: %w", k, err)
 	}

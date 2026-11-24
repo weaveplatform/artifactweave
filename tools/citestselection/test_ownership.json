@@ -425,6 +425,7 @@
       "push_scope_edges_test.go",
       "push_test.go",
       "replication_test.go",
+      "repo_fullsync_test.go",
       "repo_stream_test.go",
       "streams_resync_test.go",
       "streams_test.go"

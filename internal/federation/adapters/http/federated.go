@@ -21,6 +21,13 @@ type FederatedOperations interface {
 	Migrate(ctx context.Context, key string) error
 	ConvertToLocal(ctx context.Context, keys []string) ([]string, map[string]string, error)
 	ReplaceURL(ctx context.Context, oldBase, newBase string) error
+	FullSync(ctx context.Context, key, mirror string, forced bool) error
+	Recovery(ctx context.Context, key string, force bool) error
+	Reconnect(ctx context.Context) error
+	RemoveMember(ctx context.Context, raw string) (int, error)
+	Prioritize(ctx context.Context, key, level string) error
+	SetPropagateCreatedTime(ctx context.Context, enabled bool) error
+	Administrator(ctx context.Context) error
 }
 
 // Answers of the federated repository operations. configSync's and the URL
@@ -32,6 +39,20 @@ const (
 	msgConfigSync = "Configuration sync executed successfully"
 	msgMigrated   = "Repository '%s' was converted to a federated repository"
 	msgConverted  = "Converted to local repositories: %s"
+)
+
+// FED-04's answers. reconnect's `true` is research 40 §7's; the others'
+// bodies are closed source and no client reads them, so their wording is
+// artifactweave's [I]. fullSync's 200 is the documented object with
+// neither of its optional fields: no message is known, and resultPaths
+// names comparison files, which only the refused isDry writes.
+const (
+	msgRecoveryAll    = "Recovery started for every federated repository"
+	msgRecoveryOne    = "Recovery started for repository '%s'"
+	msgReconnected    = "true"
+	msgMemberRemoved  = "Member '%s' was removed from %d federated repositories"
+	msgPrioritized    = "Repository '%s' priority is %s"
+	msgIsDryDeviation = "isDry is not supported: artifactweave runs no full-sync comparison"
 )
 
 // FederatedAPI serves configSync, migrate, convertToLocal, replaceUrl and
@@ -57,6 +78,8 @@ func federatedError(ctx context.Context, key string, err error) error {
 	switch {
 	case errors.As(err, &refusal):
 		return apierror.New(http.StatusBadRequest, refusal.Message)
+	case errors.Is(err, federated.ErrNoStreams):
+		return apierror.ErrNotImplemented
 	case errors.Is(err, federated.ErrNoRepository):
 		return apierror.New(http.StatusNotFound, fmt.Sprintf("Repository '%s' does not exist", key))
 	case errors.As(err, &response),
@@ -178,4 +201,145 @@ func (a FederatedAPI) replace(ctx context.Context, body *artgen.FederatedReplace
 		return "", federatedError(ctx, "", err)
 	}
 	return fmt.Sprintf(federated.MsgReplaceURL, body.OldBaseUrl, body.NewBaseUrl), nil
+}
+
+// FederatedRepositoryFullSync runs a full sync with every member, or the
+// one ?mirror names (POST federation/fullSync/{repoKey}). ?isDry=true is a
+// registered deviation: 400 naming the parameter, as the comparison report
+// it would write is RTFS's format.
+func (a FederatedAPI) FederatedRepositoryFullSync(
+	ctx context.Context,
+	req artgen.FederatedRepositoryFullSyncRequestObject,
+) (artgen.FederatedRepositoryFullSyncResponseObject, error) {
+	ops, err := a.ops()
+	if err != nil {
+		return nil, err
+	}
+	if req.Params.IsDry != nil && *req.Params.IsDry {
+		// After the administrator check, so the parameter tells no one else
+		// anything.
+		if err := ops.Administrator(ctx); err != nil {
+			return nil, federatedError(ctx, req.RepoKey, err)
+		}
+		return nil, apierror.New(http.StatusBadRequest, msgIsDryDeviation)
+	}
+	if err := ops.FullSync(ctx, req.RepoKey, deref(req.Params.Mirror), false); err != nil {
+		return nil, federatedError(ctx, req.RepoKey, err)
+	}
+	return artgen.FederatedRepositoryFullSync200JSONResponse{}, nil
+}
+
+// FederatedRepositoryForceFullSync replaces every member's copy, or the
+// one ?mirror names, with this instance's (POST
+// federation/forceFullSync/{repoKey}).
+func (a FederatedAPI) FederatedRepositoryForceFullSync(
+	ctx context.Context,
+	req artgen.FederatedRepositoryForceFullSyncRequestObject,
+) (artgen.FederatedRepositoryForceFullSyncResponseObject, error) {
+	ops, err := a.ops()
+	if err != nil {
+		return nil, err
+	}
+	if err := ops.FullSync(ctx, req.RepoKey, deref(req.Params.Mirror), true); err != nil {
+		return nil, federatedError(ctx, req.RepoKey, err)
+	}
+	return artgen.FederatedRepositoryForceFullSync200JSONResponse{}, nil
+}
+
+// FederationRecovery retries at once the delivery that is backing off, for
+// one repository or every federated one (POST federation/recovery).
+func (a FederatedAPI) FederationRecovery(
+	ctx context.Context,
+	req artgen.FederationRecoveryRequestObject,
+) (artgen.FederationRecoveryResponseObject, error) {
+	ops, err := a.ops()
+	if err != nil {
+		return nil, err
+	}
+	key, force := deref(req.Params.RepoKey), req.Params.Force != nil && *req.Params.Force
+	if err := ops.Recovery(ctx, key, force); err != nil {
+		return nil, federatedError(ctx, key, err)
+	}
+	if key == "" {
+		return artgen.FederationRecovery200JSONResponse(msgRecoveryAll), nil
+	}
+	return artgen.FederationRecovery200JSONResponse(fmt.Sprintf(msgRecoveryOne, key)), nil
+}
+
+// ReconnectToFederationClient re-establishes delivery to every member
+// (POST federation/reconnect).
+func (a FederatedAPI) ReconnectToFederationClient(
+	ctx context.Context,
+	_ artgen.ReconnectToFederationClientRequestObject,
+) (artgen.ReconnectToFederationClientResponseObject, error) {
+	ops, err := a.ops()
+	if err != nil {
+		return nil, err
+	}
+	if err := ops.Reconnect(ctx); err != nil {
+		return nil, federatedError(ctx, "", err)
+	}
+	return artgen.ReconnectToFederationClient200TextResponse(msgReconnected), nil
+}
+
+// RemoveFederationMember removes the member the body names, by its base
+// URL or member URL, from every federated repository (POST
+// federation/removeMember).
+func (a FederatedAPI) RemoveFederationMember(
+	ctx context.Context,
+	req artgen.RemoveFederationMemberRequestObject,
+) (artgen.RemoveFederationMemberResponseObject, error) {
+	ops, err := a.ops()
+	if err != nil {
+		return nil, err
+	}
+	raw := strings.TrimSpace(deref(req.Body))
+	n, err := ops.RemoveMember(ctx, raw)
+	if err != nil {
+		return nil, federatedError(ctx, "", err)
+	}
+	return artgen.RemoveFederationMember200JSONResponse(fmt.Sprintf(msgMemberRemoved, raw, n)), nil
+}
+
+// PrioritizeFederatedRepository sets a repository's dispatch priority
+// (PUT federation/prioritization/{repoKey}).
+func (a FederatedAPI) PrioritizeFederatedRepository(
+	ctx context.Context,
+	req artgen.PrioritizeFederatedRepositoryRequestObject,
+) (artgen.PrioritizeFederatedRepositoryResponseObject, error) {
+	ops, err := a.ops()
+	if err != nil {
+		return nil, err
+	}
+	level := string(req.Params.PriorityLevel)
+	if err := ops.Prioritize(ctx, req.RepoKey, level); err != nil {
+		return nil, federatedError(ctx, req.RepoKey, err)
+	}
+	return artgen.PrioritizeFederatedRepository200TextResponse(
+		fmt.Sprintf(msgPrioritized, req.RepoKey, strings.ToUpper(level))), nil
+}
+
+// PropagateCreationTimeMetadataDuringFullSync stores whether full sync
+// carries original creation times (PUT federation/propagateCreatedTime).
+// The 200 object's fields are closed source; it echoes the setting [I].
+func (a FederatedAPI) PropagateCreationTimeMetadataDuringFullSync(
+	ctx context.Context,
+	req artgen.PropagateCreationTimeMetadataDuringFullSyncRequestObject,
+) (artgen.PropagateCreationTimeMetadataDuringFullSyncResponseObject, error) {
+	ops, err := a.ops()
+	if err != nil {
+		return nil, err
+	}
+	if err := ops.SetPropagateCreatedTime(ctx, req.Params.Enabled); err != nil {
+		return nil, federatedError(ctx, "", err)
+	}
+	return artgen.PropagateCreationTimeMetadataDuringFullSync200JSONResponse{"enabled": req.Params.Enabled}, nil
+}
+
+func deref[T any](p *T) T {
+	var zero T
+	if p == nil {
+		return zero
+	}
+	return *p
 }

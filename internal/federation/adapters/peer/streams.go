@@ -26,6 +26,7 @@ type StreamService interface {
 	Events(ctx context.Context, caller model.Peer, stream string, after int64, limit int) (streamsync.Page, error)
 	Snapshot(ctx context.Context, caller model.Peer, stream, cursor string, limit int) (streamsync.SnapshotPage, error)
 	Blob(ctx context.Context, caller model.Peer, sha256 string) (io.ReadSeekCloser, blob.Info, error)
+	FullSync(ctx context.Context, peerID, stream string, forced bool) (model.FullSyncRun, error)
 }
 
 // StreamServer serves POST and GET /streams/{stream}/events, GET
@@ -154,6 +155,34 @@ func (s StreamServer) GetSnapshot(
 		out.NextCursor = &page.NextCursor
 	}
 	return out, nil
+}
+
+// RequestResync starts a full sync of the stream from the caller, as the
+// caller's operator asked of it: its fullSync or forceFullSync names this
+// instance among the members it syncs (FED-04).
+func (s StreamServer) RequestResync(
+	ctx context.Context,
+	req peergen.RequestResyncRequestObject,
+) (peergen.RequestResyncResponseObject, error) {
+	caller, ok := corepeer.Caller(ctx)
+	if !ok {
+		return nil, apierror.New(http.StatusUnauthorized, notSigned)
+	}
+	if req.Body == nil {
+		return nil, apierror.New(http.StatusBadRequest, "The body is required")
+	}
+	_, err := s.Streams.FullSync(ctx, caller.InstanceID, req.Stream, req.Body.Forced)
+	switch {
+	case errors.Is(err, streamsync.ErrNoSnapshot):
+		return nil, apierror.New(http.StatusNotFound, "This instance takes no snapshots of the stream")
+	case errors.Is(err, kernel.ErrNotFound):
+		// The caller verified but its record went since: it exchanges
+		// nothing with this instance.
+		return nil, streamError(streamsync.ErrNoStream)
+	case err != nil:
+		return nil, streamError(err)
+	}
+	return peergen.RequestResync204Response{}, nil
 }
 
 // snapshotEntryOf writes a snapshot entry as the wire's.

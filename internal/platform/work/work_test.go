@@ -600,3 +600,47 @@ func TestUnitMeterName(t *testing.T) {
 		}
 	}
 }
+
+// An item enqueued ahead is leased before one enqueued earlier without a
+// lead, and a pending item keeps its schedule.
+func TestUnitEnqueueAhead(t *testing.T) {
+	w := newWorld(t, work.Options{Workers: 1})
+	w.enqueue("standard")
+	if err := w.st.Tx(context.Background(), func(ctx context.Context) error {
+		return w.q.EnqueueAhead(ctx, kind, "high", nil, time.Hour)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	std, err := w.item("standard")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.q.EnqueueAhead(context.Background(), kind, "standard", nil, time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	if again, err := w.item("standard"); err != nil || !again.NotBefore.Equal(std.NotBefore) {
+		t.Fatalf("a pending item moved: %v, %v", again.NotBefore, err)
+	}
+	var (
+		mu   sync.Mutex
+		seen []string
+	)
+	if err := w.q.Handle(kind, func(_ context.Context, it work.WorkItem) error {
+		mu.Lock()
+		defer mu.Unlock()
+		seen = append(seen, it.Key)
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	w.run()
+	w.waitIdle()
+	mu.Lock()
+	defer mu.Unlock()
+	if strings.Join(seen, ",") != "high,standard" {
+		t.Fatalf("handled %v, want high first", seen)
+	}
+	if err := w.q.EnqueueAhead(context.Background(), kind, "", nil, time.Hour); !errors.Is(err, kernel.ErrInvalid) {
+		t.Fatalf("an empty key: %v", err)
+	}
+}

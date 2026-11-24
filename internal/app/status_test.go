@@ -391,6 +391,7 @@ func newStatusFixture(
 	for _, f := range tune {
 		f(&cfg)
 	}
+	withStreams(t, &cfg, blobs)
 	return NewRouter(cfg), secrets
 }
 

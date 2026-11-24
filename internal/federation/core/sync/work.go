@@ -53,10 +53,16 @@ func (i item) key() string {
 	return i.Peer + " " + i.Stream
 }
 
-// enqueue asks for kind's work on i, in the caller's transaction.
+// enqueue asks for kind's work on i, in the caller's transaction. A
+// stream's dispatchers and pulls go ahead of others' by its priority
+// (lead).
 func (e *Engine) enqueue(ctx context.Context, kind string, i item) error {
 	payload, _ := json.Marshal(i) //nolint:errchkjson // strings only
-	if err := e.Queue.Enqueue(ctx, kind, i.key(), payload); err != nil {
+	var lead time.Duration
+	if kind == SendKind || kind == PullKind {
+		lead = e.lead(ctx, i.Stream)
+	}
+	if err := e.Queue.EnqueueAhead(ctx, kind, i.key(), payload, lead); err != nil {
 		return fmt.Errorf("queue %s: %w", kind, err)
 	}
 	return nil
@@ -81,6 +87,15 @@ func (e *Engine) Register(ctx context.Context, q *work.Queue, items work.WorkQue
 			return e.Resync(ctx, i.Peer, i.Stream)
 		},
 	}
+	if err := q.Handle(RecoverKind, func(ctx context.Context, it work.WorkItem) error {
+		var r recovery
+		if err := json.Unmarshal(it.Payload, &r); err != nil || r.Stream == "" {
+			return fmt.Errorf("%w: %s item %q has no stream", work.ErrPermanent, it.Kind, it.Key)
+		}
+		return e.Recover(ctx, r.Stream, r.Force)
+	}); err != nil {
+		return fmt.Errorf("register %s: %w", RecoverKind, err)
+	}
 	for _, kind := range []string{SendKind, PullKind, FetchKind, FullSyncKind} {
 		h := handlers[kind]
 		if err := q.Handle(kind, func(ctx context.Context, it work.WorkItem) error {
@@ -97,7 +112,7 @@ func (e *Engine) Register(ctx context.Context, q *work.Queue, items work.WorkQue
 		kind  string
 		every time.Duration
 		run   func(context.Context) error
-	}{{SweepKind, SweepInterval, e.Sweep}, {PruneKind, PruneInterval, e.Prune}}
+	}{{SweepKind, SweepInterval, e.Sweep}, {PruneKind, e.PruneEvery(), e.Prune}}
 	for _, p := range periodic {
 		again := func(ctx context.Context) error {
 			if err := items.Enqueue(ctx, p.kind, periodicKey, nil, e.now()); err != nil {

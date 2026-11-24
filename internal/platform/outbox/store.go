@@ -41,6 +41,9 @@ type OutboxStore interface {
 	// DeleteCursors removes every position of a peer; a peer with none is
 	// not an error.
 	DeleteCursors(ctx context.Context, peer string) error
+	// DeleteCursor removes a peer's position in one stream, when the peer
+	// stops exchanging it; none there is not an error.
+	DeleteCursor(ctx context.Context, peer, stream string) error
 
 	// Applied returns the receiver's position in a peer's stream; a zero
 	// LastSeq and no error when nothing was applied yet.

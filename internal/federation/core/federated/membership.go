@@ -14,6 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/federation/core/port"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
+	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 	"github.com/weaveplatform/artifactweave/internal/platform/tx"
 	"github.com/weaveplatform/artifactweave/internal/platform/work"
 )
@@ -40,6 +41,7 @@ type Store interface {
 	Stamps() port.ItemStampStore
 	Replications() port.ReplicationStore
 	Configs() configdoc.ConfigStore
+	Settings() settings.SettingsStore
 	WorkQueue() work.WorkQueue
 }
 
@@ -73,6 +75,13 @@ type Membership struct {
 	// this instance's own member enabled again, rather than at its next
 	// sweep.
 	Changed func(ctx context.Context, key string) error
+	// Dropped, when set, runs in the transaction for each peer that stops
+	// being a member of repository key, so the stream delivery engine
+	// forgets its cursor and any full sync with it on the repository's
+	// stream (streamsync.Engine.Forget): a removed member is gone from
+	// every member that hears of the change, not only from the stream's
+	// subscribers.
+	Dropped func(ctx context.Context, key, peer string) error
 }
 
 // SelfBase is this instance's own member base URL: federatedRepoUrlBase,
@@ -228,6 +237,9 @@ func (m Membership) Reconcile(ctx context.Context, c repo.Config, sync bool) err
 		if err := m.Store.Federation().SetMembers(ctx, c.Key, members); err != nil {
 			return fmt.Errorf("store federated repository members: %w", err)
 		}
+		if err := m.drop(ctx, c.Key, before, members); err != nil {
+			return err
+		}
 	}
 	if c.Class != repo.Federated {
 		// The stamps settle a federated repository's changes; a local one
@@ -248,6 +260,22 @@ func (m Membership) Reconcile(ctx context.Context, c repo.Config, sync bool) err
 	return m.Enqueue(ctx, c.Key, members)
 }
 
+// drop runs Dropped for each peer of before that after does not list.
+func (m Membership) drop(ctx context.Context, key string, before, after []model.FederationMember) error {
+	if m.Dropped == nil {
+		return nil
+	}
+	for _, b := range before {
+		if slices.ContainsFunc(after, func(a model.FederationMember) bool { return a.PeerInstanceID == b.PeerInstanceID }) {
+			continue
+		}
+		if err := m.Dropped(ctx, key, b.PeerInstanceID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func sameMembers(a, b []model.FederationMember) bool {
 	return slices.EqualFunc(a, b, func(x, y model.FederationMember) bool {
 		return x.PeerInstanceID == y.PeerInstanceID && x.BaseURL == y.BaseURL &&
@@ -258,8 +286,15 @@ func sameMembers(a, b []model.FederationMember) bool {
 // Clear drops a repository's members and its conflict-rule stamps, when
 // it is deleted, created anew or converted to a local repository.
 func (m Membership) Clear(ctx context.Context, key string) error {
+	before, err := m.Store.Federation().Members(ctx, key)
+	if err != nil {
+		return fmt.Errorf("federated repository members: %w", err)
+	}
 	if err := m.Store.Federation().SetMembers(ctx, key, nil); err != nil {
 		return fmt.Errorf("clear federated repository members: %w", err)
+	}
+	if err := m.drop(ctx, key, before, nil); err != nil {
+		return err
 	}
 	if err := m.Store.Stamps().Clear(ctx, key); err != nil {
 		return fmt.Errorf("clear federated repository stamps: %w", err)

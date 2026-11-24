@@ -184,6 +184,10 @@ func (e *Engine) self(ctx context.Context) (string, error) {
 	return id, nil
 }
 
+// Self is this instance's id, the origin of its own entries: what a kind
+// stamps an item with when no change of the stream has stamped it yet.
+func (e *Engine) Self(ctx context.Context) (string, error) { return e.self(ctx) }
+
 // tick is the clock time of a local change, never behind any time the
 // clock has given or seen (decision 0021, Conflict rule).
 func (e *Engine) tick() outbox.HLC {

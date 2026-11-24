@@ -1829,6 +1829,7 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 			p.tune(&cfg)
 		}
 	}
+	withStreams(t, &cfg, blobs)
 	f.h = NewRouter(cfg)
 	f.secrets = secrets
 	return f

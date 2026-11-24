@@ -9,6 +9,7 @@ import (
 	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/model"
+	streamsync "github.com/weaveplatform/artifactweave/internal/federation/core/sync"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
@@ -27,6 +28,17 @@ type Operations struct {
 	// Authorize refuses a caller who is not currently an administrator, as
 	// 7.161.26's FederatedRepoResource allows ROLE_ADMIN only.
 	Authorize func(ctx context.Context) error
+	// Streams is the stream delivery engine, nil until the runtime opens
+	// it: full sync, recovery and member removal answer ErrNoStreams
+	// without it. A func, since the module hands out operations before the
+	// runtime builds the engine.
+	Streams func() *streamsync.Engine
+}
+
+// Administrator refuses a caller who may not run the operations, as each
+// operation does first.
+func (o Operations) Administrator(ctx context.Context) error {
+	return o.Authorize(ctx)
 }
 
 func (o Operations) tx(ctx context.Context, fn func(context.Context) error) error {

@@ -22,8 +22,10 @@ pruning that flags a peer left behind for a full sync. **Full sync** is implemen
 streams/{stream}/snapshot`, the receiver's fallback and `full_sync_runs`. FED-02
 ([#1931](https://github.com/weaveplatform/artifactweave/issues/1931)) registers
 `repo:<key>`, so a stream answers 404 unless it is a federated repository's and the
-caller one of its members. The
-other peer operations answer 501 until FED-01 and #1949 serve them.
+caller one of its members. FED-04
+([#1932](https://github.com/weaveplatform/artifactweave/issues/1932)) adds `POST
+streams/{stream}/resync`, through which a member's `fullSync` asks another to resynchronise
+from it. The other peer operations answer 501 until FED-01 and #1949 serve them.
 P37 owns cross-vendor synchronization and separate cold-instance contracts; P40 owns
 Mission Control/bridge/estate integration. [0042](0042-capability-scope-and-supersession.md)
 replaces permanent scope cuts; [research 10](../10-scope-and-tiers.md) records current
@@ -184,6 +186,7 @@ leaves it out. Its operations:
 | `POST /streams/{stream}/events` | Push `{origin, from_seq, events[]}`; 200 `{origin, stream, applied_seq}`, or 409 with `expected_seq`. |
 | `GET /streams/{stream}/events?after=&limit=` | Pull mode, paged by `after` (cursor class, next `next_after`). `after` also acknowledges, so the sender keeps a cursor for a peer that pulls; 410 once the range is pruned. |
 | `GET /streams/{stream}/snapshot?cursor=&limit=` | Full sync, paged by an opaque cursor, every page stating the snapshot's `sequence`; 410 when the snapshot is gone. |
+| `POST /streams/{stream}/resync` | Ask the receiver to start a full sync of the stream from the caller, `{forced}`; 204 once started, or when one is already running, which `forced` makes forced. The caller's operator ran `fullSync` or `forceFullSync` ([0022](0022-federated-repositories.md)). |
 | `GET /blobs/{sha256}` | Pull one blob. |
 | `PUT /repositories/{repoKey}` | configSync ([0022](0022-federated-repositories.md)): the member creates or updates its copy. |
 | `GET /status` | The signed liveness and version read behind a peer's status and clock skew. |
@@ -273,9 +276,11 @@ In normal mode the conflict rule decides each item, so the receiver keeps what i
 on its side; a forced run takes the snapshot's item and discards items the snapshot does
 not hold. After the last page the receiver's applied position becomes the snapshot's
 sequence and it pulls the entries after it until it has caught up; a 410 on the way
-takes a new snapshot. An operator starts a run through FED-04's `fullSync` and
-`forceFullSync` (`Engine.FullSync`); a forced request restarts a normal run that is
-under way, since the pages it applied kept what a forced run discards.
+takes a new snapshot. An operator starts runs through FED-04's `fullSync` and
+`forceFullSync` on the sender, which asks each member with `POST
+/streams/{stream}/resync` to start one from it (`Engine.FullSync` on the member); a
+forced request restarts a normal run that is under way, since the pages it applied kept
+what a forced run discards.
 
 **Conflict rule.** Where a stream accepts writes on more than one instance (federated
 repositories), each event carries its hybrid logical clock timestamp and origin. For the

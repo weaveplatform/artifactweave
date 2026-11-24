@@ -61,4 +61,18 @@ type FederatedItems interface {
 	// or the folder at path when nothing is left in it. Nothing at path is
 	// not an error.
 	Delete(ctx context.Context, repoKey, path string, folder bool) error
+	// Discard removes whatever is at path, a folder with everything below
+	// it, into the trash can when it is on: a forced full sync's removal of
+	// what the member it resynchronises from does not hold. Nothing at path
+	// is not an error.
+	Discard(ctx context.Context, repoKey, path string) error
+	// List returns up to limit of the repository's files and folders whose
+	// paths follow after in byte order, in that order, as their state
+	// stands: what a full sync's snapshot lists. properties false leaves
+	// Properties out, for a caller that compares only paths.
+	List(ctx context.Context, repoKey, after string, limit int, properties bool) ([]ItemChange, error)
+	// Holds reports whether a file of the repository has the content
+	// sha256, so a member resynchronising from this instance may fetch it,
+	// whether or not a change of the stream wrote the file.
+	Holds(ctx context.Context, repoKey, sha256 string) (bool, error)
 }
