@@ -397,8 +397,9 @@ Terraform federated scenario that reuses them (QUA-02):
   `ARTIFACTWEAVE_TEST_PROCESS_LOG_DIR` when it is set. When a scenario fails,
   its output carries the tail of each instance's log. `c.Close()` stops the
   instances, closes the ingresses and egresses and removes the container, and
-  `c.Leftovers` names any process, listening address or container that
-  survived it. `in.Identity(t)` reads a running instance's identity, its
+  `c.Leftovers` names any process, ingress or egress or container that
+  survived it, asking each owner rather than dialling ports another
+  scenario may already have reused. `in.Identity(t)` reads a running instance's identity, its
   private key included, from its database, so a scenario can require that no
   answer disclosed it. `in.Peer(t, id)` reads its record of a peer, status,
   last-seen time and clock skew included, and `in.SetPeerKey(t, id, key)`

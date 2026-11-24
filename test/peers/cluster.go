@@ -278,33 +278,32 @@ func (c *Cluster) Close() {
 }
 
 // Leftovers names what a closed cluster still holds: a running instance
-// process, an instance, ingress or egress address that accepts connections, or a
-// PostgreSQL container the engine still has. It is empty after Close.
+// process, an ingress or egress that still listens, or a PostgreSQL container
+// the engine still has. It is empty after Close.
+//
+// It asks each owner rather than dialling the addresses: a port is free for
+// anyone the moment its owner closes it, and on Linux the ports Docker
+// publishes and the ones parallel scenarios listen on come from the same
+// ephemeral range, so a dial that connects can reach another scenario's
+// instance or container. An exited process holds no socket, and a relay's
+// listener is closed before close returns.
 func (c *Cluster) Leftovers(ctx context.Context) []string {
 	var left []string
-	var addrs []string
 	for _, in := range c.Instances {
 		select {
 		case <-in.done:
 		default:
 			left = append(left, in.Name+" process is still running")
 		}
-		if in.addr != "" {
-			addrs = append(addrs, in.addr)
+		for _, r := range []*relay{in.ingress, in.egress} {
+			if r.listening() {
+				left = append(left, r.addr+" still accepts connections")
+			}
 		}
-		addrs = append(addrs, in.ingress.addr, in.egress.addr)
 	}
 	if c.postgres.ContainerID != "" {
 		if err := containertest.Removed(ctx, c.postgres.ContainerID); err != nil {
 			left = append(left, err.Error())
-		}
-	}
-	slices.Sort(addrs)
-	for _, addr := range addrs {
-		conn, err := (&net.Dialer{Timeout: time.Second}).DialContext(ctx, "tcp", addr)
-		if err == nil {
-			_ = conn.Close()
-			left = append(left, addr+" still accepts connections")
 		}
 	}
 	return left
