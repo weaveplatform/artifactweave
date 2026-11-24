@@ -1,0 +1,10 @@
+# oapi-codegen configuration for the generated peer Go client (make generate).
+package: peer
+output: pkg/client/peer/client.gen.go
+generate:
+  models: true
+  client: true
+output-options:
+  skip-prune: true
+  exclude-tags:
+    - handwritten

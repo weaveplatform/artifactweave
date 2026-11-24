@@ -46,7 +46,7 @@ header syntax stays at -11 until this record is amended for a later revision.
 
 ## Rules for every operation
 
-Every operation in the seven specs under `api/src` declares three classes:
+Every operation in the specs under `api/src` declares three classes:
 `x-idempotency`, `x-cost` and, when it returns a collection, `x-pagination`. A class
 describes how the operation answers now; a 501 stub declares the class it is meant
 to have once served, except where that would change how it is admitted today (see
@@ -547,7 +547,7 @@ follows the `components-*.yaml` fragments it behaves like.
 
 The bundler (`internal/devtools/openapibundle`, `make bundle`):
 
-- merges the file into each of the seven bundles as one more components fragment,
+- merges the file into each bundle as one more components fragment,
   under the existing rule that a second declaration of a component fails;
 - adds `'429'` referencing `TooManyRequests` and `'503'` referencing
   `ServiceUnavailable` to every operation whose `x-cost` is not `exempt` and that
@@ -831,7 +831,7 @@ These checks hold the rules for every operation:
   with the three headers. The acceptance job runs it on SQLite; it passes on
   PostgreSQL too when the binary's environment names that driver.
 
-The [operation ledger and source review](../api-reliability/README.md) cover all
-seven specs and native aliases. The [generated-client retry example](../api-reliability/retrying.md)
+The [operation ledger and source review](../api-reliability/README.md) cover every
+spec and the native aliases. The [generated-client retry example](../api-reliability/retrying.md)
 shows bounded recovery. Focused tests alone do not establish the phase or release
 gate; the PR retains the full CI result.

@@ -41,8 +41,10 @@
 // # Status
 //
 // Implemented P0 (the bundle pipeline and the embedding), P1 and P1b (the
-// in-scope surface of the seven services); every later phase to P9c added
-// its operations.
+// in-scope surface of the seven JFrog-facing services); every later phase to
+// P9c added its operations. P13 added the eighth, peer.openapi.yaml, the
+// peer API of decision 0021, which has no JFrog counterpart and which
+// TestAccSpecParity does not compare.
 //
 // # Testing
 //

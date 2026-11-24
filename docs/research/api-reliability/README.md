@@ -9,9 +9,10 @@ defaults, persistence, failure modes and administrative recovery contract.
 
 ## Operation ledger
 
-[operations.json](operations.json) joins **all seven bundled specifications** with
+[operations.json](operations.json) joins **all eight bundled specifications**, the
+seven JFrog-facing ones and the peer API ([0021](../decisions/0021-peer-trust-and-sync-protocol.md)), with
 the tested implementation map and every binding in the production chi router.
-It currently contains 1084 distinct method/path bindings: 643 specified operations
+It currently contains 1093 distinct method/path bindings: 652 specified operations
 and 441 additional handwritten aliases or dispatch bindings. A wildcard binding
 represents a protocol dispatcher, not a claim that every URL matching it works.
 Some aliases describe the same operation through different route patterns.
@@ -20,8 +21,8 @@ Each entry includes the operation ID, served contract, actual implementation
 state, handler, direct source calls where a generated operation has a concrete
 method, effect/retry classification, incoming cost policy, declared pagination
 controls, response collection locations, persistence review family and evidence.
-The 379 stub bindings are explicitly marked 501 with no business query or effect:
-363 generated operations, and 10 hand-written operations and 6 of their aliases
+The 300 stub bindings are explicitly marked 501 with no business query or effect:
+290 generated operations, and 6 hand-written operations and 4 of their aliases
 that the router mounts with `handwrittenStub`. Their schemas do not establish
 implementation. Partial entries retain unsupported modes and native dispatch
 limitations; neither repository CRUD nor a mounted wildcard proves full native
@@ -257,7 +258,7 @@ the current revisions; both are working-group documents not yet with the IESG.
 Neither has a revision after the ones decision 0043 cites.
 
 **List paging.** The reference pages' own OpenAPI definitions, for each list
-operation in the seven specs whose page documents paging. The class is the one
+operation in the seven JFrog-facing specs whose page documents paging. The class is the one
 decision 0043's [paging classes](../decisions/0043-api-reliability.md#paging-classes-and-the-next-pointer)
 give it.
 

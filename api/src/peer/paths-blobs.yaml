@@ -1,0 +1,52 @@
+paths:
+  /blobs/{sha256}:
+    get:
+      description: >-
+        Returns content this instance holds, for a peer applying an event or a snapshot entry that refers to it.
+        Only content that a stream the caller holds a use case for refers to is served. Not implemented; answers
+        501.
+      operationId: getBlob
+      parameters:
+        - name: sha256
+          in: path
+          required: true
+          description: Required path parameter. SHA-256 of the content, 64 lowercase hexadecimal digits.
+          schema:
+            type: string
+            pattern: '^[0-9a-f]{64}$'
+        - $ref: '#/components/parameters/PeerProtocol'
+        - $ref: '#/components/parameters/PeerDate'
+        - $ref: '#/components/parameters/PeerSignature'
+        - $ref: '#/components/parameters/PeerSignatureInput'
+      responses:
+        '200':
+          description: >-
+            The content, whose SHA-256 is the requested one; the signed answer's `Content-Digest` covers it and
+            `Content-Length` gives its size.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: sha256 is not 64 lowercase hexadecimal digits, or the protocol major version is not this instance's.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/PeerUnauthorized'
+        '404':
+          description: >-
+            This instance does not hold the content, or no stream the caller holds a use case for refers to it.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/PeerInternalError'
+      summary: Fetch a blob
+      tags:
+        - blobs
+      x-idempotency: safe
+      x-cost: ordinary

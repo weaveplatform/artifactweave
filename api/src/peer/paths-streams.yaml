@@ -1,0 +1,422 @@
+components:
+  parameters:
+    Stream:
+      description: >-
+        Required path parameter. The stream's name on the instance whose outbox it is: `repo:<repoKey>` for a
+        federated repository, `access` for Access Federation, `distribution:<trackerId>:<instanceId>` for one
+        distribution job. A stream this instance does not exchange with the caller answers 404.
+      in: path
+      name: stream
+      required: true
+      schema:
+        type: string
+    PageLimit:
+      description: >-
+        Optional query parameter. The most items one answer holds, 1 to 1000; 100 when absent. A value outside that
+        range answers 400.
+      in: query
+      name: limit
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 1000
+        default: 100
+  schemas:
+    Event:
+      type: object
+      description: >-
+        One outbox entry. Version 1.0; a later minor version may add fields, which the receiver ignores.
+      required: [seq, hlc, type]
+      properties:
+        seq:
+          type: integer
+          format: int64
+          minimum: 1
+          description: >-
+            Required within this object. The entry's sequence on the stream, assigned when the change committed on
+            the origin. Sequences in one batch or page are consecutive.
+        hlc:
+          type: string
+          pattern: '^[0-9a-f]{16}\.[0-9a-f]{8}$'
+          description: >-
+            Required within this object. The change's hybrid logical clock time: 16 lowercase hexadecimal digits of
+            Unix milliseconds, a dot and 8 of logical counter. For the same item the later time wins and the
+            higher origin instance id breaks a tie.
+        type:
+          type: string
+          description: >-
+            Required within this object. The event type, which names the payload's form. A receiver skips a type
+            it does not subscribe to, and the skipped event still counts as applied.
+        payload:
+          type: object
+          additionalProperties: true
+          description: Optional within this object. The change itself, in the form the event type defines.
+        blob:
+          allOf:
+            - $ref: '#/components/schemas/BlobReference'
+          description: >-
+            Optional within this object. Present on content events: the content the change refers to. A receiver
+            that does not hold it fetches it with GET /blobs/{sha256} from the origin before applying the event; a
+            failed fetch is recorded and retried, and the stream moves on.
+    EventBatch:
+      type: object
+      description: >-
+        Events pushed from the sender's outbox. Version 1.0; a later minor version may add fields, which the
+        receiver ignores.
+      required: [origin, from_seq, events]
+      properties:
+        origin:
+          type: string
+          description: >-
+            Required within this object. The `jfrt@<uuid>` id of the instance whose outbox holds the events. It is
+            the calling instance.
+        from_seq:
+          type: integer
+          format: int64
+          minimum: 1
+          description: >-
+            Required within this object. The sequence of the first event. It must be the sequence this instance
+            expects next from origin on the stream: one more than the highest applied, or 1 on a stream it has not
+            applied from.
+        events:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          description: >-
+            Required within this object. The events, in sequence from from_seq without a gap, at most 1000.
+          items:
+            $ref: '#/components/schemas/Event'
+    EventAck:
+      type: object
+      description: >-
+        What the receiver holds after a batch. Version 1.0; a later minor version may add fields, which the sender
+        ignores.
+      required: [origin, stream, applied_seq]
+      properties:
+        origin:
+          type: string
+          description: Required within this object. The batch's origin.
+        stream:
+          type: string
+          description: Required within this object. The stream the batch was pushed to.
+        applied_seq:
+          type: integer
+          format: int64
+          minimum: 0
+          description: >-
+            Required within this object. The highest sequence from origin on the stream that this instance has
+            applied and committed. The sender stores it as this peer's acknowledged position and sends from the
+            next sequence.
+    EventPage:
+      type: object
+      description: >-
+        Events read from this instance's outbox by a peer that pulls. Version 1.0; a later minor version may add
+        fields, which the caller ignores.
+      required: [origin, stream, events]
+      properties:
+        origin:
+          type: string
+          description: Required within this object. This instance's `jfrt@<uuid>` id, the origin of every event.
+        stream:
+          type: string
+          description: Required within this object. The stream read.
+        events:
+          type: array
+          description: >-
+            Required within this object. The events after the requested position, in sequence, at most limit;
+            empty when the caller is up to date.
+          items:
+            $ref: '#/components/schemas/Event'
+        next_after:
+          type: integer
+          format: int64
+          minimum: 1
+          description: >-
+            Optional within this object. Present only when more events remain: the after value of the next
+            request, the last event's seq.
+    SnapshotEntry:
+      type: object
+      description: >-
+        The current state of one item on the stream. Version 1.0; a later minor version may add fields, which the
+        receiver ignores.
+      required: [key, hlc, origin, deleted]
+      properties:
+        key:
+          type: string
+          description: >-
+            Required within this object. The item's identity on the stream; on a repository stream, its path from
+            the repository root.
+        hlc:
+          type: string
+          pattern: '^[0-9a-f]{16}\.[0-9a-f]{8}$'
+          description: >-
+            Required within this object. The hybrid logical clock time of the change that produced this state, in
+            the form Event.hlc takes.
+        origin:
+          type: string
+          description: Required within this object. The `jfrt@<uuid>` id of the instance that made that change.
+        deleted:
+          type: boolean
+          description: >-
+            Required within this object. True for a tombstone: the item was deleted, and a change with an earlier
+            time must not restore it. Tombstones are kept for the outbox retention window.
+        payload:
+          type: object
+          additionalProperties: true
+          description: >-
+            Optional within this object. The item's state in the stream kind's form; on a repository stream, its
+            properties and its created and modified times. Absent on a tombstone.
+        blob:
+          allOf:
+            - $ref: '#/components/schemas/BlobReference'
+          description: Optional within this object. The item's content, absent on a tombstone and on a folder.
+    SnapshotPage:
+      type: object
+      description: >-
+        One page of a snapshot of a stream's current state. Version 1.0; a later minor version may add fields,
+        which the caller ignores.
+      required: [origin, stream, sequence, entries]
+      properties:
+        origin:
+          type: string
+          description: Required within this object. This instance's `jfrt@<uuid>` id.
+        stream:
+          type: string
+          description: Required within this object. The stream the snapshot covers.
+        sequence:
+          type: integer
+          format: int64
+          minimum: 0
+          description: >-
+            Required within this object. The stream sequence the snapshot was taken at, the same on every page of
+            one snapshot. Having applied the snapshot, the caller resumes the stream after this sequence.
+        entries:
+          type: array
+          description: Required within this object. Items in the order of key, at most limit.
+          items:
+            $ref: '#/components/schemas/SnapshotEntry'
+        next_cursor:
+          type: string
+          description: >-
+            Optional within this object. Present only when more entries remain: the cursor of the next request.
+paths:
+  /streams/{stream}/events:
+    post:
+      description: >-
+        Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the
+        highest applied sequence from the origin in the same transaction as each applied change, so a batch that
+        is retried after it was applied changes nothing. Not implemented; answers 501.
+      operationId: pushEvents
+      parameters:
+        - $ref: '#/components/parameters/Stream'
+        - $ref: '#/components/parameters/PeerProtocol'
+        - $ref: '#/components/parameters/PeerDate'
+        - $ref: '#/components/parameters/PeerSignature'
+        - $ref: '#/components/parameters/PeerSignatureInput'
+        - $ref: '#/components/parameters/PeerContentDigest'
+      requestBody:
+        description: The batch.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventBatch'
+      responses:
+        '200':
+          description: The batch is applied; the body gives the highest applied sequence.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventAck'
+        '400':
+          description: >-
+            The body is malformed, its sequences are not consecutive, or the protocol major version is not this
+            instance's.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/PeerUnauthorized'
+        '403':
+          description: >-
+            This instance accepts no events from the caller on this stream: the caller does not hold the stream's
+            use case, this instance issued it only `federated-repo/r`, or origin is not the caller.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: This instance does not exchange the stream with the caller.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: >-
+            from_seq is not the sequence this instance expects next, including a batch already applied;
+            expected_seq gives it, and the sender resumes from there.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/PeerInternalError'
+      summary: Push events
+      tags:
+        - streams
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:stream
+        - body:/origin
+        - body:/from_seq
+      x-cost: ordinary
+    get:
+      description: >-
+        Reads this instance's events on the stream after a position, for a peer that cannot be pushed to. The after
+        value also acknowledges: this instance records it as the caller's acknowledged position on the stream,
+        which never moves backwards. Not implemented; answers 501.
+      operationId: pullEvents
+      parameters:
+        - $ref: '#/components/parameters/Stream'
+        - $ref: '#/components/parameters/PeerProtocol'
+        - $ref: '#/components/parameters/PeerDate'
+        - $ref: '#/components/parameters/PeerSignature'
+        - $ref: '#/components/parameters/PeerSignatureInput'
+        - name: after
+          in: query
+          required: false
+          description: >-
+            Optional query parameter. The highest sequence the caller has applied from this instance on the
+            stream; the answer starts at the next one. 0 when absent.
+          schema:
+            type: integer
+            format: int64
+            minimum: 0
+            default: 0
+        - $ref: '#/components/parameters/PageLimit'
+      responses:
+        '200':
+          description: The events after the position.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventPage'
+        '400':
+          description: after or limit is out of range, or the protocol major version is not this instance's.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/PeerUnauthorized'
+        '403':
+          description: >-
+            This instance sends the caller no events on this stream: the caller does not hold the stream's use
+            case, or the caller issued this instance only `federated-repo/r`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: This instance does not exchange the stream with the caller.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '410':
+          description: >-
+            Events after the position have been pruned; the caller needs a full sync from GET
+            /streams/{stream}/snapshot.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/PeerInternalError'
+      summary: Pull events
+      tags:
+        - streams
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:stream
+        - header:Signature-Input
+      x-cost: ordinary
+      x-pagination: cursor
+      x-pagination-parameters:
+        position: after
+        size: limit
+      x-pagination-next: body:/next_after
+  /streams/{stream}/snapshot:
+    get:
+      description: >-
+        Lists the current state of every item on this instance's stream, tombstones included, as of one stated
+        sequence, for a peer that has fallen behind the outbox retention window or was asked to resync. The first
+        request, without a cursor, takes the snapshot; the following pages continue it. Not implemented; answers
+        501.
+      operationId: getSnapshot
+      parameters:
+        - $ref: '#/components/parameters/Stream'
+        - $ref: '#/components/parameters/PeerProtocol'
+        - $ref: '#/components/parameters/PeerDate'
+        - $ref: '#/components/parameters/PeerSignature'
+        - $ref: '#/components/parameters/PeerSignatureInput'
+        - name: cursor
+          in: query
+          required: false
+          description: >-
+            Optional query parameter. The opaque next_cursor of the previous page; absent to take a new snapshot. A
+            cursor continues only the snapshot, stream and caller it was issued for.
+          schema:
+            type: string
+        - $ref: '#/components/parameters/PageLimit'
+      responses:
+        '200':
+          description: One page of the snapshot.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SnapshotPage'
+        '400':
+          description: >-
+            The cursor is malformed or belongs to another stream or caller, limit is out of range, or the protocol
+            major version is not this instance's.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/PeerUnauthorized'
+        '403':
+          description: >-
+            This instance sends the caller no events on this stream: the caller does not hold the stream's use
+            case, or the caller issued this instance only `federated-repo/r`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: This instance does not exchange the stream with the caller.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '410':
+          description: The snapshot the cursor continues is no longer available; take a new one without a cursor.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/PeerInternalError'
+      summary: Read a stream snapshot
+      tags:
+        - streams
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: cursor
+      x-pagination-parameters:
+        position: cursor
+        size: limit
+      x-pagination-next: body:/next_cursor

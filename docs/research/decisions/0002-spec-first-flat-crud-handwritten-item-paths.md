@@ -22,11 +22,14 @@ return 204, a folder PUT returns 201.
 
 ## Decision
 
-**Seven specs, strict servers for the flat families only.** One OpenAPI 3.0.3 spec per
-service, bundled from `api/src/<service>/`: `api/artifactory.openapi.yaml`,
-`api/access.openapi.yaml` and `api/event.openapi.yaml`, and since P1b
+**One spec per service, strict servers for the flat families only.** One OpenAPI 3.0.3
+spec per service, bundled from `api/src/<service>/`: `api/artifactory.openapi.yaml`,
+`api/access.openapi.yaml` and `api/event.openapi.yaml`, since P1b
 `api/distribution.openapi.yaml`, `api/pfed.openapi.yaml`, `api/grid.openapi.yaml` and
-`api/worker.openapi.yaml`. Each generates an oapi-codegen v2.8 strict chi server into
+`api/worker.openapi.yaml`, and since P13 `api/peer.openapi.yaml`, artifactweave's own
+peer API under `/artifactweave/peer/v1` ([0021](0021-peer-trust-and-sync-protocol.md)).
+The peer API has no JFrog counterpart: its `info` carries `x-artifactweave-extension`,
+so the parity oracle leaves the whole document out. Each generates an oapi-codegen v2.8 strict chi server into
 `internal/platform/gen/<service>` and a Go client into `pkg/client/<service>`. The strict
 servers cover the families whose operations have single-segment parameters and one
 response shape: repositories, the legacy security shims, Access v2 users, groups and

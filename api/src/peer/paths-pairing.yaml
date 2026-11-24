@@ -1,0 +1,169 @@
+components:
+  schemas:
+    PairRequest:
+      type: object
+      description: >-
+        The redeeming instance's identity, sent to the instance that issued the pairing token. Version 1.0; a later
+        minor version may add fields, which the receiver ignores.
+      required: [nonce, instance_id, base_url, public_key, protocol_version]
+      properties:
+        nonce:
+          type: string
+          description: >-
+            Required within this object. The nonce the pairing token carries, exactly as the token encodes it. It
+            names the use case the token was issued for and is redeemed once, within 300 seconds of issue.
+        instance_id:
+          type: string
+          description: >-
+            Required within this object. The redeeming instance's id, the `jfrt@<uuid>` value its
+            `/artifactory/api/system/service_id` serves. It is the `keyid` of this request's signature and of every
+            later request the redeeming instance signs.
+        base_url:
+          type: string
+          description: >-
+            Required within this object. The redeeming instance's base URL without `/artifactory`, for example
+            `https://eu.example.com`. The issuing instance sends its own peer requests under
+            `<base_url>/artifactweave/peer/v1`.
+        public_key:
+          type: string
+          description: >-
+            Required within this object. The redeeming instance's Ed25519 public key (RFC 8032), the 32 key bytes
+            in padded standard base64 (RFC 4648, section 4). This request's signature verifies with it, and every
+            later request from this instance must.
+        protocol_version:
+          type: string
+          pattern: '^[0-9]+\.[0-9]+$'
+          description: >-
+            Required within this object. The protocol version the redeeming instance speaks, as `<major>.<minor>`.
+            A major version other than the issuer's answers 400.
+    PairResponse:
+      type: object
+      description: >-
+        The issuing instance's identity, which the redeeming instance checks against the key fingerprint the token
+        carries before it records the issuer. Version 1.0; a later minor version may add fields, which the caller
+        ignores.
+      required: [instance_id, base_url, public_key, protocol_version, use_case]
+      properties:
+        instance_id:
+          type: string
+          description: Required within this object. The issuing instance's `jfrt@<uuid>` id, the `keyid` of its signatures.
+        base_url:
+          type: string
+          description: >-
+            Required within this object. The issuing instance's base URL without `/artifactory`, the one the pairing
+            token carries.
+        public_key:
+          type: string
+          description: >-
+            Required within this object. The issuing instance's Ed25519 public key, the 32 key bytes in padded
+            standard base64. Its SHA-256 matches the fingerprint the pairing token carries.
+        protocol_version:
+          type: string
+          pattern: '^[0-9]+\.[0-9]+$'
+          description: Required within this object. The protocol version the issuing instance speaks, as `<major>.<minor>`.
+        use_case:
+          allOf:
+            - $ref: '#/components/schemas/UseCase'
+          description: Required within this object. The use case the token was issued for, which both instances now hold.
+paths:
+  /pair:
+    post:
+      description: >-
+        Redeems a pairing token's nonce. The request is signed with the key in public_key, which the receiver has
+        not seen before, so the signature proves the caller holds that key. The receiver records the caller as a
+        peer holding the token's use case and answers with its own identity. A repeat of a redeem that succeeded,
+        from the same instance with the same key, answers 200 with the same body until the token expires. Not
+        implemented; answers 501.
+      operationId: redeemPairing
+      parameters:
+        - $ref: '#/components/parameters/PeerProtocol'
+        - $ref: '#/components/parameters/PeerDate'
+        - $ref: '#/components/parameters/PeerSignature'
+        - $ref: '#/components/parameters/PeerSignatureInput'
+        - $ref: '#/components/parameters/PeerContentDigest'
+      requestBody:
+        description: The redeeming instance's identity and the token's nonce.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PairRequest'
+      responses:
+        '200':
+          description: The caller is recorded as a peer for the token's use case; the body is this instance's identity.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PairResponse'
+        '400':
+          description: >-
+            The body is malformed, public_key is not 32 bytes of base64, or the protocol major version is not this
+            instance's.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: >-
+            The signature is missing, does not verify with public_key, or its `keyid` is not instance_id; or its
+            time or nonce is refused as for any peer request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: >-
+            The nonce is unknown or expired, or was redeemed by another instance or with another key.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/PeerInternalError'
+      summary: Redeem a pairing token
+      tags:
+        - pairing
+      x-idempotency: natural
+      x-idempotency-natural:
+        - body:/nonce
+      x-cost: ordinary
+    delete:
+      description: >-
+        Tells this instance that the calling peer cancelled their trust for use_case. This instance drops the use
+        case from its record of the caller; a peer left with no use case is removed with its stream cursors. Not
+        implemented; answers 501.
+      operationId: cancelPairing
+      parameters:
+        - $ref: '#/components/parameters/PeerProtocol'
+        - $ref: '#/components/parameters/PeerDate'
+        - $ref: '#/components/parameters/PeerSignature'
+        - $ref: '#/components/parameters/PeerSignatureInput'
+        - name: use_case
+          in: query
+          required: true
+          description: >-
+            Required query parameter. The use case to drop, `federated-repo/*` or `federated-repo/r`,
+            percent-encoded.
+          schema:
+            $ref: '#/components/schemas/UseCase'
+      responses:
+        '204':
+          description: The use case is dropped, or the caller did not hold it.
+        '400':
+          description: use_case names no use case, or the protocol major version is not this instance's.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/PeerUnauthorized'
+        '500':
+          $ref: '#/components/responses/PeerInternalError'
+      summary: Cancel a trust
+      tags:
+        - pairing
+      x-idempotency: natural
+      x-idempotency-natural:
+        - query:use_case
+        - header:Signature-Input
+      x-cost: ordinary

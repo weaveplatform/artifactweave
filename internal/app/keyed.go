@@ -13,6 +13,7 @@ import (
 	eventgen "github.com/weaveplatform/artifactweave/internal/platform/gen/event"
 	gridgen "github.com/weaveplatform/artifactweave/internal/platform/gen/grid"
 	"github.com/weaveplatform/artifactweave/internal/platform/gen/operations"
+	peergen "github.com/weaveplatform/artifactweave/internal/platform/gen/peer"
 	pfedgen "github.com/weaveplatform/artifactweave/internal/platform/gen/pfed"
 	workergen "github.com/weaveplatform/artifactweave/internal/platform/gen/worker"
 	"github.com/weaveplatform/artifactweave/internal/platform/idempotency"
@@ -95,6 +96,10 @@ func (k keyedOperations) pfed() []pfedgen.StrictMiddlewareFunc {
 
 func (k keyedOperations) grid() []gridgen.StrictMiddlewareFunc {
 	return strictKeyed[gridgen.StrictHandlerFunc, gridgen.StrictMiddlewareFunc](k, "grid")
+}
+
+func (k keyedOperations) peer() []peergen.StrictMiddlewareFunc {
+	return strictKeyed[peergen.StrictHandlerFunc, peergen.StrictMiddlewareFunc](k, "peer")
 }
 
 // keyGate is the Idempotency-Key gate over the generated operation table.

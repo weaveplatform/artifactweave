@@ -552,6 +552,11 @@ func apiReviewPolicy(e *apiReviewOperation) {
 	)
 	if strings.HasPrefix(e.State, "stub:") {
 		e.Effects, e.Retry, e.Pagination = "no operation effect; middleware still authenticates/admit-limits", "501 is not transient; do not retry until support changes", "schema-only; no collection query executes"
+		if e.Spec == peerSpec {
+			// User authentication skips the peer API (peerRequest); its
+			// signature check arrives with PEER-03.
+			e.Effects = "no operation effect; user authentication skips the peer API, admission still limits"
+		}
 		e.Evidence = []string{
 			e.Handler,
 			"internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501",

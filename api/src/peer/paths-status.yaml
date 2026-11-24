@@ -1,0 +1,64 @@
+components:
+  schemas:
+    PeerStatus:
+      type: object
+      description: >-
+        This instance as the calling peer sees it. Version 1.0; a later minor version may add fields, which the
+        caller ignores.
+      required: [instance_id, protocol_version, version, time, use_cases]
+      properties:
+        instance_id:
+          type: string
+          description: Required within this object. This instance's `jfrt@<uuid>` id.
+        protocol_version:
+          type: string
+          pattern: '^[0-9]+\.[0-9]+$'
+          description: Required within this object. The protocol version this instance speaks, as `<major>.<minor>`.
+        version:
+          type: string
+          description: Required within this object. This instance's release version.
+        time:
+          type: string
+          format: date-time
+          description: >-
+            Required within this object. RFC 3339 time on this instance's clock when it answered, for the caller to
+            measure clock skew.
+        use_cases:
+          type: array
+          description: Required within this object. The use cases this instance holds with the caller.
+          items:
+            $ref: '#/components/schemas/UseCase'
+paths:
+  /status:
+    get:
+      description: >-
+        Answers a signed liveness and version read. A peer that answers is online for the use cases it lists; a
+        peer whose answer does not verify is unauthorized. Not implemented; answers 501.
+      operationId: getPeerStatus
+      parameters:
+        - $ref: '#/components/parameters/PeerProtocol'
+        - $ref: '#/components/parameters/PeerDate'
+        - $ref: '#/components/parameters/PeerSignature'
+        - $ref: '#/components/parameters/PeerSignatureInput'
+      responses:
+        '200':
+          description: This instance's identity, version and clock.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PeerStatus'
+        '400':
+          description: The protocol major version is not this instance's.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/PeerUnauthorized'
+        '500':
+          $ref: '#/components/responses/PeerInternalError'
+      summary: Read a peer's liveness and version
+      tags:
+        - status
+      x-idempotency: safe
+      x-cost: ordinary

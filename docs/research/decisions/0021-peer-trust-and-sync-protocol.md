@@ -5,7 +5,10 @@ Checked against: Artifactory 7.161.32 and the 7.161.26 source ([research 40](../
 Status: Accepted
 
 Implementation status (2026-11-24): **planned P13**. The decision below describes
-intended behavior; generated API stubs and storage models do not implement it.
+intended behavior; generated API stubs and storage models do not implement it. The peer
+API's wire contract is specified ([PEER-01](https://github.com/weaveplatform/artifactweave/issues/1925),
+**Wire contract** below): `api/src/peer/` generates its server and client, and every
+operation answers 501 until PEER-02 to PEER-05 and FED-01 serve it.
 P37 owns cross-vendor synchronization and separate cold-instance contracts; P40 owns
 Mission Control/bridge/estate integration. [0042](0042-capability-scope-and-supersession.md)
 replaces permanent scope cuts; [research 10](../10-scope-and-tiers.md) records current
@@ -114,6 +117,35 @@ Ed25519 key over the method, target path, `Content-Digest`, `Date` and a nonce. 
 receiver rejects unknown keys, a clock skew above five minutes and replayed nonces
 (cached for the skew window). TLS certificates are verified normally; peer signatures are
 an additional layer, not a substitute for TLS.
+
+**Wire contract.** `api/src/peer/` specifies the peer API in its own OpenAPI document,
+version 1.0, served under `/artifactweave/peer/v1` and generated like the JFrog-facing
+services into `internal/platform/gen/peer` and `pkg/client/peer`. It has no JFrog
+counterpart, so its `info` carries `x-artifactweave-extension` and the parity oracle
+leaves it out. Its operations:
+
+| Operation | Use |
+| --- | --- |
+| `POST /pair` | Redeem a pairing nonce (step 2 above); natural on the nonce, so a lost answer can be fetched again until the token expires. |
+| `DELETE /pair?use_case=` | Cancel a trust (step 5); 204 whether or not the caller held the use case. |
+| `POST /streams/{stream}/events` | Push `{origin, from_seq, events[]}`; 200 `{origin, stream, applied_seq}`, or 409 with `expected_seq`. |
+| `GET /streams/{stream}/events?after=&limit=` | Pull mode, paged by `after` (cursor class, next `next_after`). `after` also acknowledges, so the sender keeps a cursor for a peer that pulls; 410 once the range is pruned. |
+| `GET /streams/{stream}/snapshot?cursor=&limit=` | Full sync, paged by an opaque cursor, every page stating the snapshot's `sequence`; 410 when the snapshot is gone. |
+| `GET /blobs/{sha256}` | Pull one blob. |
+| `PUT /repositories/{repoKey}` | configSync ([0022](0022-federated-repositories.md)): the member creates or updates its copy. |
+| `GET /status` | The signed liveness and version read behind a peer's status and clock skew. |
+
+Every request declares `Artifactweave-Peer-Protocol`, `Date`, `Signature` and
+`Signature-Input`, and `Content-Digest` when it has a body; the signature covers
+`@method`, `@target-uri`, `date` and, with a body, `content-digest`, with the sender's
+`instance_id` as `keyid`. Responses are signed by the peer middleware (PEER-03), so no
+response object declares those headers. User authentication skips the prefix: a peer
+carries no user credential, and the signature is its authentication. Errors use
+`/grid`'s flat envelope (`apierror.ProfileGrid`), `{code, message, details}` with
+`expected_seq` on a sequence conflict, because a peer branches on a symbolic code and
+`/pfed`'s integer code only repeats the status. Event, snapshot entry and error
+schemas are versioned with the protocol and only gain fields in a minor version.
+Collections page by cursor, default 100 and at most 1000.
 
 **Ordered outbox.** Each instance appends every change a use case must propagate to an
 outbox, per stream: one stream per federated repository (`repo:<key>`), one for Access

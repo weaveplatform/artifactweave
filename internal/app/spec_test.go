@@ -23,6 +23,7 @@ import (
 	distributiongen "github.com/weaveplatform/artifactweave/internal/platform/gen/distribution"
 	eventgen "github.com/weaveplatform/artifactweave/internal/platform/gen/event"
 	gridgen "github.com/weaveplatform/artifactweave/internal/platform/gen/grid"
+	peergen "github.com/weaveplatform/artifactweave/internal/platform/gen/peer"
 	pfedgen "github.com/weaveplatform/artifactweave/internal/platform/gen/pfed"
 	workergen "github.com/weaveplatform/artifactweave/internal/platform/gen/worker"
 	"github.com/weaveplatform/artifactweave/internal/platform/testkit/repopath"
@@ -144,15 +145,18 @@ func checkParameter(where string, p *openapi3.Parameter, problems *[]string) {
 	}
 }
 
-// TestAccHandwrittenRoutesNotGenerated asserts that every operation marked
-// x-handwritten is excluded from the generated mux (decision 0002), and that
-// every other operation is present, so the exclusion cannot silently widen.
-func TestAccHandwrittenRoutesNotGenerated(t *testing.T) {
-	type gen struct {
-		spec  string
-		mount func(chi.Router)
-	}
-	gens := []gen{
+// generatedMux mounts one bundled spec's generated server on a router.
+type generatedMux struct {
+	spec  string
+	mount func(chi.Router)
+}
+
+// generatedMuxes is every generated server TestAccHandwrittenRoutesNotGenerated
+// checks against its spec. TestAccPeerServiceOutsideParityOracle reads it
+// too, so the peer service, which the parity oracle never sees, cannot drop
+// out of the one check that holds its mux to its document.
+func generatedMuxes() []generatedMux {
+	return []generatedMux{
 		{"artifactory.openapi.yaml", func(r chi.Router) {
 			artgen.HandlerWithOptions(
 				artgen.NewStrictHandler(artifactoryServer{
@@ -202,7 +206,20 @@ func TestAccHandwrittenRoutesNotGenerated(t *testing.T) {
 				gridgen.ChiServerOptions{BaseRouter: r},
 			)
 		}},
+		{peerSpec, func(r chi.Router) {
+			peergen.HandlerWithOptions(
+				peergen.NewStrictHandler(peerService{}, nil),
+				peergen.ChiServerOptions{BaseRouter: r},
+			)
+		}},
 	}
+}
+
+// TestAccHandwrittenRoutesNotGenerated asserts that every operation marked
+// x-handwritten is excluded from the generated mux (decision 0002), and that
+// every other operation is present, so the exclusion cannot silently widen.
+func TestAccHandwrittenRoutesNotGenerated(t *testing.T) {
+	gens := generatedMuxes()
 	covered := map[string]bool{}
 	for _, g := range gens {
 		covered[g.spec] = true

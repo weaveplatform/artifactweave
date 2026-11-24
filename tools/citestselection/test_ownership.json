@@ -139,6 +139,7 @@
       "modules_test.go",
       "npm_fixture_test.go",
       "oidc_status_test.go",
+      "peer_api_test.go",
       "permissions_status_test.go",
       "platform_test.go",
       "project_repositories_test.go",

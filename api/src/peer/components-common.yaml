@@ -1,0 +1,126 @@
+# Shared declarations for this service: the error envelope, the signed
+# request headers every operation declares, the use case enum and the
+# answers every operation shares. The envelope is the flat one /grid uses
+# (apierror.ProfileGrid): router.go's errorProfileRules give it the
+# /artifactweave/peer/ prefix, so 404, 405, binding errors and the 501 stubs
+# answer in it too.
+components:
+  parameters:
+    PeerProtocol:
+      description: >-
+        Required header parameter. The protocol version the sender speaks, as `<major>.<minor>`, for example `1.0`.
+        A major version other than 1 answers 400 and is recorded on the sender's peer record. The answer carries
+        the receiver's version in the same header.
+      in: header
+      name: Artifactweave-Peer-Protocol
+      required: true
+      schema:
+        type: string
+        pattern: '^[0-9]+\.[0-9]+$'
+    PeerDate:
+      description: >-
+        Required header parameter. The time the sender signed the request, as an HTTP date (RFC 9110, section
+        5.6.7), covered by the signature. More than five minutes from the receiver's clock answers 401.
+      in: header
+      name: Date
+      required: true
+      schema:
+        type: string
+    PeerSignature:
+      description: >-
+        Required header parameter. The Ed25519 signature (RFC 9421) named in `Signature-Input`, for example
+        `sig1=:<base64>:`. One that does not verify with the key recorded for its `keyid` answers 401.
+      in: header
+      name: Signature
+      required: true
+      schema:
+        type: string
+    PeerSignatureInput:
+      description: >-
+        Required header parameter. The signature's covered components and parameters (RFC 9421), for example
+        `sig1=("@method" "@target-uri" "date" "content-digest");created=1700000000;keyid="jfrt@<uuid>";alg="ed25519";nonce="<random>"`.
+        `keyid` is the sender's instance id; `content-digest` is covered exactly when the request has a body. A
+        `nonce` the receiver has accepted within the last five minutes answers 401.
+      in: header
+      name: Signature-Input
+      required: true
+      schema:
+        type: string
+    PeerContentDigest:
+      description: >-
+        Required header parameter. The SHA-256 digest of the request body (RFC 9530), for example
+        `sha-256=:<base64>:`, covered by the signature. A digest that does not match the body answers 401.
+      in: header
+      name: Content-Digest
+      required: true
+      schema:
+        type: string
+  responses:
+    PeerUnauthorized:
+      description: >-
+        The signature is missing or does not verify, its key belongs to no paired peer, its time is more than five
+        minutes from this instance's clock, its nonce was already used, or `Content-Digest` does not match the
+        body.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    PeerInternalError:
+      description: Unexpected server error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    ErrorResponse:
+      type: object
+      description: >-
+        The flat error envelope of every peer answer other than a success. Version 1.0; a later minor version may
+        add fields, which callers ignore.
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: >-
+            Required within this object. A symbolic code naming the status, such as BAD_REQUEST, UNAUTHORIZED,
+            FORBIDDEN, NOT_FOUND, CONFLICT, GONE or NOT_IMPLEMENTED.
+        message:
+          type: string
+          description: Required within this object. Human readable explanation.
+        details:
+          type: array
+          description: Optional within this object. Field-level details, one string each, when a request is invalid.
+          items:
+            type: string
+            description: One detail.
+        expected_seq:
+          type: integer
+          format: int64
+          minimum: 1
+          description: >-
+            Optional within this object. Present only on the 409 of an event batch: the sequence the next batch on
+            that stream must start at, one more than the highest sequence applied from the origin. The sender
+            resumes from it.
+    UseCase:
+      type: string
+      description: >-
+        A use case a pair of instances holds: `federated-repo/*` for two-way federated repository trust and
+        `federated-repo/r` for receiving-only trust, where the issuing instance sends events to the redeeming
+        instance and accepts none from it. Later minor versions add use cases.
+      enum:
+        - federated-repo/*
+        - federated-repo/r
+    BlobReference:
+      type: object
+      description: The content an event or a snapshot entry refers to, fetched with GET /blobs/{sha256}.
+      required: [sha256, size]
+      properties:
+        sha256:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+          description: Required within this object. SHA-256 of the content, 64 lowercase hexadecimal digits.
+        size:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Required within this object. Size of the content in bytes.

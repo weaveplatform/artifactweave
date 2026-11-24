@@ -4,7 +4,11 @@ The editable fragments in `api/src/<service>/*.yaml` are the API source of truth
 the management surface (decision
 [0002](../research/decisions/0002-spec-first-flat-crud-handwritten-item-paths.md)).
 The service families are `artifactory`, `access`, `event`, `distribution`, `grid`,
-`pfed` and `worker`; `make generate` first bundles each into `api/<service>.openapi.yaml`.
+`pfed` and `worker`, and `peer`, the peer API of decision
+[0021](../research/decisions/0021-peer-trust-and-sync-protocol.md); `make generate` first
+bundles each into `api/<service>.openapi.yaml`. The peer API has no JFrog counterpart, so
+its descriptions are written from that decision with no oracle page, and its operations
+carry no `x-oracle-source`.
 Describe every object property, including inline request/response objects, and every
 path/query/header parameter. Generated Go comments come from these descriptions; edit
 the fragments and regenerate rather than editing bundles or generated Go files.
@@ -126,7 +130,7 @@ or 503 declares `RateLimit` or `RateLimit-Policy`.
 ### The guard
 
 `TestAccAPIPrinciples` (`internal/app/api_principles_test.go`) holds every
-operation of the seven bundles to these rules, and a failure prints one summary
+operation of every bundle to these rules, and a failure prints one summary
 grouped by rule and spec. `api_principles_fixtures_test.go` has a fixture that
 fails each rule.
 

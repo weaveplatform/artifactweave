@@ -8,8 +8,8 @@
 // # Inputs
 //
 // None yet. Planned: signed peer requests through the generated server in
-// platform/gen/peer, which make generate creates with the peer specification
-// (target layout, lines 344 and 816).
+// platform/gen/peer, which make generate builds from api/src/peer (PEER-01,
+// target layout, lines 344 and 816).
 //
 // # Outputs
 //
