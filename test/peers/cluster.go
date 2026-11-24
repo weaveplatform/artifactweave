@@ -261,6 +261,7 @@ func (c *Cluster) Close() {
 		}
 		wg.Wait()
 		for _, in := range c.Instances {
+			in.closeStore()
 			in.ingress.close()
 			in.egress.close()
 			in.via.CloseIdleConnections()
@@ -421,6 +422,16 @@ type Instance struct {
 	done      chan struct{}
 	exit      error
 	kill      func()
+	// store is the scenario's own handle on the instance's metadata store,
+	// opened at the first Identity, Peer or SetPeerKey and closed by Close. A
+	// scenario polls Peer every few hundred milliseconds; opening the store
+	// for each read loaded the configuration and keyring and opened a pool
+	// every time, taking CPU from the instances of the scenarios running
+	// beside it. On SQLite that load was enough to hold a request's
+	// admission transaction past its 500ms budget (apilimit's
+	// BudgetTimeout), and the request answered 503.
+	storeMu sync.Mutex
+	store   *appsql.Store
 }
 
 // Do sends a request to the instance as its administrator and returns the
@@ -446,9 +457,7 @@ func (in *Instance) DoAs(t testing.TB, user, password, method, path, body string
 // cluster's database goes with its container.
 func (in *Instance) Identity(t testing.TB) instance.InstanceIdentity {
 	t.Helper()
-	st := in.openStore(t)
-	defer func() { _ = st.Close() }()
-	id, err := st.Instance().Get(t.Context())
+	id, err := in.openStore(t).Instance().Get(t.Context())
 	if err != nil {
 		t.Fatalf("peers: read %s's identity: %v", in.Name, err)
 	}
@@ -461,9 +470,7 @@ func (in *Instance) Identity(t testing.TB) instance.InstanceIdentity {
 // has no such record. The instance must be running, as for Identity.
 func (in *Instance) Peer(t testing.TB, instanceID string) (model.Peer, bool) {
 	t.Helper()
-	st := in.openStore(t)
-	defer func() { _ = st.Close() }()
-	p, err := st.Peers().Get(t.Context(), instanceID)
+	p, err := in.openStore(t).Peers().Get(t.Context(), instanceID)
 	if errors.Is(err, kernel.ErrNotFound) {
 		return model.Peer{}, false
 	}
@@ -481,7 +488,6 @@ func (in *Instance) Peer(t testing.TB, instanceID string) (model.Peer, bool) {
 func (in *Instance) SetPeerKey(t testing.TB, instanceID string, key ed25519.PublicKey) {
 	t.Helper()
 	st := in.openStore(t)
-	defer func() { _ = st.Close() }()
 	p, err := st.Peers().Get(t.Context(), instanceID)
 	if err != nil {
 		t.Fatalf("peers: read %s's record of %s: %v", in.Name, instanceID, err)
@@ -492,10 +498,16 @@ func (in *Instance) SetPeerKey(t testing.TB, instanceID string, key ed25519.Publ
 	}
 }
 
-// openStore opens the instance's metadata store with the configuration it
-// runs with, its master key included, without migrating it.
+// openStore returns the instance's metadata store, opened once with the
+// configuration it runs with, its master key included, without migrating
+// it.
 func (in *Instance) openStore(t testing.TB) *appsql.Store {
 	t.Helper()
+	in.storeMu.Lock()
+	defer in.storeMu.Unlock()
+	if in.store != nil {
+		return in.store
+	}
 	cfg, err := config.Load(config.LoadOptions{File: in.config})
 	if err != nil {
 		t.Fatal(err)
@@ -504,11 +516,23 @@ func (in *Instance) openStore(t testing.TB) *appsql.Store {
 	if err != nil {
 		t.Fatal(err)
 	}
-	st, err := app.OpenStore(t.Context(), cfg, appsql.Options{SkipMigrate: true, Keyring: keys})
+	// Not t's context: the handle outlives the call that opens it, until
+	// Close.
+	st, err := app.OpenStore(context.Background(), cfg, appsql.Options{SkipMigrate: true, Keyring: keys})
 	if err != nil {
 		t.Fatalf("peers: open %s's store: %v", in.Name, err)
 	}
+	in.store = st
 	return st
+}
+
+func (in *Instance) closeStore() {
+	in.storeMu.Lock()
+	defer in.storeMu.Unlock()
+	if in.store != nil {
+		_ = in.store.Close()
+		in.store = nil
+	}
 }
 
 // LogPath is the file that receives the instance's standard output and

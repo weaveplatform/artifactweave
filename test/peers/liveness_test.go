@@ -45,7 +45,7 @@ func awaitPeer(t *testing.T, in *peers.Instance, id, what string, ok func(model.
 		if time.Now().After(deadline) {
 			t.Fatalf("%s's record of %s never showed %s: last %s, seen %s", in.Name, id, what, p.Status, p.LastSeen)
 		}
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(500 * time.Millisecond)
 	}
 }
 
