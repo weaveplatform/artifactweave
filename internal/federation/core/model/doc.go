@@ -50,8 +50,8 @@
 //   - Peer with Has, Compatible and DeriveStatus (a peer whose recorded
 //     major protocol version differs from this instance's is OFFLINE, as an
 //     unreachable one is, until it sends a compatible request), PeerStatus,
-//     UseCase with
-//     KnownUseCase, PairingNonce with Usable, and PairingTokenTTL.
+//     UseCase with KnownUseCase and Name, Pairing with PairingFor,
+//     PairingNonce with Usable, and PairingTokenTTL.
 //   - Stamp with After; StreamKind with RepositoryStream, AccessStream,
 //     DistributionStream and ParseStream, and the sentinel ErrInvalidStream.
 //   - FederationMember with ParseMemberURL, MembersOf and the sentinel
@@ -68,9 +68,11 @@
 //   - A pairing nonce completes at most one pairing, and only before it
 //     expires; pairing tokens last PairingTokenTTL, JFrog's default
 //     (decision 0021).
-//   - Use cases are JFrog's names where they mean the same thing and
-//     artifactweave's own otherwise; JFrog use cases with no counterpart are
-//     unknown, which the API answers with 404.
+//   - Use cases are JFrog's names where they mean the same thing, such as
+//     federated-repo/* and federated-repo/r, and artifactweave's own
+//     otherwise; JFrog use cases with no counterpart are unknown, which the
+//     API answers with 404. PairingFor is the one classification both
+//     pairing endpoints answer by.
 //   - Stream names are part of the stored outbox, so their forms never
 //     change: repo:<key>, access and distribution:<tracker>:<peer>.
 //

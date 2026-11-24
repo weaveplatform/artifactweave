@@ -11,6 +11,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/md5"
 	"crypto/rand"
@@ -1788,7 +1789,14 @@ func seedFixtureIdentity(t *testing.T, st instance.Store) {
 	const id = "jfrt@01234567-89ab-4cde-8f01-23456789abcd"
 	current, err := st.Instance().ID(t.Context())
 	if errors.Is(err, kernel.ErrNotFound) {
-		if err := st.Instance().Init(t.Context(), instance.InstanceIdentity{InstanceID: id, ProtocolVersion: 1}); err != nil {
+		// With the Ed25519 key startup creates, which pairing signs with.
+		pub, priv, err := ed25519.GenerateKey(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := st.Instance().Init(t.Context(), instance.InstanceIdentity{
+			InstanceID: id, ProtocolVersion: 1, PublicKey: pub, PrivateKey: priv,
+		}); err != nil {
 			t.Fatal(err)
 		}
 		return

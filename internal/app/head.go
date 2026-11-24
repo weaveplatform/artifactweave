@@ -40,6 +40,10 @@ var handwrittenHeads = map[string]headAnswer{
 	"/artifactory/api/versions/{repo}/{path}":                headRunsGet,
 	"/artifactory/api/versions/{repo}/*":                     headRunsGet,
 	"/artifactory/api/artifactweave/remote-status/{repoKey}": headRunsGet,
+	// ServiceTrustResource declares a @GET alone; a use case may hold a
+	// slash, so the wildcard serves it too.
+	"/artifactory/api/v1/service_trust/pairings/{usecase}": headRunsGet,
+	"/artifactory/api/v1/service_trust/pairings/*":         headRunsGet,
 	// ArchiveResource.downloadFolder and DownloadResource declare a @GET
 	// alone; the folder archive is streamed, so its HEAD builds none.
 	"/artifactory/api/archive/download/{repoKey}/{path}": headSeesHead,

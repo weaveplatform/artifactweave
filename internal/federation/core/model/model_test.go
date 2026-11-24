@@ -28,12 +28,12 @@ func TestUnitDirectionFor(t *testing.T) {
 }
 
 func TestUnitPeer(t *testing.T) {
-	for _, u := range []model.UseCase{model.UseFederation, model.UseDistribution, model.UseAccessFederation, model.UsePlatformFederation} {
+	for _, u := range []model.UseCase{model.UseFederatedRepo, model.UseFederatedRepoRead, model.UseDistribution, model.UseAccessFederation, model.UsePlatformFederation} {
 		if !model.KnownUseCase(u) {
 			t.Errorf("%s should be known", u)
 		}
 	}
-	for _, u := range []model.UseCase{"mission-control", "bridge", "artifactory-cold"} {
+	for _, u := range []model.UseCase{"mission-control", "bridge", "artifactory-cold", "federation"} {
 		if model.KnownUseCase(u) {
 			t.Errorf("%s should answer 404", u)
 		}
@@ -43,10 +43,10 @@ func TestUnitPeer(t *testing.T) {
 		t.Fatal(err)
 	}
 	p := model.Peer{
-		PublicKey: pub, UseCases: []model.UseCase{model.UseFederation}, LastSeen: t0,
+		PublicKey: pub, UseCases: []model.UseCase{model.UseFederatedRepo}, LastSeen: t0,
 		ProtocolVersion: instance.ProtocolVersion,
 	}
-	if !p.Has(model.UseFederation) || p.Has(model.UseDistribution) {
+	if !p.Has(model.UseFederatedRepo) || p.Has(model.UseDistribution) {
 		t.Error("Peer.Has")
 	}
 	stale := 5 * time.Minute
@@ -89,6 +89,39 @@ func TestUnitPeer(t *testing.T) {
 	n.RedeemedAt = t0
 	if n.Usable(t0) {
 		t.Error("a redeemed nonce is single-use")
+	}
+}
+
+func TestUnitUseCasePairing(t *testing.T) {
+	for path, want := range map[string]model.Pairing{
+		"federated-repo/*":            model.PairingServed,
+		"federated-repo/r":            model.PairingServed,
+		"platform-federation":         model.PairingPlanned,
+		"access-federation":           model.PairingPlanned,
+		"distribution":                model.PairingPlanned,
+		"mission-control":             model.PairingPlanned,
+		"bridge":                      model.PairingPlanned,
+		"artifactory-cold":            model.PairingUnknown,
+		"artifactory-cold/ns1":        model.PairingUnknown,
+		"federated-repo":              model.PairingUnknown,
+		"federated-repo/libs-local:w": model.PairingUnknown,
+		"federation":                  model.PairingUnknown,
+		"":                            model.PairingUnknown,
+		"federated-repo/*/":           model.PairingUnknown,
+		"FEDERATED-REPO/*":            model.PairingUnknown,
+	} {
+		if got := model.PairingFor(path); got != want {
+			t.Errorf("PairingFor(%q) = %d, want %d", path, got, want)
+		}
+	}
+	for u, want := range map[model.UseCase]string{
+		model.UseFederatedRepo:      "federated-repo",
+		model.UseFederatedRepoRead:  "federated-repo",
+		model.UsePlatformFederation: "platform-federation",
+	} {
+		if got := u.Name(); got != want {
+			t.Errorf("%s.Name() = %q, want %q", u, got, want)
+		}
 	}
 }
 

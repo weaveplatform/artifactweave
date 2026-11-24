@@ -4,15 +4,16 @@ Checked against: Artifactory 7.161.32 and the 7.161.26 source ([research 40](../
 
 Status: Accepted
 
-Implementation status (2026-11-24): **planned P13**. The decision below describes
-intended behavior; generated API stubs and storage models do not implement it. The peer
-API's wire contract is specified ([PEER-01](https://github.com/weaveplatform/artifactweave/issues/1925),
-**Wire contract** below): `api/src/peer/` generates its server and client, and every
-operation answers 501 until PEER-02 to PEER-05 and FED-01 serve it. The signed transport
-is implemented ([PEER-03](https://github.com/weaveplatform/artifactweave/issues/1927),
-**Transport** below): no request under the peer prefix reaches a handler without a
-paired peer's valid signature, except `POST /pair`, verified with the key its body
-presents.
+Implementation status (2026-11-24): **partly implemented P13**. The decision below describes
+intended behavior. The peer API's wire contract is specified
+([PEER-01](https://github.com/weaveplatform/artifactweave/issues/1925), **Wire contract**
+below): `api/src/peer/` generates its server and client. The signed transport is
+implemented ([PEER-03](https://github.com/weaveplatform/artifactweave/issues/1927),
+**Transport** below): no request under the peer prefix reaches a handler without a paired
+peer's valid signature, except `POST /pair`, verified with the key its body presents.
+**Pairing** is implemented ([PEER-02](https://github.com/weaveplatform/artifactweave/issues/1926)):
+the service_trust endpoints and the peer API's `POST` and `DELETE /pair`. The other peer
+operations answer 501 until PEER-04, PEER-05 and FED-01 serve them.
 P37 owns cross-vendor synchronization and separate cold-instance contracts; P40 owns
 Mission Control/bridge/estate integration. [0042](0042-capability-scope-and-supersession.md)
 replaces permanent scope cuts; [research 10](../10-scope-and-tiers.md) records current
@@ -54,16 +55,24 @@ two instances is artifactweave's own:
    after 300 seconds, 7.x's five minutes. It encodes A's base URL, `instance_id`,
    public-key fingerprint, the use case and a random nonce, and A signs it. For the
    federated-repository use cases the base URL is `federatedRepoUrlBase` without
-   `/artifactory`, or `urlBase` when that is empty, as 7.x does.
+   `/artifactory`, or `urlBase` when that is empty, as 7.x does. Until FED-01 adds
+   `federatedRepoUrlBase`, it is the configured base URL without `/artifactory`, or the
+   address the request reached when none is configured. A stores only the nonce's SHA-256.
 2. An administrator on instance B calls `PUT .../pairing/{usecase}` with `{pairing_token}`.
    B refuses an expired token with 400 "Error while token pairing. Attempt to pair instances
    with an expired token", and otherwise calls A's peer endpoint
    `POST /artifactweave/peer/v1/pair` with the nonce, B's identity and B's public key,
    signed with B's key. This call takes the place of the 7.x redeemer's call to the issuer's
-   `exchange`.
+   `exchange`. B first claims the nonce in its own store, so a reused token, or the second of
+   two concurrent redemptions, is refused with "The pairing token was already used"; the
+   claim is released when the pairing fails.
 3. A checks the nonce is unused and unexpired, records B, and answers with its own public
    key and protocol version, signed. B checks the key matches the fingerprint in the token
-   and records A. Both now hold each other as peers for that use case. B answers
+   and records A. Both now hold each other as peers for that use case. When B refuses A's
+   answer (a key that does not match the fingerprint, a token A's key did not sign, another
+   instance, use case or protocol major version), it tells A in a signed
+   `DELETE /artifactweave/peer/v1/pair` to drop B, so a refused token leaves no peer record
+   on either side; A's nonce stays spent. B answers
    `{"message":"Trust with service federated-repo was established successfully"}`, 7.x's
    message, which names the use case.
 4. `GET .../pairings/{usecase}` lists the peers holding the use case as `[{"base_url"}]`.
@@ -80,7 +89,7 @@ two instances is artifactweave's own:
    master token, to get a token. artifactweave peers sign requests instead
    (**Transport**), so no artifactweave token can be exchanged: it answers 400
    `{"message":"Error while token exchange. <reason>"}`, 7.x's pattern for a refused
-   exchange. This is a deviation that PEER-02 registers.
+   exchange. This is [DV-205](../../implementation/deviations.md#api-behaviour).
 
 **Use cases.** On the Artifactory endpoint they are 7.x's, as `ServiceTrustUseCase` matches
 them:
@@ -93,8 +102,8 @@ them:
   federations that send back to A ([research 40 §6](../40-federated-repositories-7x.md#6-receiving-only-unidirectional-members)).
   When a pair holds both use cases, `federated-repo/*` applies.
 
-`internal/federation/core/model` names the two-way use case `UseFederation = "federation"`;
-PEER-02 renames it to `federated-repo/*` and adds `federated-repo/r`. The Access endpoint
+`internal/federation/core/model` names them `UseFederatedRepo` (`federated-repo/*`) and
+`UseFederatedRepoRead` (`federated-repo/r`). The Access endpoint
 keeps `platform-federation` (P14). artifactweave adds its own `distribution` (P15) and
 `access-federation` (P14); 7.161.26's `ServiceTrustUseCase` also matches `distribution` on the
 Artifactory endpoint, which its documentation does not list. One peer relationship can

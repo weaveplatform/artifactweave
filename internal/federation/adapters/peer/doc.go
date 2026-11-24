@@ -13,6 +13,8 @@
 //     (pushhttp.PlatformProxy), extra TLS roots, private origins granted to
 //     peers, timeouts, body bounds and retry settings; a peer record's
 //     instance id, base URL and public key.
+//   - PairServer: the pairing service's issuing side (PairService); PairRemote:
+//     a Factory.
 //
 // # Outputs
 //
@@ -33,24 +35,35 @@
 //     *UnverifiedAnswerError. Client.API wraps the generated client
 //     pkg/client/peer; WithAnswerKey and PairAnswerKey verify the answer to
 //     POST /pair with the key it presents.
+//   - PairServer serves POST /pair, redeeming a pairing nonce for the
+//     instance whose identity the verified body presents (400 malformed, 401
+//     not signed by that identity, 403 a nonce that is unknown, expired or
+//     spent), and DELETE /pair, dropping a use case from the verified
+//     caller's record (204). PairRemote is the pairing service's transport
+//     (pairing.Remote): it calls both and sorts failures into unreachable,
+//     unverified and a status the issuer refused with.
 //
 // # References
 //
 //   - Decision 0021: docs/research/decisions/0021-peer-trust-and-sync-protocol.md.
 //   - Decision 0043: docs/research/decisions/0043-api-reliability.md.
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md.
-//   - Ticket: https://github.com/weaveplatform/artifactweave/issues/1927.
+//   - Tickets: https://github.com/weaveplatform/artifactweave/issues/1927,
+//     https://github.com/weaveplatform/artifactweave/issues/1926 (pairing).
 //
 // # Status
 //
 // Implemented P13 (PEER-03): the server middleware and the signing client.
-// The operations behind the middleware are PEER-02's, PEER-04's, PEER-05's
-// and FED-01's.
+// Implemented P13 (PEER-02): /pair and the pairing transport. The other
+// operations behind the middleware are PEER-04's, PEER-05's and FED-01's.
 //
 // # Testing
 //
 // Middleware tests send each refusal and check the handler never ran;
 // client tests run against TLS servers with verified certificates, tamper
 // with answers and count retries; internal/app sends signed requests
-// between two running instances.
+// between two running instances. pair_test.go pairs and unpairs two
+// instances through their signed peer APIs and refuses spent nonces,
+// unreachable and forged issuers and requests not signed by the instance
+// they name.
 package peer

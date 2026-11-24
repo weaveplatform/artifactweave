@@ -346,27 +346,6 @@ func (e RefreshLdapGroupSettingsParamsOperation) Valid() bool {
 	}
 }
 
-// Defines values for CreatePairingTokenParamsUseCase.
-const (
-	Bridge             CreatePairingTokenParamsUseCase = "bridge"
-	MissionControl     CreatePairingTokenParamsUseCase = "mission-control"
-	PlatformFederation CreatePairingTokenParamsUseCase = "platform-federation"
-)
-
-// Valid indicates whether the value is a known member of the CreatePairingTokenParamsUseCase enum.
-func (e CreatePairingTokenParamsUseCase) Valid() bool {
-	switch e {
-	case Bridge:
-		return true
-	case MissionControl:
-		return true
-	case PlatformFederation:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for DeletePermissionResourceParamsResourceType.
 const (
 	DeletePermissionResourceParamsResourceTypeArtifact      DeletePermissionResourceParamsResourceType = "artifact"
@@ -1875,6 +1854,12 @@ type ScimUserListResponse struct {
 	TotalResults *int `json:"totalResults,omitempty"`
 }
 
+// ServiceTrustMessage The body of a service trust error answer: a single message, as every service trust endpoint answers, not the Access error envelope.
+type ServiceTrustMessage struct {
+	// Message Required within this object. What went wrong, naming the operation first, for example "Error creating pairing token." followed by the reason, or "Unknown use case".
+	Message string `json:"message"`
+}
+
 // TokenCreateRequest An access token request. Accepted as JSON or form-encoded. Every field is optional; the defaults mint an identity token for the caller that expires after the configured default expiry (31536000 seconds, one year, until an admin changes it).
 type TokenCreateRequest struct {
 	// Audience Optional within this object. Which services accept the token, as <service type>@<service id> patterns. Defaults to *@*, every service.
@@ -2383,9 +2368,6 @@ type GetScimUserByUsernameParams struct {
 	// ExcludedAttributes Optional query parameter. Comma-separated attributes to leave out of each resource.
 	ExcludedAttributes *string `form:"excludedAttributes,omitempty" json:"excludedAttributes,omitempty"`
 }
-
-// CreatePairingTokenParamsUseCase defines parameters for CreatePairingToken.
-type CreatePairingTokenParamsUseCase string
 
 // GetTokensParams defines parameters for GetTokens.
 type GetTokensParams struct {
@@ -4194,13 +4176,6 @@ type ClientInterface interface {
 	//
 	// Corresponds with PUT /api/v1/scim/v2/Users/{username} (the `UpdateScimUser` operationId).
 	UpdateScimUserWithApplicationScimPlusJSONBody(ctx context.Context, username string, body UpdateScimUserApplicationScimPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// CreatePairingToken Create a pairing token
-	//
-	// Issues a single-use pairing token on this instance so that another instance of this server can establish mutual trust with it over the peer protocol (decision 0021). Run it on the instance that is to be trusted, hand the token to the administrator of the other instance, who redeems it there, for example when adding this instance as a follower (POST /pfed/api/v1/jpd) or registering it as an Access federation target. Redeeming exchanges per-peer keys that are sealed at rest (decision 0017); the token itself is never stored in clear and stops working once redeemed or when it expires, 300 seconds after issue by default (configurable). Only the platform-federation use case is supported; mission-control and bridge answer 501. The peer must be another instance of this server. Administrators only.
-	//
-	// Corresponds with POST /api/v1/service_trust/pairing/{useCase} (the `CreatePairingToken` operationId).
-	CreatePairingToken(ctx context.Context, useCase CreatePairingTokenParamsUseCase, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ExportAccessConfiguration Export the Access configuration (not supported)
 	//
@@ -7398,23 +7373,6 @@ func (c *Client) UpdateScimUserWithBody(ctx context.Context, username string, co
 // Corresponds with PUT /api/v1/scim/v2/Users/{username} (the `UpdateScimUser` operationId).
 func (c *Client) UpdateScimUserWithApplicationScimPlusJSONBody(ctx context.Context, username string, body UpdateScimUserApplicationScimPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateScimUserRequestWithApplicationScimPlusJSONBody(c.Server, username, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CreatePairingToken Create a pairing token
-//
-// Issues a single-use pairing token on this instance so that another instance of this server can establish mutual trust with it over the peer protocol (decision 0021). Run it on the instance that is to be trusted, hand the token to the administrator of the other instance, who redeems it there, for example when adding this instance as a follower (POST /pfed/api/v1/jpd) or registering it as an Access federation target. Redeeming exchanges per-peer keys that are sealed at rest (decision 0017); the token itself is never stored in clear and stops working once redeemed or when it expires, 300 seconds after issue by default (configurable). Only the platform-federation use case is supported; mission-control and bridge answer 501. The peer must be another instance of this server. Administrators only.
-//
-// Corresponds with POST /api/v1/service_trust/pairing/{useCase} (the `CreatePairingToken` operationId).
-func (c *Client) CreatePairingToken(ctx context.Context, useCase CreatePairingTokenParamsUseCase, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreatePairingTokenRequest(c.Server, useCase)
 	if err != nil {
 		return nil, err
 	}
@@ -12944,40 +12902,6 @@ func NewUpdateScimUserRequestWithBody(server string, username string, contentTyp
 	return req, nil
 }
 
-// NewCreatePairingTokenRequest constructs an http.Request for the CreatePairingToken method
-func NewCreatePairingTokenRequest(server string, useCase CreatePairingTokenParamsUseCase) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "useCase", useCase, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/v1/service_trust/pairing/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
 // NewExportAccessConfigurationRequest constructs an http.Request for the ExportAccessConfiguration method
 func NewExportAccessConfigurationRequest(server string) (*http.Request, error) {
 	var err error
@@ -16471,15 +16395,6 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with PUT /api/v1/scim/v2/Users/{username} (the `UpdateScimUser` operationId).
 	UpdateScimUserWithApplicationScimPlusJSONBodyWithResponse(ctx context.Context, username string, body UpdateScimUserApplicationScimPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateScimUserResponse, error)
-
-	// CreatePairingTokenWithResponse Create a pairing token
-	//
-	// Issues a single-use pairing token on this instance so that another instance of this server can establish mutual trust with it over the peer protocol (decision 0021). Run it on the instance that is to be trusted, hand the token to the administrator of the other instance, who redeems it there, for example when adding this instance as a follower (POST /pfed/api/v1/jpd) or registering it as an Access federation target. Redeeming exchanges per-peer keys that are sealed at rest (decision 0017); the token itself is never stored in clear and stops working once redeemed or when it expires, 300 seconds after issue by default (configurable). Only the platform-federation use case is supported; mission-control and bridge answer 501. The peer must be another instance of this server. Administrators only.
-	//
-	// Returns a wrapper object for the known response body format(s).
-	//
-	// Corresponds with POST /api/v1/service_trust/pairing/{useCase} (the `CreatePairingToken` operationId).
-	CreatePairingTokenWithResponse(ctx context.Context, useCase CreatePairingTokenParamsUseCase, reqEditors ...RequestEditorFn) (*CreatePairingTokenResponse, error)
 
 	// ExportAccessConfigurationWithResponse Export the Access configuration (not supported)
 	//
@@ -26894,113 +26809,6 @@ func (r UpdateScimUserResponse) ContentType() string {
 	return ""
 }
 
-// CreatePairingTokenResponse429Headers the declared response headers of an HTTP 429 response for CreatePairingToken
-type CreatePairingTokenResponse429Headers struct {
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      int
-}
-
-// CreatePairingTokenResponse503Headers the declared response headers of an HTTP 503 response for CreatePairingToken
-type CreatePairingTokenResponse503Headers struct {
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      int
-}
-
-type CreatePairingTokenResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *struct {
-		// PairingToken Required within this object. The opaque, single-use token to give to the other instance's administrator. Treat it as a secret until it is redeemed.
-		PairingToken string `json:"pairing_token"`
-	}
-	// JSON401 the response for an HTTP 401 `application/json` response
-	JSON401 *ErrorResponse
-	// JSON403 the response for an HTTP 403 `application/json` response
-	JSON403 *ErrorResponse
-	// JSON404 the response for an HTTP 404 `application/json` response
-	JSON404 *ErrorResponse
-	// JSON429 the response for an HTTP 429 `application/json` response
-	JSON429 *TooManyRequests
-	// JSON501 the response for an HTTP 501 `application/json` response
-	JSON501 *ErrorResponse
-	// JSON503 the response for an HTTP 503 `application/json` response
-	JSON503 *ServiceUnavailable
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *CreatePairingTokenResponse429Headers
-	// Headers503 the parsed response headers for an HTTP 503 response
-	Headers503 *CreatePairingTokenResponse503Headers
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r CreatePairingTokenResponse) GetJSON200() *struct {
-	// PairingToken Required within this object. The opaque, single-use token to give to the other instance's administrator. Treat it as a secret until it is redeemed.
-	PairingToken string `json:"pairing_token"`
-} {
-	return r.JSON200
-}
-
-// GetJSON401 returns the response for an HTTP 401 `application/json` response
-func (r CreatePairingTokenResponse) GetJSON401() *ErrorResponse {
-	return r.JSON401
-}
-
-// GetJSON403 returns the response for an HTTP 403 `application/json` response
-func (r CreatePairingTokenResponse) GetJSON403() *ErrorResponse {
-	return r.JSON403
-}
-
-// GetJSON404 returns the response for an HTTP 404 `application/json` response
-func (r CreatePairingTokenResponse) GetJSON404() *ErrorResponse {
-	return r.JSON404
-}
-
-// GetJSON429 returns the response for an HTTP 429 `application/json` response
-func (r CreatePairingTokenResponse) GetJSON429() *TooManyRequests {
-	return r.JSON429
-}
-
-// GetJSON501 returns the response for an HTTP 501 `application/json` response
-func (r CreatePairingTokenResponse) GetJSON501() *ErrorResponse {
-	return r.JSON501
-}
-
-// GetJSON503 returns the response for an HTTP 503 `application/json` response
-func (r CreatePairingTokenResponse) GetJSON503() *ServiceUnavailable {
-	return r.JSON503
-}
-
-// GetBody returns the raw response body bytes
-func (r CreatePairingTokenResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r CreatePairingTokenResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r CreatePairingTokenResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r CreatePairingTokenResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
 // ExportAccessConfigurationResponse429Headers the declared response headers of an HTTP 429 response for ExportAccessConfiguration
 type ExportAccessConfigurationResponse429Headers struct {
 	RateLimit       *string
@@ -33591,21 +33399,6 @@ func (c *ClientWithResponses) UpdateScimUserWithApplicationScimPlusJSONBodyWithR
 		return nil, err
 	}
 	return ParseUpdateScimUserResponse(rsp)
-}
-
-// CreatePairingTokenWithResponse Create a pairing token
-//
-// Issues a single-use pairing token on this instance so that another instance of this server can establish mutual trust with it over the peer protocol (decision 0021). Run it on the instance that is to be trusted, hand the token to the administrator of the other instance, who redeems it there, for example when adding this instance as a follower (POST /pfed/api/v1/jpd) or registering it as an Access federation target. Redeeming exchanges per-peer keys that are sealed at rest (decision 0017); the token itself is never stored in clear and stops working once redeemed or when it expires, 300 seconds after issue by default (configurable). Only the platform-federation use case is supported; mission-control and bridge answer 501. The peer must be another instance of this server. Administrators only.
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /api/v1/service_trust/pairing/{useCase} (the `CreatePairingToken` operationId).
-func (c *ClientWithResponses) CreatePairingTokenWithResponse(ctx context.Context, useCase CreatePairingTokenParamsUseCase, reqEditors ...RequestEditorFn) (*CreatePairingTokenResponse, error) {
-	rsp, err := c.CreatePairingToken(ctx, useCase, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCreatePairingTokenResponse(rsp)
 }
 
 // ExportAccessConfigurationWithResponse Export the Access configuration (not supported)
@@ -46345,128 +46138,6 @@ func ParseUpdateScimUserResponse(rsp *http.Response) (*UpdateScimUserResponse, e
 		response.Headers429 = &headers
 	case rsp.StatusCode == 503:
 		var headers UpdateScimUserResponse503Headers
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
-			var value int
-			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RetryAfter = value
-		}
-		response.Headers503 = &headers
-	}
-
-	return response, nil
-}
-
-// ParseCreatePairingTokenResponse parses an HTTP response from a CreatePairingTokenWithResponse call
-func ParseCreatePairingTokenResponse(rsp *http.Response) (*CreatePairingTokenResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &CreatePairingTokenResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			// PairingToken Required within this object. The opaque, single-use token to give to the other instance's administrator. Treat it as a secret until it is redeemed.
-			PairingToken string `json:"pairing_token"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest ErrorResponse
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest ErrorResponse
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest ErrorResponse
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
-		var dest TooManyRequests
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON429 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 501:
-		var dest ErrorResponse
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON501 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
-		var dest ServiceUnavailable
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON503 = &dest
-
-	}
-
-	switch {
-	case rsp.StatusCode == 429:
-		var headers CreatePairingTokenResponse429Headers
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
-			var value int
-			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RetryAfter = value
-		}
-		response.Headers429 = &headers
-	case rsp.StatusCode == 503:
-		var headers CreatePairingTokenResponse503Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {

@@ -478,6 +478,8 @@ func TestAccHeadAnswersHandwrittenGets(t *testing.T) {
 		{path: "/router/api/v1/system/liveness"},
 		{path: "/artifactory/api/pypi/pypi-local/pypi/foo/json"},
 		{path: "/artifactory/api/pypi/pypi-local/pypi/foo/1.0/json"},
+		{path: "/artifactory/api/v1/service_trust/pairings/artifactory-cold"},
+		{path: "/artifactory/api/v1/service_trust/pairings/federated-repo/*"},
 	}
 	router, ok := w.h.(chi.Routes)
 	if !ok {

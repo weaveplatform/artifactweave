@@ -87,10 +87,10 @@
 // # Status
 //
 // Implemented P13 (PEER-01): the document and its generated server. The
-// router's peer service embeds UnimplementedStrict and implements nothing,
-// so every operation a paired peer signs answers 501, signed, until PEER-02
-// to PEER-05 and FED-01 build them; an unsigned request is refused before
-// it reaches this server (PEER-03).
+// router's peer service embeds UnimplementedStrict and serves POST and
+// DELETE /pair (PEER-02); every other operation a paired peer signs answers
+// 501, signed, until PEER-04, PEER-05 and FED-01 build them. An unsigned
+// request is refused before it reaches this server (PEER-03).
 //
 // # Testing
 //
@@ -100,8 +100,8 @@
 //   - TestAccHandwrittenRoutesNotGenerated: the generated mux holds every
 //     operation of the document.
 //   - TestAccPeerOperationsSignedBetweenInstances: every operation, signed
-//     by a paired instance's peer client, answers a signed 501 in the flat
-//     envelope over SQLite and PostgreSQL.
+//     by a paired instance's peer client, answers signed in the flat
+//     envelope over SQLite and PostgreSQL: 501, or /pair's own answer.
 //   - TestAccPeerOperationsRefuseUnsignedAtStartUp: unsigned, every
 //     operation is refused 401 through the server run starts.
 //   - TestAccPeerServiceOutsideParityOracle: the document stays outside the

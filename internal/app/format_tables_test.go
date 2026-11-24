@@ -43,6 +43,7 @@ var statusParts = []statusPart{
 	pkgtestStatusPart,
 	reindexStatusPart,
 	cranArchiveStatusPart,
+	serviceTrustStatusPart,
 }
 
 // matrixPart is a format's share of the route × principal matrix.
@@ -64,6 +65,7 @@ var matrixParts = []matrixPart{
 	pkgtestMatrixPart,
 	reindexMatrixPart,
 	cranArchiveMatrixPart,
+	serviceTrustMatrixPart,
 }
 
 // partRoutes is the routes each status part lists under pick.

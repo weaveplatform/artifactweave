@@ -6221,6 +6221,12 @@ type SecurityStatusMessage struct {
 	Status *string `json:"status,omitempty"`
 }
 
+// ServiceTrustMessage The body of every service trust answer other than a pairing token or a pairing list, success or error.
+type ServiceTrustMessage struct {
+	// Message Required within this object. What happened. An error names the operation first, for example "Error while token pairing." followed by the reason.
+	Message string `json:"message"`
+}
+
 // SetSingleReplicationConfigurationRequest One single-target configuration, supplied as an object or a one-element array.
 type SetSingleReplicationConfigurationRequest struct {
 	union json.RawMessage
