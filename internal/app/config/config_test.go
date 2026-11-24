@@ -170,6 +170,7 @@ func TestUnitFileCoversEveryKey(t *testing.T) {
 		Maven:        Maven{SnapshotCleanupInterval: 2 * time.Minute},
 		NuGet:        NuGet{SnapshotCleanupInterval: 3 * time.Minute},
 		XZ:           XZ{DictionaryBudget: 512 << 20},
+		Federation:   Federation{OutboxRetention: 72 * time.Hour},
 		Virtual: Virtual{MetadataCache: VirtualMetadataCache{
 			MaxEntries: 2000, MaxSize: 64 << 20,
 		}},
@@ -203,7 +204,7 @@ func TestUnitEnvCoversEveryKey(t *testing.T) {
 		case strings.HasSuffix(k, ".member_timeout"), strings.HasPrefix(k, "gc."),
 			strings.HasSuffix(k, ".ttl"), k == "work.lease", strings.HasPrefix(k, "aql_timeout."),
 			k == "maven.snapshot_cleanup_interval", k == "npm.login_token_expiry",
-			strings.HasPrefix(k, "nuget."):
+			strings.HasPrefix(k, "nuget."), k == "federation.outbox_retention":
 			env[envName(k)] = "45s"
 		default:
 			// String keys accept "true" as a plain string; the booleans parse it.
@@ -233,6 +234,7 @@ func TestUnitEnvCoversEveryKey(t *testing.T) {
 		!cfg.PyPI.EnforceLayout || !cfg.PyPI.EnforceNamingNormalization ||
 		!cfg.PyPI.SimpleJSON || !cfg.PyPI.CoreMetadata ||
 		cfg.Environments.GlobalLimit != 3 || cfg.NuGet.SnapshotCleanupInterval != 45*time.Second ||
+		cfg.Federation.OutboxRetention != 45*time.Second ||
 		cfg.Blob.S3.CDN.CloudFront.KeyPairID != "true" ||
 		cfg.ColdBlob.S3.CDN.CloudFront.PathPrefix != "true" ||
 		cfg.Blob.Azure.CDN.FrontDoor.Endpoint != "true" ||
