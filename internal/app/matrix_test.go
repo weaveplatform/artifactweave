@@ -1167,6 +1167,27 @@ func keypairMatrix() []matrixRow {
 			k.bundle, administrators, 200,
 		),
 		row("DELETE "+cert+"/{certificateAlias}", cert+"/cert-{p}", "", administrators, 200),
+		// The instance GPG key (#1654): admin-only writes of one field each,
+		// and its public half, which any caller reads once it is set
+		// (getgpgpublickey). passphrase: sends the header (checksumDeploy).
+		at("PUT /artifactory/api/gpg/key/private", k.gpgPrivate, administrators, 200),
+		at("PUT /artifactory/api/gpg/key/public", k.gpgPublic, administrators, 200),
+		at("PUT /artifactory/api/gpg/passphrase", "passphrase:secret", administrators, 200),
+		at("GET /artifactory/api/gpg/key/public", "", anyone, 200).seeding(
+			func(t *testing.T, f *matrixFixture, _ string) {
+				t.Helper()
+				// The first principal's seed sets it for the rest.
+				if _, err := f.db.Keys().Keypair(t.Context(), api.DefaultGPGKey); err == nil {
+					return
+				}
+				if err := f.db.Keys().CreateKeypair(t.Context(), api.Keypair{
+					Name: api.DefaultGPGKey, Alias: api.DefaultGPGKey, Type: api.KeypairGPG,
+					PrivateKey: k.gpgPrivate, PublicKey: k.gpgPublic,
+				}); err != nil {
+					t.Fatal(err)
+				}
+			},
+		),
 	}
 }
 
