@@ -84,6 +84,9 @@ type faults struct {
 	corrupt, truncate bool
 	// fetchErr fails every blob fetch with itself.
 	fetchErr error
+	// beforePush, when set, runs once as the next push is sent, before the
+	// receiver sees it.
+	beforePush func()
 }
 
 var errDropped = errors.New("connection dropped after the request was sent")
@@ -289,6 +292,13 @@ func caller(to *node, from string) (model.Peer, error) {
 }
 
 func (r remote) Push(ctx context.Context, peer model.Peer, b streamsync.Batch) (int64, error) {
+	r.w.mu.Lock()
+	before := r.w.faults.beforePush
+	r.w.faults.beforePush = nil
+	r.w.mu.Unlock()
+	if before != nil {
+		before()
+	}
 	to, err := r.target(peer)
 	if err != nil {
 		return 0, err
