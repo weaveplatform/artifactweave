@@ -351,31 +351,65 @@ func TestUnitDeployOverwriteIdentical(t *testing.T) {
 	}
 }
 
-// The refusal reads as Artifactory 7.x's (RTFACT-26398, a 7.26.0 REST
-// deploy), which clients match on "overwrite artifact", and is still
+// The refusal reads as 7.161.26's REQUIRES_DELETE_PERMISSION, which
+// names the file as '<repo>/<path>' (#1916); RTFACT-31423 (7.136.0) and
+// conan-io/conan#19271 show the same text from 7.x servers. While the
+// setting hides it, the text is ARTIFACT_NOT_FOUND's. It is still
 // ErrOverwriteDenied to a caller that tests for that.
 func TestUnitOverwriteDeniedText(t *testing.T) {
 	for _, c := range []struct {
 		err      *OverwriteDeniedError
 		expected string
+		notFound string
 	}{
 		{
-			&OverwriteDeniedError{Repo: "test-libs-release-local", Path: "abc-test-art-plugin-0.3.jar", User: "abc@jfrog.com"},
-			"Not enough permissions to delete/overwrite artifact " +
-				"'test-libs-release-local:abc-test-art-plugin-0.3.jar' " +
-				"(user: 'abc@jfrog.com' needs DELETE permission).",
+			&OverwriteDeniedError{Repo: "davidfa-opkg-local", Path: "_temp-1770714485539_", User: "davidfa-test"},
+			"Artifact deletion error: Not enough permissions to delete/overwrite all artifacts under " +
+				"'davidfa-opkg-local/_temp-1770714485539_' (user: 'davidfa-test' needs DELETE permission).",
+			"Artifact deletion error: Could not locate artifact. Path: 'davidfa-opkg-local/_temp-1770714485539_'",
 		},
 		{
 			&OverwriteDeniedError{Repo: "pypi-local", Path: "pkg/1.0/pkg-1.0.tar.gz", User: "anonymous"},
-			"Not enough permissions to delete/overwrite artifact 'pypi-local:pkg/1.0/pkg-1.0.tar.gz' " +
-				"(user: 'anonymous' needs DELETE permission).",
+			"Artifact deletion error: Not enough permissions to delete/overwrite all artifacts under " +
+				"'pypi-local/pkg/1.0/pkg-1.0.tar.gz' (user: 'anonymous' needs DELETE permission).",
+			"Artifact deletion error: Could not locate artifact. Path: 'pypi-local/pkg/1.0/pkg-1.0.tar.gz'",
 		},
 	} {
 		if got := c.err.Error(); got != c.expected {
 			t.Errorf("text %q, want %q", got, c.expected)
 		}
+		if got := c.err.NotFound(); got != c.notFound {
+			t.Errorf("hidden text %q, want %q", got, c.notFound)
+		}
 		if !errors.Is(fmt.Errorf("deploy: %w", c.err), ErrOverwriteDenied) {
 			t.Errorf("%v is not ErrOverwriteDenied", c.err)
+		}
+	}
+}
+
+// TestUnitOverwriteNeedsDelete: only the files 7.161.26's
+// shouldProtectPathDeletion leaves unprotected are replaced without Delete
+// (#1916): checksum files by media type, Maven metadata and Maven
+// non-unique snapshots, in any package type's layout.
+func TestUnitOverwriteNeedsDelete(t *testing.T) {
+	for p, needs := range map[string]bool{
+		"a.txt":                               true,
+		"g/a/1.0/a-1.0.jar":                   true,
+		"a.txt.sha1":                          false,
+		"a.txt.SHA256":                        false,
+		"a.txt.md5":                           false,
+		"a.txt.sha512":                        true, // not application/x-checksum in 7.x's mime types
+		"g/a/maven-metadata.xml":              false,
+		"maven-metadata.xml":                  false,
+		"g/a/repo:maven-metadata.xml":         false,
+		"g/a/maven-metadata.xml.bak":          true,
+		"g/a/1.0-SNAPSHOT/a-1.0-SNAPSHOT.jar": false,
+		"g/a/1.0-SNAPSHOT/a-1.0-SNAPSHOT-sources.jar":  false,
+		"g/a/1.0-SNAPSHOT/a-1.0-20261124.040638-2.jar": true,
+		"g/a/1.0/a-1.0-SNAPSHOT.jar":                   true,
+	} {
+		if got := OverwriteNeedsDelete(p); got != needs {
+			t.Errorf("%q: %v, want %v", p, got, needs)
 		}
 	}
 }

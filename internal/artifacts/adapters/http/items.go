@@ -68,15 +68,18 @@ func (s ArtifactoryAPI) builds(st Store) *build.Service {
 // deployItem answers PUT on an item path: a file, a folder (trailing slash),
 // a checksum deploy, or a checksum sidecar for an existing file.
 func (s ArtifactoryAPI) deployItem(w http.ResponseWriter, r *http.Request) {
-	s.deployEscapedItem(w, r, strings.TrimPrefix(r.URL.EscapedPath(), "/artifactory/"))
+	s.deployEscapedItem(w, r, strings.TrimPrefix(r.URL.EscapedPath(), "/artifactory/"), itemkit.DeployRefusal)
 }
 
 // deployEscapedItem also serves package APIs that expose ordinary item PUTs.
 // Keeping the original request preserves its error envelope and base URL.
+// refuse answers an overwrite the caller may not make: only the item route
+// hides it, since 7.x's package endpoints are closed code.
 func (s ArtifactoryAPI) deployEscapedItem(
 	w http.ResponseWriter,
 	r *http.Request,
 	escaped string,
+	refuse func(context.Context, *item.OverwriteDeniedError) error,
 ) {
 	ctx := r.Context()
 	st, err := s.content()
@@ -137,8 +140,9 @@ func (s ArtifactoryAPI) deployEscapedItem(
 	existing, err := st.Items().Get(ctx, c.Key, false, req.Path)
 	switch {
 	case err == nil && !existing.Folder && !req.IsFolder && !explode &&
-		!s.MayBeIdentical(byChecksum) && !acc.File(c, req.Path, api.ActionDelete):
-		httpkit.WriteErr(w, r, itemkit.OverwriteRefusal(ctx, &item.OverwriteDeniedError{
+		item.OverwriteNeedsDelete(req.Path) && !s.MayBeIdentical(byChecksum) &&
+		!acc.File(c, req.Path, api.ActionDelete):
+		httpkit.WriteErr(w, r, refuse(ctx, &item.OverwriteDeniedError{
 			Repo: c.Key, Path: req.Path, User: p.Name,
 		}))
 		return
@@ -178,7 +182,12 @@ func (s ArtifactoryAPI) deployEscapedItem(
 	if answered(w, err) {
 		return
 	}
-	if err != nil {
+	var overwrite *item.OverwriteDeniedError
+	switch {
+	case errors.As(err, &overwrite):
+		httpkit.WriteErr(w, r, refuse(ctx, overwrite))
+		return
+	case err != nil:
 		httpkit.WriteErr(w, r, s.ItemError(ctx, "deploy", err))
 		return
 	}
@@ -435,8 +444,7 @@ func deleteRefused(c repo.Config, path string, p kernel.Principal) error {
 	if c.Class == repo.Remote {
 		key += model.CacheSuffix
 	}
-	return apierror.Hide(refusal, apierror.New(http.StatusNotFound,
-		fmt.Sprintf("Artifact deletion error: Could not locate artifact. Path: '%s/%s'", key, path)))
+	return apierror.Hide(refusal, apierror.New(http.StatusNotFound, item.ArtifactNotFound(key, path)))
 }
 
 // GetUploadsConfig tells the JFrog CLI whether to upload large files in

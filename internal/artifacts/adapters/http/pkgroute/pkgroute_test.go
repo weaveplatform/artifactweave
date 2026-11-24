@@ -546,8 +546,8 @@ func TestAccDeploy(t *testing.T) {
 	// item service's own refusal, naming the file and the caller, and is
 	// answered in the protocol's envelope; the file is left as it was.
 	rec = f.do(http.MethodPut, base+local+"/files/a/b.txt", "updater", "other")
-	const refused = "Not enough permissions to delete/overwrite artifact 'gen-local:a/b.txt' " +
-		"(user: 'updater' needs DELETE permission)."
+	const refused = "Artifact deletion error: Not enough permissions to delete/overwrite all artifacts " +
+		"under 'gen-local/a/b.txt' (user: 'updater' needs DELETE permission)."
 	if got := npmError(t, rec); rec.Code != http.StatusForbidden || got != refused {
 		t.Fatalf("refused overwrite: %d %q", rec.Code, got)
 	}

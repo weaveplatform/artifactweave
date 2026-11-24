@@ -694,11 +694,29 @@ func nonUniqueSnapshot(p string) bool {
 	return strings.Contains(name, "-SNAPSHOT.") || strings.Contains(name, "-SNAPSHOT-")
 }
 
+// OverwriteNeedsDelete reports whether replacing the file at full needs the
+// Delete permission. 7.161.26's shouldProtectPathDeletion
+// (DbStoringRepoMixin 932-966) lets anyone who may deploy a file replace a
+// checksum file (the application/x-checksum media type), Maven metadata
+// (MavenNaming.isMavenMetadata) and a Maven non-unique snapshot
+// (NonUniqueSnapshotArtifactExpirableOrOverridable, for every package
+// type), since clients rewrite all three on every build. Closed 7.x code
+// may add more (LocalNonCacheOverridable).
+func OverwriteNeedsDelete(full string) bool {
+	name := path.Base(full)
+	return MimeType(name) != "application/x-checksum" && name != mavenMetadata &&
+		!strings.HasSuffix(name, ":"+mavenMetadata) && !nonUniqueSnapshot(full)
+}
+
 // mayReplace reports whether d may replace old, the file at full, with
-// content whose digests are actual: CanOverwritePath allows it, or
+// content whose digests are actual: the file needs no Delete
+// (OverwriteNeedsDelete), CanOverwritePath allows it, or
 // OverwriteIdentical does and the deploy declares and stores old's own
 // content.
 func (d *Deploy) mayReplace(ctx context.Context, full string, old model.Item, declared, actual kernel.Checksums) (bool, error) {
+	if !OverwriteNeedsDelete(full) {
+		return true, nil
+	}
 	if d.CheckCurrent != nil {
 		err := d.checkCurrent(ctx, full, false, accessapi.ActionDelete)
 		if err == nil {

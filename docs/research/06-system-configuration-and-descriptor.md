@@ -611,7 +611,8 @@ with no challenge. A local, remote, remote-cache and virtual file download is th
 hidden, a checksum and an archive entry as their file, and so is the trace of one. A
 cache fill the remote's deploy check rejects keeps its answer, since
 `respondFoundResource` answers it; a folder keeps its listing's answer; and a deployment
-keeps its answer, the deploy handlers being closed code **[I]**. The Git LFS and Hugging
+the caller may not make keeps its answer, since `assertValidDeployPathAndPermissions`
+(2818-2871) does not read the setting for it, except an overwrite without Delete (below). The Git LFS and Hugging
 Face virtual handlers, whose 7.x code is closed, hide their anonymous challenge under
 either setting, as `PackageSecurityServiceImpl.shouldHideUnauthorizedResources` gives the
 global one to package handlers **[I]**.
@@ -634,6 +635,14 @@ REST surfaces 7.161.26 also hides, each with its own answer:
   a `DELETE` without Delete answers 404 `Artifact deletion error: Could not locate
   artifact. Path: '<repo>/<path>'`, under a remote's cache key. The root's refusal
   (`isForbiddenRootPathDelete`) is never hidden.
+- Overwriting on deploy ([#1916](https://github.com/weaveplatform/artifactweave/issues/1916)):
+  `assertValidDeployPathAndPermissions` runs the same check with `assertOverwrite`
+  (2848-2853), and `UploadServiceImpl.handleInvalidDeployPathError` (379-391) sends its
+  404 with no challenge, which it gives only a 403. So the item deploy route answers a
+  deploy over a file without Delete with 404 `Artifact deletion error: Could not locate
+  artifact. Path: '<repo>/<path>'`, naming the file the 403 names, to an anonymous caller
+  too. The package formats' own upload endpoints keep their 403, their 7.x handlers
+  being closed code **[I]**.
 - The REST exception mappers: `interceptForbiddenStatus` (84-93) answers an anonymous
   caller's forbidden with a bare 404 instead of the 401 challenge, which
   `RestResponseFilter` fills in as 404 `Not Found`. Jersey applies the

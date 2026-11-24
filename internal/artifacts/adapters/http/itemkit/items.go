@@ -164,16 +164,29 @@ func (s *Kit) ItemError(ctx context.Context, op string, err error) error {
 }
 
 // OverwriteRefusal answers a write refused because it would replace a file
-// the caller may not delete, with Artifactory's text
-// (item.OverwriteDeniedError) in whatever envelope the route renders. The
-// status is 403, or 401 with a challenge to an anonymous caller, as 6.20's
-// UploadServiceImpl.handleInvalidDeployPathError answers one: a client that
-// sends credentials only when challenged would otherwise never send them.
+// the caller may not delete, with 7.x's text (item.OverwriteDeniedError) in
+// whatever envelope the route renders. The status is 403, or 401 with a
+// challenge to an anonymous caller, as 7.161.26's
+// UploadServiceImpl.handleInvalidDeployPathError (379-391) answers a 403
+// rejection for the anonymous user (UploadServiceUtils
+// .rejectionSignifiesRequiredAuthorization 135-138): a client that sends
+// credentials only when challenged would otherwise never send them.
 func OverwriteRefusal(ctx context.Context, e *item.OverwriteDeniedError) error {
 	if p, ok := kernel.FromContext(ctx); ok && !p.Anonymous {
 		return apierror.New(http.StatusForbidden, e.Error())
 	}
 	return apierror.New(http.StatusUnauthorized, e.Error())
+}
+
+// DeployRefusal is OverwriteRefusal for the item deploy route, with the
+// answer that hides it. While the global hideUnauthorizedResources is on,
+// 7.161.26's assertNonRootPathDelete records ARTIFACT_NOT_FOUND for an
+// overwrite (3428-3444), and handleInvalidDeployPathError sends its 404 with
+// no challenge, since only a 403 earns the anonymous user one. Package
+// formats' own upload endpoints are closed code in 7.x, so they keep
+// OverwriteRefusal whatever the setting.
+func DeployRefusal(ctx context.Context, e *item.OverwriteDeniedError) error {
+	return apierror.Hide(OverwriteRefusal(ctx, e), apierror.New(http.StatusNotFound, e.NotFound()))
 }
 
 // ItemNotFound is the 404 for a missing item. No public source documents

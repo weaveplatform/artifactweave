@@ -210,8 +210,8 @@ func TestAccRepublish(t *testing.T) {
 		},
 		{
 			"info", "deployer", `{"Version":"v1.0.0","Time":"2026-10-17T21:04:05Z"}`, http.StatusForbidden,
-			"Not enough permissions to delete/overwrite artifact 'go-local:example.com/m/@v/v1.0.0.info' " +
-				"(user: 'deployer' needs DELETE permission).\n",
+			"Artifact deletion error: Not enough permissions to delete/overwrite all artifacts under " +
+				"'go-local/example.com/m/@v/v1.0.0.info' (user: 'deployer' needs DELETE permission).\n",
 		},
 		{"info", "maintainer", `{"Version":"v1.0.0","Time":"2026-10-17T21:04:05Z"}`, http.StatusCreated, ""},
 	} {
