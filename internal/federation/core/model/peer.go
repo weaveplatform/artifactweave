@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/platform/instance"
 	"github.com/weaveplatform/artifactweave/internal/platform/outbox"
 )
 
@@ -69,9 +70,16 @@ type Peer struct {
 // Has reports whether the peer is paired for u.
 func (p Peer) Has(u UseCase) bool { return slices.Contains(p.UseCases, u) }
 
+// Compatible reports whether the peer's recorded major protocol version is
+// this build's. A verified request with another major version is refused
+// and recorded (decision 0021, Versioning), so the peer shows unavailable
+// until it speaks this build's version again.
+func (p Peer) Compatible() bool { return p.ProtocolVersion == instance.ProtocolVersion }
+
 // DeriveStatus computes the JPD status: UNAUTHORIZED when the last signed
-// exchange was rejected, OFFLINE when nothing succeeded within the stale
-// window, PARTIAL when some use cases are failing, ONLINE otherwise.
+// exchange was rejected, OFFLINE when its protocol major version is not
+// this build's or nothing succeeded within the stale window, PARTIAL when
+// some use cases are failing, ONLINE otherwise.
 func (p Peer) DeriveStatus(
 	now time.Time,
 	stale time.Duration,
@@ -81,7 +89,7 @@ func (p Peer) DeriveStatus(
 	switch {
 	case rejected:
 		return PeerUnauthorized
-	case p.LastSeen.IsZero() || now.Sub(p.LastSeen) > stale:
+	case !p.Compatible(), p.LastSeen.IsZero() || now.Sub(p.LastSeen) > stale:
 		return PeerOffline
 	case failingUseCases > 0:
 		return PeerPartial

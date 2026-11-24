@@ -10,6 +10,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/model"
+	"github.com/weaveplatform/artifactweave/internal/platform/instance"
 	"github.com/weaveplatform/artifactweave/internal/platform/outbox"
 )
 
@@ -41,7 +42,10 @@ func TestUnitPeer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := model.Peer{PublicKey: pub, UseCases: []model.UseCase{model.UseFederation}, LastSeen: t0}
+	p := model.Peer{
+		PublicKey: pub, UseCases: []model.UseCase{model.UseFederation}, LastSeen: t0,
+		ProtocolVersion: instance.ProtocolVersion,
+	}
 	if !p.Has(model.UseFederation) || p.Has(model.UseDistribution) {
 		t.Error("Peer.Has")
 	}
@@ -64,6 +68,19 @@ func TestUnitPeer(t *testing.T) {
 	}
 	if (model.Peer{}).DeriveStatus(t0, stale, false, 0) != model.PeerOffline {
 		t.Error("a never-seen peer is offline")
+	}
+	// A recorded major version mismatch makes a peer seen a minute ago
+	// unavailable (decision 0021, Versioning), and unauthorized still wins.
+	other := p
+	other.ProtocolVersion = instance.ProtocolVersion + 1
+	if other.Compatible() || !p.Compatible() {
+		t.Error("Peer.Compatible")
+	}
+	if got := other.DeriveStatus(t0.Add(time.Minute), stale, false, 0); got != model.PeerOffline {
+		t.Errorf("a peer speaking another major version is %s, want OFFLINE", got)
+	}
+	if got := other.DeriveStatus(t0, stale, true, 0); got != model.PeerUnauthorized {
+		t.Errorf("a rejected peer of another major version is %s, want UNAUTHORIZED", got)
 	}
 	n := model.PairingNonce{ExpiresAt: t0.Add(model.PairingTokenTTL)}
 	if !n.Usable(t0) || n.Usable(t0.Add(model.PairingTokenTTL)) {

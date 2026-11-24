@@ -124,6 +124,8 @@ type RouterStore interface {
 	instance.Store
 	// The receipts of the keyed operations' replay (keyed.go).
 	Replays() idempotency.ReplayStore
+	// The peer records and replay cache the peer transport verifies with.
+	PeerStore
 	// Subscription administration and its sealed handler secrets.
 	notifications.Store
 }
@@ -746,6 +748,9 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			),
 		)
 	}
+	// Ahead of routing, so nothing under the peer prefix is served without
+	// a paired peer's signature; user authentication above skips it.
+	r.Use(peerGuard(cfg.Store, time.Now))
 	// After authentication, which it needs, and ahead of routing, which
 	// cannot match it (HelmPartialReindex).
 	if cfg.Store != nil {
@@ -951,8 +956,9 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			},
 		)
 		// artifactweave's own peer protocol (decision 0021), beside the
-		// JFrog prefixes and outside the parity oracle; every operation
-		// answers 501 until PEER-02 to PEER-05 and FED-01 serve it.
+		// JFrog prefixes and outside the parity oracle; peerGuard verifies
+		// every request first, and every operation answers 501 until
+		// PEER-02 to PEER-05 and FED-01 serve it.
 		peerOpts := peergen.StrictHTTPServerOptions{
 			RequestErrorHandlerFunc:  middleware.BindingError(http.StatusBadRequest),
 			ResponseErrorHandlerFunc: middleware.BindingError(http.StatusInternalServerError),
@@ -1333,17 +1339,6 @@ func skipsAuthentication(mounted []pkgroute.Protocol) func(*http.Request) bool {
 		})
 	}
 }
-
-// peerBase is the prefix of the peer API (decision 0021), its spec's
-// servers[0].url.
-const peerBase = "/artifactweave/peer/v1"
-
-// peerRequest reports a request to the peer API, which user authentication
-// skips. A peer proves who it is with an HTTP message signature, which the
-// peer middleware verifies (PEER-03), and carries no user credential: user
-// authentication would answer every peer 401 while anonymous access is off,
-// and run it as the anonymous user while it is on.
-func peerRequest(r *http.Request) bool { return strings.HasPrefix(r.URL.Path, peerBase+"/") }
 
 // errorProfileFor is the profile errorProfileRules give path. Unclaimed
 // routes keep the same profile as handled requests so clients can read

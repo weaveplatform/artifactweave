@@ -168,6 +168,11 @@ func (p peerStore) Delete(ctx context.Context, instanceID string) error {
 	})
 }
 
+func (p peerStore) SetProtocolVersion(ctx context.Context, instanceID string, major int) error {
+	return p.s.ExecOne(ctx, "set peer protocol version "+instanceID,
+		"UPDATE peers SET protocol_version = ? WHERE instance_id = ?", major, instanceID)
+}
+
 func (p peerStore) AddNonce(ctx context.Context, n model.PairingNonce) error {
 	_, err := p.s.Exec(
 		ctx,
@@ -233,6 +238,35 @@ func (p peerStore) RedeemNonce(
 func (p peerStore) PruneNonces(ctx context.Context, before time.Time) (int64, error) {
 	return p.s.Exec(ctx, "prune pairing nonces",
 		"DELETE FROM pairing_nonces WHERE expires_at IS NULL OR expires_at < ?", before.UnixMicro())
+}
+
+// RequestNonces returns the replay cache of signed peer requests (decision
+// 0021, Transport).
+func (s *Store) RequestNonces() port.RequestNonceStore { return requestNonceStore{s} }
+
+type requestNonceStore struct{ s *Store }
+
+func (n requestNonceStore) Remember(ctx context.Context, hash []byte, expires, now time.Time) error {
+	// One statement, so two concurrent requests with one nonce cannot both
+	// insert: the second meets the first's row and updates it only when it
+	// has expired, which leaves no row changed while it is live.
+	changed, err := n.s.Exec(ctx, "remember peer request nonce",
+		"INSERT INTO peer_request_nonces (nonce_hash, expires_at) VALUES (?, ?) "+
+			"ON CONFLICT (nonce_hash) DO UPDATE SET expires_at = excluded.expires_at "+
+			"WHERE peer_request_nonces.expires_at <= ?",
+		hash, expires.UnixMicro(), now.UnixMicro())
+	if err != nil {
+		return err
+	}
+	if changed == 0 {
+		return fmt.Errorf("remember peer request nonce: %w", kernel.ErrConflict)
+	}
+	return nil
+}
+
+func (n requestNonceStore) Prune(ctx context.Context, before time.Time) (int64, error) {
+	return n.s.Exec(ctx, "prune peer request nonces",
+		"DELETE FROM peer_request_nonces WHERE expires_at < ?", before.UnixMicro())
 }
 
 // Federation returns the federated repository store: members and full
