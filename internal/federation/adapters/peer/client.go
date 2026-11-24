@@ -246,6 +246,41 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 	}
 }
 
+// Stream sends req, which has no body, signed, once, and hands the answer
+// to into once its signature over the status and fields verifies, with
+// its body unread. It is for an answer too large to hold, a blob: the
+// signature covers Content-Digest, and into must check the content
+// against it before using it. An answer that does not verify is an
+// *UnverifiedAnswerError and into is not called.
+func (c *Client) Stream(req *http.Request, into func(*http.Response) error) error {
+	signer, err := c.f.o.Signer(req.Context())
+	if err != nil {
+		return fmt.Errorf("peer request signer: %w", err)
+	}
+	r := req.Clone(req.Context())
+	r.Body, r.GetBody, r.ContentLength = http.NoBody, nil, 0
+	target := r.URL.Scheme + "://" + r.URL.Host + r.URL.RequestURI()
+	if err := signer.SignRequest(r.Method, target, r.Header, nil); err != nil {
+		return err //nolint:wrapcheck // SignRequest names the failure
+	}
+	resp, err := c.http.Do(r)
+	if err != nil {
+		return fmt.Errorf("peer %s: %w", c.peer.InstanceID, err)
+	}
+	defer resp.Body.Close()
+	m := corepeer.Message{
+		Status: resp.StatusCode, Header: resp.Header,
+		Request: &corepeer.Message{Method: r.Method, TargetURI: target, Header: r.Header},
+	}
+	if len(c.peer.PublicKey) == 0 {
+		return &UnverifiedAnswerError{Status: resp.StatusCode, Err: ErrNoPeerKey}
+	}
+	if err := corepeer.VerifyResponseFields(m, c.peer.InstanceID, c.peer.PublicKey, c.f.o.Now()); err != nil {
+		return &UnverifiedAnswerError{Status: resp.StatusCode, Err: err}
+	}
+	return into(resp)
+}
+
 func (c *Client) requestBody(req *http.Request) ([]byte, error) {
 	if req.Body == nil {
 		return nil, nil

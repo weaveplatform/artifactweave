@@ -101,6 +101,37 @@ const (
 	PeerUnauthorized PeerStatus = "UNAUTHORIZED"
 )
 
+// Delivery is how stream entries travel between this instance and a peer
+// (decision 0021, Constraints): an instance behind NAT cannot be pushed to,
+// so it pulls instead, and the instance it pulls from must not push to it.
+// One instance of the pair can reach the other, so the two records of one
+// pair differ: the unreachable instance records the other as DeliveryPull
+// and is recorded by it as DeliveryPulled.
+type Delivery string
+
+// Deliveries. The zero value is DeliveryPush.
+const (
+	// DeliveryPush: each instance pushes its own entries to the other.
+	DeliveryPush Delivery = "push"
+	// DeliveryPull: this instance pulls the peer's entries, because the
+	// peer cannot reach it; it still pushes its own entries to the peer.
+	DeliveryPull Delivery = "pull"
+	// DeliveryPulled: the peer pulls this instance's entries, because this
+	// instance cannot reach it, so this instance pushes nothing to it.
+	DeliveryPulled Delivery = "pulled"
+)
+
+// KnownDelivery reports whether d is one of the deliveries, the zero value
+// included.
+func KnownDelivery(d Delivery) bool {
+	switch d {
+	case "", DeliveryPush, DeliveryPull, DeliveryPulled:
+		return true
+	default:
+		return false
+	}
+}
+
 // Peer is another instance this one is paired with: a federation member, a
 // distribution edge, an Access Federation target, a follower JPD or a
 // topology site. Location fields are set by the administrator.
@@ -116,7 +147,16 @@ type Peer struct {
 	CityName        string
 	CountryCode     string
 	EdgeRole        bool
+	// Delivery is how stream entries travel to and from the peer; the
+	// stores return DeliveryPush for a peer recorded without one.
+	Delivery Delivery
 }
+
+// Pushes reports whether this instance pushes its entries to the peer.
+func (p Peer) Pushes() bool { return p.Delivery != DeliveryPulled }
+
+// Pulls reports whether this instance pulls the peer's entries.
+func (p Peer) Pulls() bool { return p.Delivery == DeliveryPull }
 
 // Has reports whether the peer is paired for u.
 func (p Peer) Has(u UseCase) bool { return slices.Contains(p.UseCases, u) }
@@ -187,6 +227,22 @@ func (s Stamp) After(o Stamp) bool {
 		return c > 0
 	}
 	return s.Origin > o.Origin
+}
+
+// StreamResync records that a receiver's position in an origin's stream is
+// below the origin's pruned floor: the entries after it are gone from the
+// origin's outbox, so the receiver can catch up only through a full sync
+// (decision 0021, Ordered outbox; PEER-05). The origin records it for a
+// peer it cannot send to any more, and the receiver for an origin that
+// answered its pull with 410; one of Origin and Receiver is this instance.
+type StreamResync struct {
+	Origin   string
+	Receiver string
+	Stream   string
+	// Position is the receiver's position when the gap was found: the
+	// highest sequence it had applied, or the origin had seen acknowledged.
+	Position int64
+	Flagged  time.Time
 }
 
 // StreamKind is the family of an outbox stream.

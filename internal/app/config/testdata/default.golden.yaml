@@ -183,6 +183,8 @@ cran:
     archive_mover_enabled: false
 remote:
     allowed_private_origins: []
+federation:
+    outbox_retention: 168h0m0s
 api:
     enabled: true
     authentication_per_minute: 120000

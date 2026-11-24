@@ -403,6 +403,24 @@ func TestUnitRedeemChecksTheAnswer(t *testing.T) {
 	})
 }
 
+// TestUnitRepairKeepsDelivery pairs a second use case with a peer whose
+// record an administrator set to pull: the new grant keeps it, as it keeps
+// the record's other administrator fields.
+func TestUnitRepairKeepsDelivery(t *testing.T) {
+	net := newNetwork()
+	a, b := net.add(t, "https://a.example.com"), net.add(t, "https://b.example.com")
+	pair(t, a, b, model.UseFederatedRepo)
+	p := a.store.peers(t)[0]
+	p.Delivery = model.DeliveryPull
+	if err := a.store.Peers().Put(t.Context(), p); err != nil {
+		t.Fatal(err)
+	}
+	pair(t, a, b, model.UseFederatedRepoRead)
+	if got := a.store.peers(t)[0]; got.Delivery != model.DeliveryPull || len(got.UseCases) != 2 {
+		t.Fatalf("record after the second pairing %+v", got)
+	}
+}
+
 func TestUnitAccept(t *testing.T) {
 	net := newNetwork()
 	a, b := net.add(t, "https://a.example.com"), net.add(t, "https://b.example.com")
@@ -489,10 +507,17 @@ func TestUnitUnpair(t *testing.T) {
 			}); err != nil {
 				t.Fatal(err)
 			}
+			if err := n.store.Resyncs().Flag(t.Context(), model.StreamResync{
+				Origin: n.store.identity().InstanceID, Receiver: other.store.identity().InstanceID,
+				Stream: "repo:libs", Position: 3, Flagged: t0,
+			}); err != nil {
+				t.Fatal(err)
+			}
 		}
 		return net, a, b
 	}
 	cursors := func(n *node) int { return len(must(n.store.Outbox().Cursors(context.Background(), ""))) }
+	flags := func(n *node) int { return len(must(n.store.Resyncs().Resyncs(context.Background(), ""))) }
 
 	t.Run("both sides", func(t *testing.T) {
 		_, a, b := setup(t)
@@ -501,7 +526,7 @@ func TestUnitUnpair(t *testing.T) {
 		}
 		for _, n := range []*node{a, b} {
 			peers := n.store.peers(t)
-			if len(peers) != 1 || fmt.Sprint(peers[0].UseCases) != "[federated-repo/*]" || cursors(n) != 1 {
+			if len(peers) != 1 || fmt.Sprint(peers[0].UseCases) != "[federated-repo/*]" || cursors(n) != 1 || flags(n) != 1 {
 				t.Errorf("%s keeps %+v", n.base, peers)
 			}
 		}
@@ -511,8 +536,9 @@ func TestUnitUnpair(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, n := range []*node{a, b} {
-			if len(n.store.peers(t)) != 0 || cursors(n) != 0 {
-				t.Errorf("%s keeps a peer or cursor", n.base)
+			// A peer's full-sync flags go with its cursors.
+			if len(n.store.peers(t)) != 0 || cursors(n) != 0 || flags(n) != 0 {
+				t.Errorf("%s keeps a peer, cursor or full-sync flag", n.base)
 			}
 		}
 		refusal(t, a.svc.Unpair(t.Context(), model.UseFederatedRepo, b.base, false),
@@ -778,6 +804,20 @@ func (f faultStore) Peers() port.PeerStore { return faultPeers{f.store.Peers(), 
 
 func (f faultStore) Outbox() outbox.OutboxStore { return faultOutbox{f.store.Outbox(), f.fail} }
 
+func (f faultStore) Resyncs() port.StreamResyncStore { return faultResyncs{f.store.Resyncs(), f.fail} }
+
+type faultResyncs struct {
+	port.StreamResyncStore
+	fail map[string]bool
+}
+
+func (f faultResyncs) DeletePeer(ctx context.Context, id string) error {
+	if f.fail["DeletePeer"] {
+		return errStore
+	}
+	return f.StreamResyncStore.DeletePeer(ctx, id)
+}
+
 type faultPeers struct {
 	port.PeerStore
 	fail map[string]bool
@@ -860,6 +900,7 @@ func TestUnitStoreFaults(t *testing.T) {
 	for name, err := range map[string]error{
 		"drop Delete":        faulty(b, "Delete").Drop(t.Context(), aid, model.UseFederatedRepo),
 		"drop DeleteCursors": faulty(b, "DeleteCursors").Drop(t.Context(), aid, model.UseFederatedRepo),
+		"drop DeletePeer":    faulty(b, "DeletePeer").Drop(t.Context(), aid, model.UseFederatedRepo),
 	} {
 		if !errors.Is(err, kernel.ErrStore) {
 			t.Errorf("%s: %v", name, err)

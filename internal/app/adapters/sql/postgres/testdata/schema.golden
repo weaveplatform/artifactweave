@@ -710,6 +710,7 @@ column peers.display_name text NOT NULL DEFAULT ''::text
 column peers.city_name text NOT NULL DEFAULT ''::text
 column peers.country_code text NOT NULL DEFAULT ''::text
 column peers.edge_role boolean NOT NULL DEFAULT false
+column peers.delivery text NOT NULL DEFAULT 'push'::text
 constraint peers.peers_pkey PRIMARY KEY (instance_id)
 index peers.peers_pkey CREATE UNIQUE INDEX peers_pkey ON peers USING btree (instance_id)
 table permission_grants
@@ -1095,6 +1096,15 @@ column signing_keys.passphrase bytea
 column signing_keys.is_default boolean NOT NULL DEFAULT false
 constraint signing_keys.signing_keys_pkey PRIMARY KEY (alias)
 index signing_keys.signing_keys_pkey CREATE UNIQUE INDEX signing_keys_pkey ON signing_keys USING btree (alias)
+table stream_resyncs
+column stream_resyncs.origin text COLLATE "C" NOT NULL
+column stream_resyncs.receiver text COLLATE "C" NOT NULL
+column stream_resyncs.stream text COLLATE "C" NOT NULL
+column stream_resyncs.position bigint NOT NULL DEFAULT 0
+column stream_resyncs.flagged_at bigint
+constraint stream_resyncs.stream_resyncs_pkey PRIMARY KEY (origin, receiver, stream)
+index stream_resyncs.stream_resyncs_pkey CREATE UNIQUE INDEX stream_resyncs_pkey ON stream_resyncs USING btree (origin, receiver, stream)
+index stream_resyncs.stream_resyncs_receiver CREATE INDEX stream_resyncs_receiver ON stream_resyncs USING btree (receiver, origin, stream)
 table tokens
 column tokens.id text COLLATE "C" NOT NULL
 column tokens.subject text NOT NULL DEFAULT ''::text

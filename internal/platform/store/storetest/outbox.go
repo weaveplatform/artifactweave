@@ -2,6 +2,7 @@ package storetest
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"sync"
@@ -19,6 +20,7 @@ func runOutbox(t *testing.T, newStore func(*testing.T) Store) {
 	t.Run("OutboxConcurrent", func(t *testing.T) { testOutboxConcurrent(t, newStore(t)) })
 	t.Run("PeerCursors", func(t *testing.T) { testPeerCursors(t, newStore(t)) })
 	t.Run("AppliedMarkers", func(t *testing.T) { testAppliedMarkers(t, newStore(t)) })
+	t.Run("AppliedMarkersLocked", func(t *testing.T) { testAppliedMarkersLocked(t, newStore(t)) })
 	t.Run("FailedFetches", func(t *testing.T) { testFailedFetches(t, newStore(t)) })
 }
 
@@ -295,6 +297,12 @@ func testAppliedMarkers(t *testing.T, s Store) {
 		zero,
 		storekit.Get[outbox.AppliedMarker](t)(ob.Applied(ctx, origin, "repo:a")),
 	)
+	storekit.Same(
+		t,
+		"LockApplied before any",
+		zero,
+		storekit.Get[outbox.AppliedMarker](t)(ob.LockApplied(ctx, origin, "repo:a")),
+	)
 	for _, seq := range []int64{5, 7} {
 		m := outbox.AppliedMarker{Origin: origin, Stream: "repo:a", LastSeq: seq}
 		storekit.Must(t, ob.SetApplied(ctx, m))
@@ -303,6 +311,12 @@ func testAppliedMarkers(t *testing.T, s Store) {
 			"Applied",
 			m,
 			storekit.Get[outbox.AppliedMarker](t)(ob.Applied(ctx, origin, "repo:a")),
+		)
+		storekit.Same(
+			t,
+			"LockApplied",
+			m,
+			storekit.Get[outbox.AppliedMarker](t)(ob.LockApplied(ctx, origin, "repo:a")),
 		)
 	}
 	other := outbox.AppliedMarker{Origin: peerID(2), Stream: "repo:a", LastSeq: 1}
@@ -320,6 +334,81 @@ func testAppliedMarkers(t *testing.T, s Store) {
 	); m.LastSeq != 7 {
 		t.Fatalf("Applied after another origin's update = %d", m.LastSeq)
 	}
+}
+
+// testAppliedMarkersLocked applies one origin's stream from concurrent
+// transactions, each reading its position with LockApplied and recording
+// the next: every transaction must read the position the one before it
+// committed, so no two apply the same entry and none is lost. A rolled-back
+// transaction leaves the position as it was.
+func testAppliedMarkersLocked(t *testing.T, s Store) {
+	ctx := context.Background()
+	const workers = 8
+	origin, stream := peerID(3), repoStream("locked")
+	var (
+		wg   sync.WaitGroup
+		mu   sync.Mutex
+		read []int64
+	)
+	for range workers {
+		wg.Go(func() {
+			err := s.Tx(ctx, func(ctx context.Context) error {
+				m, err := s.Outbox().LockApplied(ctx, origin, stream)
+				if err != nil {
+					return fmt.Errorf("lock applied: %w", err)
+				}
+				mu.Lock()
+				read = append(read, m.LastSeq)
+				mu.Unlock()
+				m.LastSeq++
+				if err := s.Outbox().SetApplied(ctx, m); err != nil {
+					return fmt.Errorf("set applied: %w", err)
+				}
+				return nil
+			})
+			if err != nil {
+				t.Error(err)
+			}
+		})
+	}
+	wg.Wait()
+	slices.Sort(read)
+	want := make([]int64, 0, workers)
+	for i := range workers {
+		want = append(want, int64(i))
+	}
+	storekit.Same(t, "positions read under LockApplied", want, read)
+	storekit.Same(
+		t,
+		"Applied after concurrent appliers",
+		outbox.AppliedMarker{Origin: origin, Stream: stream, LastSeq: workers},
+		storekit.Get[outbox.AppliedMarker](t)(s.Outbox().Applied(ctx, origin, stream)),
+	)
+	// errBoom rolls the transaction back after the position moved.
+	err := s.Tx(ctx, func(ctx context.Context) error {
+		m, err := s.Outbox().LockApplied(ctx, origin, stream)
+		if err != nil {
+			return fmt.Errorf("lock applied: %w", err)
+		}
+		m.LastSeq = 99
+		if err := s.Outbox().SetApplied(ctx, m); err != nil {
+			return fmt.Errorf("set applied: %w", err)
+		}
+		return errBoom
+	})
+	if !errors.Is(err, errBoom) {
+		t.Fatalf("rolled-back apply: %v", err)
+	}
+	storekit.Same(
+		t,
+		"Applied after a rolled-back apply",
+		outbox.AppliedMarker{Origin: origin, Stream: stream, LastSeq: workers},
+		storekit.Get[outbox.AppliedMarker](t)(s.Outbox().Applied(ctx, origin, stream)),
+	)
+	failsCancelled(t, map[string]func(context.Context) error{
+		//nolint:wrapcheck // the case checks only that the call fails
+		"LockApplied": func(ctx context.Context) error { _, err := s.Outbox().LockApplied(ctx, origin, stream); return err },
+	})
 }
 
 func testFailedFetches(t *testing.T, s Store) {

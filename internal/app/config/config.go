@@ -60,6 +60,8 @@ const (
 	DefaultWorkWorkers     = 4
 	DefaultWorkLease       = 2 * time.Minute
 	DefaultWorkMaxAttempts = 10
+	// DefaultOutboxRetention is decision 0021's outbox retention window.
+	DefaultOutboxRetention = 7 * 24 * time.Hour
 	// DefaultNPMMaxPublishSize is decision 0034's cap on an npm publish
 	// body. The body carries the tarball in base64, a third larger than the
 	// tarball itself.
@@ -111,9 +113,18 @@ type Config struct {
 	PyPI              PyPI             `yaml:"pypi"`
 	Cran              Cran             `yaml:"cran"`
 	Remote            Remote           `yaml:"remote"`
+	Federation        Federation       `yaml:"federation"`
 	API               apilimit.Options `yaml:"api"`
 	XZ                XZ               `yaml:"xz"`
 	Virtual           Virtual          `yaml:"virtual"`
+}
+
+// Federation sizes stream delivery between peers (decision 0021).
+type Federation struct {
+	// OutboxRetention is how long this instance keeps an entry for a peer
+	// that has not acknowledged it; a peer still behind it then needs a full
+	// sync.
+	OutboxRetention time.Duration `yaml:"outbox_retention"`
 }
 
 // Remote supplies exact operator-approved private outbound origins for remote
@@ -355,7 +366,8 @@ func Default() Config {
 			Lease:       DefaultWorkLease,
 			MaxAttempts: DefaultWorkMaxAttempts,
 		},
-		Build: Build{BlockDuplicateEntries: true},
+		Build:      Build{BlockDuplicateEntries: true},
+		Federation: Federation{OutboxRetention: DefaultOutboxRetention},
 		NPM: NPM{
 			MaxPublishSize: DefaultNPMMaxPublishSize,
 			NPMLogin:       NPMLogin{LoginTokenExpiry: DefaultNPMLoginTokenExpiry},
@@ -469,6 +481,7 @@ var keys = append(append([]string{
 	"work.workers",
 	"work.lease",
 	"work.max_attempts",
+	"federation.outbox_retention",
 	"build.block_duplicate_entries",
 	"npm.max_publish_size",
 	"token.allow_basic_auth",
@@ -563,6 +576,8 @@ func set(cfg *Config, key, value string) error {
 		return setDuration(&cfg.Work.Lease, key, value)
 	case "work.max_attempts":
 		return setInt(&cfg.Work.MaxAttempts, key, value)
+	case "federation.outbox_retention":
+		return setDuration(&cfg.Federation.OutboxRetention, key, value)
 	case "npm.max_publish_size":
 		return setByteSize(&cfg.NPM.MaxPublishSize, key, value)
 	case "environments.global_limit":
@@ -798,6 +813,12 @@ func (c Config) Validate() error {
 	if c.Work.Lease < time.Second {
 		errs = append(errs, fmt.Errorf("%w: work.lease %s must be at least 1s",
 			ErrInvalidValue, c.Work.Lease))
+	}
+	// A retention under a minute would prune entries a dispatcher's next
+	// run is about to send, flagging every peer for a full sync.
+	if c.Federation.OutboxRetention < time.Minute {
+		errs = append(errs, fmt.Errorf("%w: federation.outbox_retention %s must be at least 1m",
+			ErrInvalidValue, c.Federation.OutboxRetention))
 	}
 	if c.NPM.MaxPublishSize <= 0 {
 		errs = append(errs, fmt.Errorf("%w: npm.max_publish_size %s must be more than zero",

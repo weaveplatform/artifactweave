@@ -26,7 +26,7 @@ paths:
   /blobs/{sha256}:
     get:
       description: >-
-        Returns content this instance holds, for a peer applying an event or a snapshot entry that refers to it. Only content that a stream the caller holds a use case for refers to is served. Not implemented; answers 501.
+        Returns content this instance holds, for a peer applying an event or a snapshot entry that refers to it. Only content that a stream the caller holds a use case for refers to is served.
       operationId: getBlob
       parameters:
         - name: sha256
@@ -276,7 +276,7 @@ paths:
   /streams/{stream}/events:
     post:
       description: >-
-        Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. Not implemented; answers 501.
+        Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. A content event whose blob this instance does not hold is applied after the blob is fetched from the origin; when the fetch fails, the event is still applied, the content is recorded as a failed binary and fetched again with back-off, and the item appears once it arrives, unless a later event has deleted or replaced it.
       operationId: pushEvents
       parameters:
         - $ref: '#/components/parameters/Stream'
@@ -345,7 +345,7 @@ paths:
       x-cost: ordinary
     get:
       description: >-
-        Reads this instance's events on the stream after a position, for a peer that cannot be pushed to. The after value also acknowledges: this instance records it as the caller's acknowledged position on the stream, which never moves backwards. Not implemented; answers 501.
+        Reads this instance's events on the stream after a position, for a peer that cannot be pushed to. The after value also acknowledges: this instance records it as the caller's acknowledged position on the stream, which never moves backwards.
       operationId: pullEvents
       parameters:
         - $ref: '#/components/parameters/Stream'
@@ -696,6 +696,9 @@ components:
           type: object
           additionalProperties: true
           description: Optional within this object. The change itself, in the form the event type defines.
+          # The payload is carried as the origin wrote it: decoding it into a
+          # map would turn an integer beyond 2^53 into a float and change it.
+          x-go-type: json.RawMessage
         blob:
           allOf:
             - $ref: '#/components/schemas/BlobReference'

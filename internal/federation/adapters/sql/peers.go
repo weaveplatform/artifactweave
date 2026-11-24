@@ -22,7 +22,7 @@ func (s *Store) Peers() port.PeerStore { return peerStore{s} }
 type peerStore struct{ s *Store }
 
 const peerCols = "instance_id, base_url, public_key, protocol_version, status, last_seen_at, " +
-	"display_name, city_name, country_code, edge_role"
+	"display_name, city_name, country_code, edge_role, delivery"
 
 func scanPeer(r dialect.PeersScanner) (model.Peer, error) {
 	var (
@@ -31,7 +31,7 @@ func scanPeer(r dialect.PeersScanner) (model.Peer, error) {
 		seen sql.NullInt64
 	)
 	err := r.Scan(&p.InstanceID, &p.BaseURL, &pub, &p.ProtocolVersion, &p.Status, &seen,
-		&p.DisplayName, &p.CityName, &p.CountryCode, &p.EdgeRole)
+		&p.DisplayName, &p.CityName, &p.CountryCode, &p.EdgeRole, &p.Delivery)
 	if len(pub) > 0 {
 		p.PublicKey = pub
 	}
@@ -55,6 +55,7 @@ func (p peerStore) Put(ctx context.Context, peer model.Peer) error {
 			peer.CityName,
 			peer.CountryCode,
 			peer.EdgeRole,
+			string(delivery(peer.Delivery)),
 		); err != nil {
 			return err
 		}
@@ -75,6 +76,14 @@ func (p peerStore) Put(ctx context.Context, peer model.Peer) error {
 		}
 		return nil
 	})
+}
+
+// delivery stores the zero delivery as push, the column's default.
+func delivery(d model.Delivery) model.Delivery {
+	if d == "" {
+		return model.DeliveryPush
+	}
+	return d
 }
 
 // peerUseCaseSet sorts and deduplicates use cases, the form they are stored

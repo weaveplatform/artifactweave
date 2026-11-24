@@ -68,7 +68,7 @@ type Event struct {
 	Hlc string `json:"hlc"`
 
 	// Payload Optional within this object. The change itself, in the form the event type defines.
-	Payload *map[string]interface{} `json:"payload,omitempty"`
+	Payload *json.RawMessage `json:"payload,omitempty"`
 
 	// Seq Required within this object. The entry's sequence on the stream, assigned when the change committed on the origin. Sequences in one batch or page are consecutive.
 	Seq int64 `json:"seq"`
@@ -486,7 +486,7 @@ type ClientInterface interface {
 
 	// GetBlob Fetch a blob
 	//
-	// Returns content this instance holds, for a peer applying an event or a snapshot entry that refers to it. Only content that a stream the caller holds a use case for refers to is served. Not implemented; answers 501.
+	// Returns content this instance holds, for a peer applying an event or a snapshot entry that refers to it. Only content that a stream the caller holds a use case for refers to is served.
 	//
 	// Corresponds with GET /blobs/{sha256} (the `GetBlob` operationId).
 	GetBlob(ctx context.Context, sha256 string, params *GetBlobParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -543,14 +543,14 @@ type ClientInterface interface {
 
 	// PullEvents Pull events
 	//
-	// Reads this instance's events on the stream after a position, for a peer that cannot be pushed to. The after value also acknowledges: this instance records it as the caller's acknowledged position on the stream, which never moves backwards. Not implemented; answers 501.
+	// Reads this instance's events on the stream after a position, for a peer that cannot be pushed to. The after value also acknowledges: this instance records it as the caller's acknowledged position on the stream, which never moves backwards.
 	//
 	// Corresponds with GET /streams/{stream}/events (the `PullEvents` operationId).
 	PullEvents(ctx context.Context, stream Stream, params *PullEventsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// PushEventsWithBody Push events
 	//
-	// Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. Not implemented; answers 501.
+	// Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. A content event whose blob this instance does not hold is applied after the blob is fetched from the origin; when the fetch fails, the event is still applied, the content is recorded as a failed binary and fetched again with back-off, and the item appears once it arrives, unless a later event has deleted or replaced it.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -559,7 +559,7 @@ type ClientInterface interface {
 
 	// PushEvents Push events
 	//
-	// Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. Not implemented; answers 501.
+	// Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. A content event whose blob this instance does not hold is applied after the blob is fetched from the origin; when the fetch fails, the event is still applied, the content is recorded as a failed binary and fetched again with back-off, and the item appears once it arrives, unless a later event has deleted or replaced it.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -576,7 +576,7 @@ type ClientInterface interface {
 
 // GetBlob Fetch a blob
 //
-// Returns content this instance holds, for a peer applying an event or a snapshot entry that refers to it. Only content that a stream the caller holds a use case for refers to is served. Not implemented; answers 501.
+// Returns content this instance holds, for a peer applying an event or a snapshot entry that refers to it. Only content that a stream the caller holds a use case for refers to is served.
 //
 // Corresponds with GET /blobs/{sha256} (the `GetBlob` operationId).
 func (c *Client) GetBlob(ctx context.Context, sha256 string, params *GetBlobParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -703,7 +703,7 @@ func (c *Client) GetPeerStatus(ctx context.Context, params *GetPeerStatusParams,
 
 // PullEvents Pull events
 //
-// Reads this instance's events on the stream after a position, for a peer that cannot be pushed to. The after value also acknowledges: this instance records it as the caller's acknowledged position on the stream, which never moves backwards. Not implemented; answers 501.
+// Reads this instance's events on the stream after a position, for a peer that cannot be pushed to. The after value also acknowledges: this instance records it as the caller's acknowledged position on the stream, which never moves backwards.
 //
 // Corresponds with GET /streams/{stream}/events (the `PullEvents` operationId).
 func (c *Client) PullEvents(ctx context.Context, stream Stream, params *PullEventsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -720,7 +720,7 @@ func (c *Client) PullEvents(ctx context.Context, stream Stream, params *PullEven
 
 // PushEventsWithBody Push events
 //
-// Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. Not implemented; answers 501.
+// Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. A content event whose blob this instance does not hold is applied after the blob is fetched from the origin; when the fetch fails, the event is still applied, the content is recorded as a failed binary and fetched again with back-off, and the item appears once it arrives, unless a later event has deleted or replaced it.
 //
 // Takes any type of body and a specified content type.
 //
@@ -739,7 +739,7 @@ func (c *Client) PushEventsWithBody(ctx context.Context, stream Stream, params *
 
 // PushEvents Push events
 //
-// Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. Not implemented; answers 501.
+// Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. A content event whose blob this instance does not hold is applied after the blob is fetched from the origin; when the fetch fails, the event is still applied, the content is recorded as a failed binary and fetched again with back-off, and the item appears once it arrives, unless a later event has deleted or replaced it.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -1557,7 +1557,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetBlobWithResponse Fetch a blob
 	//
-	// Returns content this instance holds, for a peer applying an event or a snapshot entry that refers to it. Only content that a stream the caller holds a use case for refers to is served. Not implemented; answers 501.
+	// Returns content this instance holds, for a peer applying an event or a snapshot entry that refers to it. Only content that a stream the caller holds a use case for refers to is served.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -1620,7 +1620,7 @@ type ClientWithResponsesInterface interface {
 
 	// PullEventsWithResponse Pull events
 	//
-	// Reads this instance's events on the stream after a position, for a peer that cannot be pushed to. The after value also acknowledges: this instance records it as the caller's acknowledged position on the stream, which never moves backwards. Not implemented; answers 501.
+	// Reads this instance's events on the stream after a position, for a peer that cannot be pushed to. The after value also acknowledges: this instance records it as the caller's acknowledged position on the stream, which never moves backwards.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -1629,7 +1629,7 @@ type ClientWithResponsesInterface interface {
 
 	// PushEventsWithBodyWithResponse Push events
 	//
-	// Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. Not implemented; answers 501.
+	// Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. A content event whose blob this instance does not hold is applied after the blob is fetched from the origin; when the fetch fails, the event is still applied, the content is recorded as a failed binary and fetched again with back-off, and the item appears once it arrives, unless a later event has deleted or replaced it.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -1638,7 +1638,7 @@ type ClientWithResponsesInterface interface {
 
 	// PushEventsWithResponse Push events
 	//
-	// Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. Not implemented; answers 501.
+	// Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. A content event whose blob this instance does not hold is applied after the blob is fetched from the origin; when the fetch fails, the event is still applied, the content is recorded as a failed binary and fetched again with back-off, and the item appears once it arrives, unless a later event has deleted or replaced it.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2479,7 +2479,7 @@ func (r GetSnapshotResponse) ContentType() string {
 
 // GetBlobWithResponse Fetch a blob
 //
-// Returns content this instance holds, for a peer applying an event or a snapshot entry that refers to it. Only content that a stream the caller holds a use case for refers to is served. Not implemented; answers 501.
+// Returns content this instance holds, for a peer applying an event or a snapshot entry that refers to it. Only content that a stream the caller holds a use case for refers to is served.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -2584,7 +2584,7 @@ func (c *ClientWithResponses) GetPeerStatusWithResponse(ctx context.Context, par
 
 // PullEventsWithResponse Pull events
 //
-// Reads this instance's events on the stream after a position, for a peer that cannot be pushed to. The after value also acknowledges: this instance records it as the caller's acknowledged position on the stream, which never moves backwards. Not implemented; answers 501.
+// Reads this instance's events on the stream after a position, for a peer that cannot be pushed to. The after value also acknowledges: this instance records it as the caller's acknowledged position on the stream, which never moves backwards.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -2599,7 +2599,7 @@ func (c *ClientWithResponses) PullEventsWithResponse(ctx context.Context, stream
 
 // PushEventsWithBodyWithResponse Push events
 //
-// Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. Not implemented; answers 501.
+// Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. A content event whose blob this instance does not hold is applied after the blob is fetched from the origin; when the fetch fails, the event is still applied, the content is recorded as a failed binary and fetched again with back-off, and the item appears once it arrives, unless a later event has deleted or replaced it.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -2614,7 +2614,7 @@ func (c *ClientWithResponses) PushEventsWithBodyWithResponse(ctx context.Context
 
 // PushEventsWithResponse Push events
 //
-// Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. Not implemented; answers 501.
+// Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. A content event whose blob this instance does not hold is applied after the blob is fetched from the origin; when the fetch fails, the event is still applied, the content is recorded as a failed binary and fetched again with back-off, and the item appears once it arrives, unless a later event has deleted or replaced it.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //

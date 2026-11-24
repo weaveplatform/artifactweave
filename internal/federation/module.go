@@ -14,6 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/federation/core/federated"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/port"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/replication"
+	streamsync "github.com/weaveplatform/artifactweave/internal/federation/core/sync"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/internal/platform/schedule"
@@ -55,6 +56,7 @@ type Module struct {
 	push            *replication.Push
 	pull            *replication.Pull
 	pushConnections *pushhttp.Factory
+	streams         *streamsync.Engine
 	// configRemote and configLog are configSync's transport and log
 	// (OpenConfigSync); pushMu guards them.
 	configRemote federated.Remote

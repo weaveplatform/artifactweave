@@ -11329,17 +11329,22 @@
     "route": "GET /artifactweave/peer/v1/blobs/{sha256}",
     "spec": "peer.openapi.yaml",
     "operation_id": "getBlob",
-    "state": "stub: 501",
-    "contract": "Returns content this instance holds, for a peer applying an event or a snapshot entry that refers to it. Only content that a stream the caller holds a use case for refers to is served. Not implemented; answers 501.",
-    "handler": "internal/platform/gen/peer/unimplemented.gen.go",
+    "state": "partial: handwritten override of generated operation",
+    "contract": "Returns content this instance holds, for a peer applying an event or a snapshot entry that refers to it. Only content that a stream the caller holds a use case for refers to is served.",
+    "handler": "internal/app/router.go: handwritten routes precede generated handlers",
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; user authentication skips the peer API, admission still limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/peer/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -11366,12 +11371,12 @@
     "route": "GET /artifactweave/peer/v1/streams/{stream}/events",
     "spec": "peer.openapi.yaml",
     "operation_id": "pullEvents",
-    "state": "stub: 501",
-    "contract": "Reads this instance's events on the stream after a position, for a peer that cannot be pushed to. The after value also acknowledges: this instance records it as the caller's acknowledged position on the stream, which never moves backwards. Not implemented; answers 501.",
-    "handler": "internal/platform/gen/peer/unimplemented.gen.go",
+    "state": "partial: handwritten override of generated operation",
+    "contract": "Reads this instance's events on the stream after a position, for a peer that cannot be pushed to. The after value also acknowledges: this instance records it as the caller's acknowledged position on the stream, which never moves backwards.",
+    "handler": "internal/app/router.go: handwritten routes precede generated handlers",
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; user authentication skips the peer API, admission still limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on path:stream, header:Signature-Input",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "natural on path:stream, header:Signature-Input: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "declared_page_controls": [
       "query limit: Optional query parameter. The most items one answer holds, 1 to 1000; 100 when absent. A value outside that range answers 400."
@@ -11379,10 +11384,15 @@
     "response_collections": [
       "200 application/json.events[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes; declared cursor",
+    "pagination_execution": "cursor (position after, size limit, next body:/next_after); content-and-configuration: singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
     "evidence": [
-      "internal/platform/gen/peer/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -20597,17 +20607,22 @@
     "route": "POST /artifactweave/peer/v1/streams/{stream}/events",
     "spec": "peer.openapi.yaml",
     "operation_id": "pushEvents",
-    "state": "stub: 501",
-    "contract": "Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. Not implemented; answers 501.",
-    "handler": "internal/platform/gen/peer/unimplemented.gen.go",
+    "state": "partial: handwritten override of generated operation",
+    "contract": "Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. A content event whose blob this instance does not hold is applied after the blob is fetched from the origin; when the fetch fails, the event is still applied, the content is recorded as a failed binary and fetched again with back-off, and the item appears once it arrives, unless a later event has deleted or replaced it.",
+    "handler": "internal/app/router.go: handwritten routes precede generated handlers",
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; user authentication skips the peer API, admission still limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on path:stream, body:/origin, body:/from_seq",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "natural on path:stream, body:/origin, body:/from_seq: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/peer/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
