@@ -43,8 +43,9 @@ from current state for the delivered sections listed in
 [research 06](../06-system-configuration-and-descriptor.md#what-artifactweave-serves).
 The export joins the owning APIs to one metadata transaction and shared authority
 guard, rechecks current administrator authority there, and publishes XML only after
-commit. Later descriptor sections extend this same read contract. P12 also owns
-completion of the baseline YAML descriptor.
+commit. Later descriptor sections extend this same read contract. P12 completed the
+baseline YAML descriptor sections listed in research 06; #1838 records the phase's
+merged-main qualification.
 Full XML replacement by `POST`, Artifactory bootstrap-file compatibility and Access
 bootstrap migration belong to P36. The separate deprecated raw security XML interface
 has Security REST and Access bootstrap replacements; that does not remove general system

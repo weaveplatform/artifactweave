@@ -16,8 +16,8 @@ corrects research 03 and 04 (section 16). Decision [0038](decisions/0038-nuget.m
 choices.
 
 **Roadmap ownership (2026-10-21).** P28 owns the remaining supported v2 grammar and
-aliases, non-normalized mode, global settings and broader client qualification; P12
-supplies configuration and P36 migration. The bounded feed and symbol reads already
+aliases, non-normalized mode, global settings and their configuration surface (#1904)
+and broader client qualification; P36 owns migration. The bounded feed and symbol reads already
 work. Decision [0038](decisions/0038-nuget.md#owned-follow-up) distinguishes these
 gaps from the narrowly superseded `GetUpdates` functions.
 

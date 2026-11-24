@@ -330,7 +330,7 @@ profile; registry errors and format policy refusals keep their codes and envelop
     [RTFACT-29681](https://jfrog.atlassian.net/browse/RTFACT-29681)). Under Tag Retention
     the previous revision is kept whole instead, as the same page says. A list overwritten by
     a list keeps the previous platform manifests, 7.x's default; the "Complete list manifest
-    image overwrite" setting is not currently offered (DV-084; P28/P12).
+    image overwrite" setting is not currently offered (DV-084; P28).
   - One tag is reserved and answers 400 `TAG_INVALID`, though the tag grammar allows it:
     `_uploads`, which would collide with the uploads folder, as on Artifactory. A digest
     folder needs no reservation, since no tag may hold a colon, and a tag starting with
@@ -629,7 +629,7 @@ The audit of 2026-10-18 against KB, Jira and client sources ([#378](https://gith
 - The Package Settings option "Complete list manifest image overwrite", off by default
   ([7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed)),
   is a global setting and is not currently offered (DV-084); P28 owns the cleanup
-  behavior and P12 the configuration surface.
+  behavior together with its configuration surface (#1904).
 - 7.x differs: a promotion with `copy:false` by a caller without Delete on the source
   copies the image and answers 206
   ([7.111.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71114-self-managed),
@@ -685,7 +685,7 @@ raw tags/referrer listings remain independent of that index. Local behavior is u
 
 P28 owns port-per-repository routing (DV-009), complete list-manifest overwrite
 cleanup (DV-084) and discovery/implementation of any additional target digest
-algorithms. P12 supplies configuration and native anonymous-access proof (#303);
+algorithms, each with its global setting (#1904). P12 supplied native anonymous-access proof (#303);
 P9 supplies remote behavior; P10 DKR-01 supplies virtual pulls below. P41 broadens supported native clients.
 
 Docker documents [Registry V1 removal and schema-1 removal](https://docs.docker.com/engine/deprecated/)

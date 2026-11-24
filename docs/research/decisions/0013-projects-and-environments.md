@@ -163,7 +163,8 @@ its 403 fields, which read paths classify, and names the Artifactory answer as
 an override for that envelope (`apierror.Error.ByProfile`).
 The [mail-server guide](https://docs.jfrog.com/administration/docs/mail-server-configuration)
 identifies project quota notifications as a mail-server use case. PRJ-04 supplies
-its narrow configuration/delivery path; full descriptor administration remains P12.
+its narrow configuration/delivery path; P12 CFG-07 (#1831) delivers full `mailServer`
+descriptor administration over the same delivery path.
 
 The worker resolves current enabled project administrators, including current
 group membership, under the project administration guard. It repeats the

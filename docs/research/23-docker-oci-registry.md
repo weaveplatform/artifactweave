@@ -21,8 +21,8 @@ registry fetching; P10 DKR-01 adds virtual manifest and blob reads. The upstream
 is implemented ([build status](../implementation/plan.md#build-status)).
 
 **Roadmap ownership (2026-10-21).** P28 owns port-per-repository routing, complete
-list-manifest overwrite cleanup and the target digest-algorithm contract; P12 supplies
-applicable global settings and native anonymous access. Decision
+list-manifest overwrite cleanup and the target digest-algorithm contract, each with its
+global setting (#1904); P12 supplied native anonymous access (#303). Decision
 [0031](decisions/0031-docker-oci-registry.md#owned-follow-up) separates these gaps from
 the specifically superseded Docker V1/schema-1 protocols. Current P6/P8 results do
 not claim those planned capabilities.
@@ -697,7 +697,7 @@ Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/we
   Tag Retention keeps the previous revision whole; artifactweave does the same (section 5.3).
 - **Complete list-manifest overwrite.** The global Package Settings option from 7.125.4, off
   by default, is not currently offered (section 5.3, DV-084); P28 owns its lifecycle
-  behavior with P12 configuration support.
+  behavior and its configuration surface.
 - **`auth` endpoints** answer the `config.json` entry keyed by the registry URL,
   `{"https://<host>": {"auth", "email"}}`, as artifactweave does with its base URL's scheme
   and host (section 2.1).

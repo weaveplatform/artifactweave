@@ -49,5 +49,5 @@ variable "header_secret" {
 
 variable "proxy_key" {
   type        = string
-  description = "Existing proxy definition referenced by the generic remote. Manage it through the YAML descriptor until P12 implements XML descriptor reads used by artifactory_proxy."
+  description = "Existing proxy definition referenced by the generic remote. Manage it through the YAML descriptor or the artifactory_proxy resource of the configuration reference."
 }

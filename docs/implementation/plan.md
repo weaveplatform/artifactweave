@@ -41,7 +41,7 @@ Updated as phases land. "Done" means the exit criteria hold, the gate (95% merge
 | P9d Modular-monolith migration | Done (2026-11-11) | Behaviour-preserving move to the layout of [decision 0044](../research/decisions/0044-modular-monolith-migration.md); code was staged under `migration/` and promoted to `internal/`, and [p9d-path-map.json](p9d-path-map.json) maps each legacy path to its final one. The [Phase 9d qualification record](../testing/phase9d-signoff.md) holds [PRO-05](https://github.com/weaveplatform/artifactweave/issues/1104)'s merged-main, real-cloud and release evidence. |
 | P10 Virtual repositories | Implementation delivered; qualification in progress | **M3**; [qualification and epic closeout](../testing/phase10-signoff.md), final completion record in [EPIC-QUA #1528](https://github.com/weaveplatform/artifactweave/issues/1528) |
 | P11 Projects, events, cleanup and single replication | Done (2026-11-23) | Project APIs/authorization/sharing/quotas, typed events and durable consumers, 24 webhook subscription resources, package cleanup, single push/pull execution/status (#1763) and native/provider qualification (#1764) are merged. #1765 qualified merged main `425ce4de9a68`: the no-input [full workflow 45191301585](https://github.com/weaveplatform/artifactweave/actions/runs/45191301585) passed at 95.2% total coverage and literal `make gate` passed at 95.1%. Epic #1742 closure is the maintainer's; P19a owns observation-dependent completion |
-| P12 Descriptor export, system configuration, LDAP | In progress | The anonymous-access descriptor switch is implemented; #303 qualifies native reads with explicit grants. #1800 tracks empty proxy-password idempotence. LDAP-01 (#1832) manages LDAP connections through the Access API and `security.ldapSettings`; LDAP-02 (#1833) authenticates users against them, tested against an OpenLDAP container, and tests connections. LDAP-03 (#1834) synchronises LDAP groups by the STATIC, DYNAMIC and HIERARCHICAL strategies through the Access API and `security.ldapGroupSettings`, publishes the memberships at each fresh login and refresh, and qualifies `artifactory_ldap_group_setting_v2` in the Terraform lane; the deprecated `artifactory_ldap_group_setting` cannot read back, since the XML export follows 7.161.26's `SecurityType` without `ldapGroupSettings` (#1905), as on 7.x from 7.57.1. QUA-01 (#1837) qualifies the seven exit-criteria resources in the required Terraform lane through the `configuration`, `reverse-proxy` and `ldap-groups` references, with a step ledger, a secret scan and retained provenance. Full descriptor export, system configuration, provider round-trips and LDAP retain this phase's exit requirements |
+| P12 Descriptor export, system configuration, LDAP | Done (2026-11-23) | XML export, base URL/reverse proxy/nginx, temporary loggers, baseline security and global hiding, GC/trash can, global quota, backups/mail/system message, LDAP connections/bind/group synchronization, NTLM and redirected proxy credentials and the seven provider resources are merged (#1825 to #1837, #1848, #1902, #1903). #1838 qualified merged main `b910ea869b65`: the no-input [full workflow 45277781762](https://github.com/weaveplatform/artifactweave/actions/runs/45277781762) passed at 95.2% total coverage and literal `make gate` passed at 95.1%, two load timeouts rerun once. #1905 (#1912) then made the XML `security` element follow 7.161.26's `SecurityType`, so the deprecated `artifactory_ldap_group_setting` no longer reads back, as on 7.x from 7.57.1; `artifactory_ldap_group_setting_v2` remains qualified. Epic closure is the maintainer's; #1908, #1873 and #1901 are open follow-ups; P36 owns XML POST and backup execution |
 | P13 Peer trust and federated repositories | Not started | |
 | P14 Platform federation and topology | Not started | |
 | P15 Release bundles v1 and Distribution | Not started | |
@@ -926,7 +926,8 @@ adds bounded upstream-only rows to direct/virtual `items.find(...).transitive()`
 with five ordered remote members, explicit failure behavior and current authority
 fences. Search does not create cache items. Cached-path precedence and cold normal-key
 JFrog search/download are covered; precise current-vendor wire mapping remains
-[I]/#216. Configurable member limits stay P12 and package virtual delivery stays P10.
+[I]/#216. The member limit is fixed at 7.x's default of five (DV-204), and package
+virtual delivery stays P10.
 
 **Tasks**
 1. `internal/artifacts/core/remote` fetcher with the full remote field set, the retrieval decision table, negative caching, offline and hard-fail modes, assumed-offline tripping, HEAD-before-GET, singleflight, client TLS, custom headers, Docker Hub token auth.
@@ -1251,6 +1252,76 @@ Decisions: [0009](../research/decisions/0009-configuration-as-code.md),
 **Exit criteria**
 - `platform_reverse_proxy`, `artifactory_backup`, `artifactory_mail_server`, `artifactory_property_set`, `artifactory_proxy`, `artifactory_repository_layout`, `artifactory_ldap_setting_v2` apply, plan clean, destroy.
 - A descriptor round-trips through PATCH and `config apply`; LDAP bind works against a test container.
+
+**Delivery.** Every P12 task is merged: XML export CFG-01 (#1842, with #1884
+and #1896 aligning `xs:ID` keys and the exported sections with 7.161.26), base URL,
+reverse proxy and nginx CFG-02 (#1863), temporary loggers CFG-03 (#1841), baseline
+security CFG-04 (#1871), GC and trash can CFG-05 (#1865), global storage quota
+CFG-06 (#1877), backups, mail and system message CFG-07 (#1867), LDAP connections,
+bind and group synchronization LDAP-01 to LDAP-03 (#1857, #1864, #1879), NTLM and
+redirected proxy credentials PRX-01/PRX-02 (#1850, #1854) and on replication push
+(#1859), the seven provider resources QUA-01 (#1897), descriptor shape validation
+(#1855), anonymous registry pulls (#303, #1819) and empty proxy-password idempotence
+(#1800, #1815). The qualification audit found two more P12 gaps, fixed by #1907: a
+`urlBase` at or above a CDN host was refused by PATCH but stored by `config apply`
+and the bootstrap descriptor (#1902), and the global
+`security.hideUnauthorizedResources` that P10 handed over had no implementation
+(#1903). It also moved settings that earlier phases had assigned to P12 without a
+P12 task to their delivering owner (#1904; DV-204).
+
+**Epic acceptance, independently of task delivery.** EPIC-CFG (#1821): one
+mixed descriptor applies through PATCH and `config apply` to the same protected XML
+read model, with reapply, null and invalid-input atomicity (`descriptor.feature`),
+the bootstrap descriptor through the same service (`internal/app` bootstrap tests,
+including the #1902 CDN refusal), and the runtime effects of each section: nginx
+validating the rendered snippet in a pinned container, loggers, baseline
+security and global hiding, GC/trash can expiry, global quota admission and
+warnings, and real SMTP delivery. EPIC-LDAP (#1822): OpenLDAP over LDAP and LDAPS on
+SQLite and PostgreSQL, DN-pattern and search binds, connection tests, STATIC/DYNAMIC/HIERARCHICAL
+group import and refresh, and membership revocation that reaches existing tokens
+(`test/server/access`). EPIC-PRX (#1823): `jf` cold downloads through one NTLM
+connection and through permitted and refused redirects, and replication push
+through an NTLM proxy on both stores. EPIC-QUA (#1824): the required Terraform lane
+applies, refreshes to an empty plan, reads back and destroys all seven exit-criteria
+resources and writes `p12-provider-evidence.json`.
+
+**Qualification (2026-11-23).** On merged main
+`b910ea869b65c3f348caba9f432cf58342f8d9c3`, which includes #1907 and #1909, the
+no-input [full workflow 45277781762](https://github.com/weaveplatform/artifactweave/actions/runs/45277781762)
+selected the full profile (3,768 unit and 3,141 acceptance tests) and passed all 20 required jobs;
+only `Documentation checks` and the format-only `Affected-package coverage` lane
+skipped, as the full profile intends.
+[Its coverage gate](https://github.com/weaveplatform/artifactweave/actions/runs/45277781762/job/138083686724)
+merged 11 lane artifacts at 95.2% (109,666/115,238) with every package at or above 90%. Its
+Terraform provider conformance lane applied the seven P12 resources and retained
+`p12-provider-evidence.json` in `cover-terraform`. Literal `make gate` on a clean
+detached checkout of the same revision passed vet, lint, unit/race/fuzz (276
+packages) and 270 of 272 Go acceptance packages. `test/server/federation` and
+`test/server/retention` timed out under workstation load (load average 30 to 60;
+client and transaction deadlines, among them the setup upload of the P12 NTLM push
+test, with no assertion reached) and passed when each was rerun once (GATE_RETRY),
+after which `make cover` measured 95.1% (109,546/115,199) with every package at or
+above 90%, govulncheck found no vulnerabilities and the build passed. An earlier
+attempt on `47d08cfdb` failed `TestAccMigrateCommand`, which still expected eight
+federation migrations after #1906 added the ninth (fixed by #1909, which derives
+each stream's latest version from its files), and, under load, the NuGet
+`TestAccSymbolsOppositeMovesOnPostgres` barrier deadline, which also covers its
+PostgreSQL start-up. No P12 assertion failed in any attempt. P12 has met its exit;
+closing the epics is left to the maintainer.
+
+**After the qualified revision.** #1905 merged as #1912 (`ac9c17180`) with every
+check of its own full CI run green, including Terraform provider conformance and
+the coverage gate. The XML `security` element now follows 7.161.26's
+`SecurityType`: it carries only `hideUnauthorizedResources` and
+`passwordSettings.expirationPolicy`. The deprecated `artifactory_ldap_group_setting`
+therefore no longer reads back, as on 7.x from 7.57.1. `artifactory_ldap_group_setting_v2`
+and the seven exit-criteria resources are unaffected.
+
+**Open follow-ups, outside the phase exit.** #1908 (the global hiding setting on the REST
+surfaces 7.x also hides), #1873 (the P39 system message banner) and #1901 (the
+weave provider's LDAP manager-password limitation). XML POST, vendor bootstrap
+import and backup execution remain P36; other human identity P21/P22; later
+operational APIs P38; observation P19.
 
 ## P13: Peer trust and federated repositories
 
@@ -1641,8 +1712,8 @@ requires P26/P27. Independent client and signing work may land earlier.
    proved replacement; broad input refusal must not hide an unplanned feature.
 4. Complete NuGet non-normalized mode/migration and global SemVer2/authentication settings,
    Helm global policy enforcement, Docker list-overwrite cleanup and target digest variants,
-   copy-time creation timestamps and global exclude patterns, with P12 configuration and
-   P36 migration support. P9/P10 retain remote NuGet signatures
+   copy-time creation timestamps and global exclude patterns, each with its descriptor or
+   system-property surface (#1904), and P36 migration support. P9/P10 retain remote NuGet signatures
    and other upstream/class behavior; these must be checked in their own exits.
 5. Research and deliver the target npm stage/token/profile/legacy-search contracts and
    trusted-publishing/provenance integration with P21/P23. Implement Terraform state-version

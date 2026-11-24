@@ -16,8 +16,8 @@ merged metadata or peer synchronisation. Those are P9, P10 and P13 respectively
 ([build status](../implementation/plan.md#build-status)). The other accepted package
 types acquire native handlers in P29–P33, with release bundles in P15; current
 configuration round-tripping is not a claim of package support. P28 owns remaining
-protocol and setting gaps in the first eight ecosystems, with P12 supplying system
-configuration. See the [capability roadmap](../implementation/capability-roadmap.md).
+protocol and setting gaps in the first eight ecosystems, together with each setting's
+configuration surface (#1904). See the [capability roadmap](../implementation/capability-roadmap.md).
 
 Sources: <https://docs.jfrog.com/integrations/docs/configuration-json-files.md>, the
 schema embedded in <https://docs.jfrog.com/artifactory/reference/createrepository.md>,
@@ -1105,8 +1105,8 @@ Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/we
   repository JSON field for it is documented (DV-041,
   [research 25 section 6](25-npm.md#6-strict-layout)).
 - **Global excludes.** `artifactory.repo.includeExclude.globalExcludes` ([7.90.5](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-7905-self-managed)) adds
-  system-wide exclude patterns. artifactweave currently has no equivalent. P12 owns
-  the configuration surface and P28 the effective package policy; lack of a known
+  system-wide exclude patterns. artifactweave currently has no equivalent. P28 owns
+  the setting and the effective package policy (#1904); lack of a known
   client setter does not exclude the setting.
 - **Repository API changes** that research 02 covers: filters on Get All Repository
   Configurations ([7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed)) and batch updates ([7.104.5](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71045-self-managed)).

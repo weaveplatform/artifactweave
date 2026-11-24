@@ -19,9 +19,9 @@ does not establish that its upstream protocol is implemented.
   cache/fetch policy and content-synchronisation settings. These management fields retain
   their individual runtime owners, including property synchronisation in P12/#303.
 
-The proxy definition is supplied through the implemented YAML descriptor. The separate
-`artifactory_proxy` resource needs XML descriptor reads, which remain P12/#303; this
-reference does not claim provider CRUD for that resource.
+The proxy definition is supplied through the YAML descriptor. The separate
+`artifactory_proxy` resource is qualified in the [`configuration`](../configuration/)
+reference (#1837); this reference only names an existing proxy and does not manage it.
 
 Project-scoped remote repositories retain P11/#487 ownership.
 
@@ -151,7 +151,7 @@ No modules.
 | ---- | ----------- | ---- | ------- | :------: |
 | access\_token | Admin access token, sent as a Bearer token. | `string` | n/a | yes |
 | header\_secret | Sensitive generic upstream header value. Terraform stores it in state; artifactweave seals it and redacts API reads. | `string` | n/a | yes |
-| proxy\_key | Existing proxy definition referenced by the generic remote. Manage it through the YAML descriptor until P12 implements XML descriptor reads used by artifactory\_proxy. | `string` | n/a | yes |
+| proxy\_key | Existing proxy definition referenced by the generic remote. Manage it through the YAML descriptor or the artifactory\_proxy resource of the configuration reference. | `string` | n/a | yes |
 | repository\_prefix | Prefix for all fourteen remote repository keys. | `string` | `"managed-remote"` | no |
 | revision | Configuration revision, 1 or 2. Revision 2 demonstrates updates, disables generic persistence and takes that repository offline. | `number` | `1` | no |
 | upstream\_password | Generic upstream password passed to the provider's write-only attribute; never stored in Terraform state. Rotate it by increasing revision. | `string` | n/a | yes |

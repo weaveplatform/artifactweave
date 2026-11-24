@@ -200,7 +200,7 @@ the request's base URL (decision [0002](0002-spec-first-flat-crud-handwritten-it
     the version its nuspec wrote has a dot-separated pre-release label or build metadata, or
     when a dependency range has a bound that does, as Microsoft defines it (R29 6). The SemVer
     2 filter is not optional: 7.x's `artifactory.nuget.disableSemVer2SearchFilterForLocalRepos`
-    currently has no equivalent; P28 owns the setting with P12 configuration support.
+    currently has no equivalent; P28 owns the setting and its configuration surface.
 - **`GET <v3>/query`** takes `q`, `skip`, `take`, `prerelease`, `semVerLevel` and
   `packageType`, and ignores `includeDelisted` and `supportedFramework`:
   - each whitespace-separated term of `q` must appear, ignoring case, in the id, title,
@@ -349,8 +349,8 @@ the request's base URL (decision [0002](0002-spec-first-flat-crud-handwritten-it
   therefore needs force authentication before a NuGet client sends credentials, as JFrog
   documents (R29 9). 6.20's system property fallback, `artifactory.nuget.forceAuthentication`,
   and its anonymous root `GET`, `artifactory.nuget.allowRootGetWithAnon`, currently have
-  no equivalent. P19/P20 must establish their current target applicability; P28/P12
-  own applicable policy and configuration.
+  no equivalent. P19/P20 must establish their current target applicability; P28 owns
+  applicable policy and its configuration.
 
 ### The v2 OData feed
 
@@ -638,7 +638,8 @@ N9-1 through N9-7 in research 29 remain P19/#216 work.
 P28 owns the remaining target-supported v2 query grammar and aliases, framework
 filter semantics, non-normalized repositories, SemVer2/global authentication settings
 and any still-supported PDB identities beyond MSF7/Portable PDB. P19/P20 must settle
-uncertain target contracts; P12 supplies settings and P36 non-normalized migration.
+uncertain target contracts; P28 also owns those settings' configuration surface (#1904);
+P36 owns non-normalized migration.
 P9 #628 implements v3 remote signatures/cache behavior; #629 implements v2/symbol
 retrieval and remote snapshot retention. P10 virtual priority and metadata are implemented in the sections below.
 NuGet CLI, Chocolatey, PowerShell, Visual Studio/MSBuild and JFrog NuGet proof belong
