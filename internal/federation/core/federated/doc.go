@@ -1,7 +1,8 @@
 // Package federated manages federated repositories: their members, the
 // configuration sync between them (FED-01), and the repo:<key> stream kind
-// that converges their content under the conflict rule (FED-02); as P13
-// continues, full sync, lag and replay.
+// that converges their content under the conflict rule (FED-02), with its
+// full sync and the member operations (FED-04); as P13 continues, lag and
+// replay.
 //
 // # Role
 //
@@ -33,8 +34,16 @@
 // tombstones older than the outbox retention window. The stamps live in
 // federation_item_stamps (ItemStampStore).
 //
-// Planned: full and forced sync, status, lag and failed-binary replay
-// (decision 0022; plan P13, FED-04 to FED-06).
+// The repository's snapshot for full sync (SnapshotItems, LocalItems,
+// Reconcile, Discard) and Operations' fullSync and forceFullSync, which ask
+// each member to resynchronise from this instance through the work queue
+// (FullSyncRequestKind, Resyncer, Membership.QueueFullSync); recovery and
+// reconnect, removeMember, prioritization and propagateCreatedTime, kept
+// in instance settings. A member dropped from a repository is forgotten by
+// the sync engine (Membership.Dropped).
+//
+// Planned: status, lag and failed-binary replay (decision 0022; plan P13,
+// FED-05 and FED-06).
 //
 // # References
 //
@@ -56,5 +65,6 @@
 // # Status
 //
 // Members and configuration sync implemented (FED-01, issue #1930); change
-// propagation implemented (FED-02, issue #1931); the rest of P13 to follow.
+// propagation implemented (FED-02, issue #1931); full sync and the member
+// operations implemented (FED-04, issue #1932); the rest of P13 to follow.
 package federated

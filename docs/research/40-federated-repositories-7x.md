@@ -276,13 +276,13 @@ Paths are under `/artifactory/api/`. Line numbers are the `@Path` lines in
 | `POST federation/migrate/{repoKey}` | `FederatedRepoResource.java:328` | yes | P13 FED-01 | Converts a local repository; refuses `terraformbackend` |
 | `POST federation/convertToLocal` | `:343` | yes | P13 FED-01 | |
 | `POST federation/configSync/{repoKey}` | `:406` | yes | P13 FED-01 | 200 "Configuration sync executed successfully" (`:424`) |
-| `POST federation/fullSync/{repoKey}` | `:360` | yes | P13 FED-04 | `?mirror` limits it to one member. `?isDry` (the comparison tool, from 7.104.2) is a deviation: 400 naming the parameter, as the comparison files' format is RTFS's |
+| `POST federation/fullSync/{repoKey}` | `:360` | yes | P13 FED-04 | `?mirror` limits it to one member. `?isDry` (the comparison tool, from 7.104.2) is a deviation (DV-206): 400 naming the parameter, as the comparison files' format is RTFS's. 200 `{}` otherwise |
 | `POST federation/forceFullSync/{repoKey}` | `:375` | yes | P13 FED-04 | `?mirror` as above |
-| `POST federation/recovery` | `:601` | yes | P13 FED-04 | |
-| `POST federation/reconnect` | `:694` | yes | P13 FED-04 | 200 `true` |
+| `POST federation/recovery` | `:601` | yes | P13 FED-04 | `?repoKey` limits it to one repository; `?force` retries every member's delivery [I] |
+| `POST federation/reconnect` | `:694` | yes | P13 FED-04 | 200 `true`; a forced recovery of every repository [I] |
 | `PUT federation/prioritization/{repoKey}` | `:852` | yes | P13 FED-04 | `?priorityLevel` HIGH or STANDARD |
 | `PUT federation/propagateCreatedTime` | `:895` | yes | P13 FED-04 | `?enabled` |
-| `POST federation/removeMember` | `:969` | yes | P13 FED-04 | Body is the member URL |
+| `POST federation/removeMember` | `:969` | yes | P13 FED-04 | Body is the member's base URL or member URL |
 | `GET federation/state` | `:270` | yes | P13 FED-05 | Legacy monitoring, served (deviation above) |
 | `GET federation/inconsistentRepos` | `:957` | yes | P13 FED-05 | |
 | `GET federation/status/repo/{repoKey}` | `FederatedStatusResource.java:125` | yes | P13 FED-05 | Body in "Status payloads" below |
@@ -298,7 +298,7 @@ Paths are under `/artifactory/api/`. Line numbers are the `@Path` lines in
 | `GET federation/binaries/tasks/{repoKey}` | `:135` | no | [I] FED-06 | The repository's binary-task counts; the DTO is closed |
 | `GET federation/status/repoState/{repoKey}/binaries/` | `FederatedStatusResource.java:254` | no | [I] FED-06 | As above, for any user with read |
 | `POST federation/replaceUrl`, `POST federation/updateMemberUrl` | `FederatedReplaceUrlResource.java:61`, `:96` | no | [I] FED-01 | Body `{oldBaseUrl, newBaseUrl}` (`base/config/.../model/ReplaceUrlConfig.java:10-11`); rewrites member URLs on every federated repository; 200 text "Binding URL from URL %s to new %s finished." (`:137-140`). Whether 7.x then tells the members is **[I]** |
-| `GET federation/compareResult/{fileName}` | `FederatedRepoResource.java:927` | no | Deviation (FED-04) | 404: no comparison files exist, as `isDry` is refused |
+| `GET federation/compareResult/{fileName}` | `FederatedRepoResource.java:927` | no | Deviation (FED-04, DV-207) | 404: no comparison files exist, as `isDry` is refused |
 | `GET federation/status` (the JPD status) | `FederatedStatusResource.java:139` | no | Deviation (FED-05) | 404; internal scope `jpd-status` |
 | `GET federation/validate/{repoKey}`, `GET federation/repos`, `GET federation/baseUrlAndRepos` | `FederatedRepoResource.java:208`, `:238`, `:254` | no | Deviation (FED-05) | 404; internal scopes |
 | `POST federation/properties/{repoKey}`, `GET federation/property/{repoKey}/{fileName}`, `GET federation/extendedInfo/{repoKey}` | `:291`, `:305`, `:321` | no | Deviation (FED-05) | 404; full-sync plumbing |

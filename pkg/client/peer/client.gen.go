@@ -179,6 +179,12 @@ type RepositoryConfiguration struct {
 	Stream string `json:"stream"`
 }
 
+// ResyncRequest A request for a full sync of a stream. Version 1.0; a later minor version may add fields, which the receiver ignores.
+type ResyncRequest struct {
+	// Forced Required within this object. True for a forced full sync, which discards what the receiver holds of the stream that the caller's snapshot does not; false for one that settles each item by the conflict rule.
+	Forced bool `json:"forced"`
+}
+
 // SnapshotEntry The current state of one item on the stream. Version 1.0; a later minor version may add fields, which the receiver ignores.
 type SnapshotEntry struct {
 	// Blob Optional within this object. The item's content, absent on a tombstone and on a folder.
@@ -380,6 +386,24 @@ type PushEventsParams struct {
 	ContentDigest PeerContentDigest `json:"Content-Digest"`
 }
 
+// RequestResyncParams defines parameters for RequestResync.
+type RequestResyncParams struct {
+	// ArtifactweavePeerProtocol Required header parameter. The protocol version the sender speaks, as `<major>.<minor>`, for example `1.0`. A major version other than 1 answers 400 and is recorded on the sender's peer record. The answer carries the receiver's version in the same header.
+	ArtifactweavePeerProtocol PeerProtocol `json:"Artifactweave-Peer-Protocol"`
+
+	// Date Required header parameter. The time the sender signed the request, as an HTTP date (RFC 9110, section 5.6.7), covered by the signature. More than five minutes from the receiver's clock answers 401.
+	Date PeerDate `json:"Date"`
+
+	// Signature Required header parameter. The Ed25519 signature (RFC 9421) named in `Signature-Input`, for example `sig1=:<base64>:`. One that does not verify with the key recorded for its `keyid` answers 401.
+	Signature PeerSignature `json:"Signature"`
+
+	// SignatureInput Required header parameter. The signature's covered components and parameters (RFC 9421), for example `sig1=("@method" "@target-uri" "date" "content-digest");created=1700000000;keyid="jfrt@<uuid>";alg="ed25519";nonce="<random>"`. `keyid` is the sender's instance id; `content-digest` is covered exactly when the request has a body. A `nonce` the receiver has accepted within the last five minutes answers 401.
+	SignatureInput PeerSignatureInput `json:"Signature-Input"`
+
+	// ContentDigest Required header parameter. The SHA-256 digest of the request body (RFC 9530), for example `sha-256=:<base64>:`, covered by the signature. A digest that does not match the body answers 401.
+	ContentDigest PeerContentDigest `json:"Content-Digest"`
+}
+
 // GetSnapshotParams defines parameters for GetSnapshot.
 type GetSnapshotParams struct {
 	// Cursor Optional query parameter. The opaque next_cursor of the previous page; absent to take a new snapshot. A cursor continues only the snapshot, stream and caller it was issued for.
@@ -409,6 +433,9 @@ type PutRepositoryConfigurationJSONRequestBody = RepositoryConfiguration
 
 // PushEventsJSONRequestBody defines body for PushEvents for application/json ContentType.
 type PushEventsJSONRequestBody = EventBatch
+
+// RequestResyncJSONRequestBody defines body for RequestResync for application/json ContentType.
+type RequestResyncJSONRequestBody = ResyncRequest
 
 // RequestEditorFn is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -565,6 +592,24 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /streams/{stream}/events (the `PushEvents` operationId).
 	PushEvents(ctx context.Context, stream Stream, params *PushEventsParams, body PushEventsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RequestResyncWithBody Ask for a full sync
+	//
+	// Asks this instance to resynchronise the stream from the caller with a full sync, as an operator's fullSync or forceFullSync on the caller asks of each member it names. This instance starts the full sync, reading the caller's snapshot with GET /streams/{stream}/snapshot, and answers once it is started; a full sync already running is answered for, made forced when forced asks for it, rather than started again. A forced full sync discards what this instance holds of the stream that the caller's snapshot does not.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /streams/{stream}/resync (the `RequestResync` operationId).
+	RequestResyncWithBody(ctx context.Context, stream Stream, params *RequestResyncParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RequestResync Ask for a full sync
+	//
+	// Asks this instance to resynchronise the stream from the caller with a full sync, as an operator's fullSync or forceFullSync on the caller asks of each member it names. This instance starts the full sync, reading the caller's snapshot with GET /streams/{stream}/snapshot, and answers once it is started; a full sync already running is answered for, made forced when forced asks for it, rather than started again. A forced full sync discards what this instance holds of the stream that the caller's snapshot does not.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /streams/{stream}/resync (the `RequestResync` operationId).
+	RequestResync(ctx context.Context, stream Stream, params *RequestResyncParams, body RequestResyncJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetSnapshot Read a stream snapshot
 	//
@@ -746,6 +791,44 @@ func (c *Client) PushEventsWithBody(ctx context.Context, stream Stream, params *
 // Corresponds with POST /streams/{stream}/events (the `PushEvents` operationId).
 func (c *Client) PushEvents(ctx context.Context, stream Stream, params *PushEventsParams, body PushEventsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPushEventsRequest(c.Server, stream, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RequestResyncWithBody Ask for a full sync
+//
+// Asks this instance to resynchronise the stream from the caller with a full sync, as an operator's fullSync or forceFullSync on the caller asks of each member it names. This instance starts the full sync, reading the caller's snapshot with GET /streams/{stream}/snapshot, and answers once it is started; a full sync already running is answered for, made forced when forced asks for it, rather than started again. A forced full sync discards what this instance holds of the stream that the caller's snapshot does not.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /streams/{stream}/resync (the `RequestResync` operationId).
+func (c *Client) RequestResyncWithBody(ctx context.Context, stream Stream, params *RequestResyncParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRequestResyncRequestWithBody(c.Server, stream, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RequestResync Ask for a full sync
+//
+// Asks this instance to resynchronise the stream from the caller with a full sync, as an operator's fullSync or forceFullSync on the caller asks of each member it names. This instance starts the full sync, reading the caller's snapshot with GET /streams/{stream}/snapshot, and answers once it is started; a full sync already running is answered for, made forced when forced asks for it, rather than started again. A forced full sync discards what this instance holds of the stream that the caller's snapshot does not.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /streams/{stream}/resync (the `RequestResync` operationId).
+func (c *Client) RequestResync(ctx context.Context, stream Stream, params *RequestResyncParams, body RequestResyncJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRequestResyncRequest(c.Server, stream, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -1398,6 +1481,102 @@ func NewPushEventsRequestWithBody(server string, stream Stream, params *PushEven
 	return req, nil
 }
 
+// NewRequestResyncRequest calls the generic RequestResync builder with application/json body
+func NewRequestResyncRequest(server string, stream Stream, params *RequestResyncParams, body RequestResyncJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewRequestResyncRequestWithBody(server, stream, params, "application/json", bodyReader)
+}
+
+// NewRequestResyncRequestWithBody constructs an http.Request for the RequestResync method, with any body, and a specified content type
+func NewRequestResyncRequestWithBody(server string, stream Stream, params *RequestResyncParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "stream", stream, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/streams/%s/resync", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Artifactweave-Peer-Protocol", params.ArtifactweavePeerProtocol, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("Artifactweave-Peer-Protocol", headerParam0)
+
+		var headerParam1 string
+
+		headerParam1, err = runtime.StyleParamWithOptions("simple", false, "Date", params.Date, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("Date", headerParam1)
+
+		var headerParam2 string
+
+		headerParam2, err = runtime.StyleParamWithOptions("simple", false, "Signature", params.Signature, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("Signature", headerParam2)
+
+		var headerParam3 string
+
+		headerParam3, err = runtime.StyleParamWithOptions("simple", false, "Signature-Input", params.SignatureInput, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("Signature-Input", headerParam3)
+
+		var headerParam4 string
+
+		headerParam4, err = runtime.StyleParamWithOptions("simple", false, "Content-Digest", params.ContentDigest, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("Content-Digest", headerParam4)
+
+	}
+
+	return req, nil
+}
+
 // NewGetSnapshotRequest constructs an http.Request for the GetSnapshot method
 func NewGetSnapshotRequest(server string, stream Stream, params *GetSnapshotParams) (*http.Request, error) {
 	var err error
@@ -1644,6 +1823,24 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /streams/{stream}/events (the `PushEvents` operationId).
 	PushEventsWithResponse(ctx context.Context, stream Stream, params *PushEventsParams, body PushEventsJSONRequestBody, reqEditors ...RequestEditorFn) (*PushEventsResponse, error)
+
+	// RequestResyncWithBodyWithResponse Ask for a full sync
+	//
+	// Asks this instance to resynchronise the stream from the caller with a full sync, as an operator's fullSync or forceFullSync on the caller asks of each member it names. This instance starts the full sync, reading the caller's snapshot with GET /streams/{stream}/snapshot, and answers once it is started; a full sync already running is answered for, made forced when forced asks for it, rather than started again. A forced full sync discards what this instance holds of the stream that the caller's snapshot does not.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /streams/{stream}/resync (the `RequestResync` operationId).
+	RequestResyncWithBodyWithResponse(ctx context.Context, stream Stream, params *RequestResyncParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RequestResyncResponse, error)
+
+	// RequestResyncWithResponse Ask for a full sync
+	//
+	// Asks this instance to resynchronise the stream from the caller with a full sync, as an operator's fullSync or forceFullSync on the caller asks of each member it names. This instance starts the full sync, reading the caller's snapshot with GET /streams/{stream}/snapshot, and answers once it is started; a full sync already running is answered for, made forced when forced asks for it, rather than started again. A forced full sync discards what this instance holds of the stream that the caller's snapshot does not.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /streams/{stream}/resync (the `RequestResync` operationId).
+	RequestResyncWithResponse(ctx context.Context, stream Stream, params *RequestResyncParams, body RequestResyncJSONRequestBody, reqEditors ...RequestEditorFn) (*RequestResyncResponse, error)
 
 	// GetSnapshotWithResponse Read a stream snapshot
 	//
@@ -2362,6 +2559,107 @@ func (r PushEventsResponse) ContentType() string {
 	return ""
 }
 
+// RequestResyncResponse429Headers the declared response headers of an HTTP 429 response for RequestResync
+type RequestResyncResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// RequestResyncResponse503Headers the declared response headers of an HTTP 503 response for RequestResync
+type RequestResyncResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type RequestResyncResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ErrorResponse
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *PeerUnauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *ErrorResponse
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *PeerInternalError
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *RequestResyncResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *RequestResyncResponse503Headers
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r RequestResyncResponse) GetJSON400() *ErrorResponse {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r RequestResyncResponse) GetJSON401() *PeerUnauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r RequestResyncResponse) GetJSON403() *ErrorResponse {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r RequestResyncResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r RequestResyncResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r RequestResyncResponse) GetJSON500() *PeerInternalError {
+	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r RequestResyncResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r RequestResyncResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RequestResyncResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RequestResyncResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RequestResyncResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // GetSnapshotResponse429Headers the declared response headers of an HTTP 429 response for GetSnapshot
 type GetSnapshotResponse429Headers struct {
 	RateLimit       *string
@@ -2625,6 +2923,36 @@ func (c *ClientWithResponses) PushEventsWithResponse(ctx context.Context, stream
 		return nil, err
 	}
 	return ParsePushEventsResponse(rsp)
+}
+
+// RequestResyncWithBodyWithResponse Ask for a full sync
+//
+// Asks this instance to resynchronise the stream from the caller with a full sync, as an operator's fullSync or forceFullSync on the caller asks of each member it names. This instance starts the full sync, reading the caller's snapshot with GET /streams/{stream}/snapshot, and answers once it is started; a full sync already running is answered for, made forced when forced asks for it, rather than started again. A forced full sync discards what this instance holds of the stream that the caller's snapshot does not.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /streams/{stream}/resync (the `RequestResync` operationId).
+func (c *ClientWithResponses) RequestResyncWithBodyWithResponse(ctx context.Context, stream Stream, params *RequestResyncParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RequestResyncResponse, error) {
+	rsp, err := c.RequestResyncWithBody(ctx, stream, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRequestResyncResponse(rsp)
+}
+
+// RequestResyncWithResponse Ask for a full sync
+//
+// Asks this instance to resynchronise the stream from the caller with a full sync, as an operator's fullSync or forceFullSync on the caller asks of each member it names. This instance starts the full sync, reading the caller's snapshot with GET /streams/{stream}/snapshot, and answers once it is started; a full sync already running is answered for, made forced when forced asks for it, rather than started again. A forced full sync discards what this instance holds of the stream that the caller's snapshot does not.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /streams/{stream}/resync (the `RequestResync` operationId).
+func (c *ClientWithResponses) RequestResyncWithResponse(ctx context.Context, stream Stream, params *RequestResyncParams, body RequestResyncJSONRequestBody, reqEditors ...RequestEditorFn) (*RequestResyncResponse, error) {
+	rsp, err := c.RequestResync(ctx, stream, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRequestResyncResponse(rsp)
 }
 
 // GetSnapshotWithResponse Read a stream snapshot
@@ -3454,6 +3782,128 @@ func ParsePushEventsResponse(rsp *http.Response) (*PushEventsResponse, error) {
 		response.Headers429 = &headers
 	case rsp.StatusCode == 503:
 		var headers PushEventsResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseRequestResyncResponse parses an HTTP response from a RequestResyncWithResponse call
+func ParseRequestResyncResponse(rsp *http.Response) (*RequestResyncResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RequestResyncResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest PeerUnauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest PeerInternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers RequestResyncResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers RequestResyncResponse503Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {

@@ -434,6 +434,20 @@ records the other ONLINE from a read after pairing, with a clock skew under a
 second; a partition turns both OFFLINE and healing it both ONLINE; a record
 holding a key the peer does not sign with shows it UNAUTHORIZED on both sides
 until the key is restored; and a stopped instance turns OFFLINE on the other.
+`TestAccFederatedFullSyncSQLite` and `TestAccFederatedFullSyncPostgres` run
+FED-04's operations across three instances ([#1932](https://github.com/weaveplatform/artifactweave/issues/1932))
+with `Options.Retention` at one minute, the least the configuration accepts, so
+the members partitioned from the sender outlast its retention window. A normal
+full sync gives the member `?mirror` names what it missed and keeps what the
+sender no longer holds; a forced one discards that, on the named member and
+then on every member; the repaired members then follow the stream both ways.
+Recovery delivers at once what a cut left undelivered, reconnect answers
+`true`, full sync keeps creation times only with `propagateCreatedTime`, and a
+removed member neither receives from nor sends to the others. In
+`test/server/federation`, `TestAccRepositoryFullSyncSQLite` and
+`TestAccRepositoryFullSyncPostgres` check the same full sync between two
+runtimes item by item: stamps, folders and the `isDry` and `compareResult`
+deviations.
 `TestAccPeersFailurePrintsEachServerLog` runs a deliberately failing scenario in
 a process of its own and requires its output to carry each instance's log.
 

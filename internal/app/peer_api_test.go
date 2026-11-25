@@ -162,8 +162,8 @@ func TestAccPeerOperationsRefuseUnsignedAtStartUp(t *testing.T) {
 					}
 				}
 			}
-			if checked != 8 {
-				t.Errorf("checked %d peer operations, want the 8 the spec declares", checked)
+			if checked != 9 {
+				t.Errorf("checked %d peer operations, want the 9 the spec declares", checked)
 			}
 		})
 	}
@@ -373,8 +373,8 @@ func TestAccPeerOperationsSignedBetweenInstances(t *testing.T) {
 					secrets = append(secrets, req.Header.Get("Signature"), resp.Header.Get("Signature"))
 				}
 			}
-			if checked != 8 {
-				t.Errorf("checked %d peer operations, want 8", checked)
+			if checked != 9 {
+				t.Errorf("checked %d peer operations, want 9", checked)
 			}
 			secrets = append(secrets, refusedLive(t, a, b)...)
 

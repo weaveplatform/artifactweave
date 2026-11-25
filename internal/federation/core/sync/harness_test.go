@@ -64,6 +64,8 @@ type world struct {
 	faults  faults
 	pushes  int
 	fetches int
+	// pushed is the stream of each push, in the order they were sent.
+	pushed []string
 	// snapshots counts snapshot pages asked for; onSnapshot, when set, is
 	// called with each page's cursor before it is served.
 	snapshots  int
@@ -317,6 +319,7 @@ func (r remote) Push(ctx context.Context, peer model.Peer, b streamsync.Batch) (
 	applied, err := to.engine.Receive(ctx, c, b)
 	r.w.mu.Lock()
 	r.w.pushes++
+	r.w.pushed = append(r.w.pushed, b.Stream)
 	drop := r.w.faults.dropAnswer > 0
 	if drop {
 		r.w.faults.dropAnswer--

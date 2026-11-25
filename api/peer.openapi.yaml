@@ -418,6 +418,64 @@ paths:
         position: after
         size: limit
       x-pagination-next: body:/next_after
+  /streams/{stream}/resync:
+    post:
+      description: >-
+        Asks this instance to resynchronise the stream from the caller with a full sync, as an operator's fullSync or forceFullSync on the caller asks of each member it names. This instance starts the full sync, reading the caller's snapshot with GET /streams/{stream}/snapshot, and answers once it is started; a full sync already running is answered for, made forced when forced asks for it, rather than started again. A forced full sync discards what this instance holds of the stream that the caller's snapshot does not.
+      operationId: requestResync
+      parameters:
+        - $ref: '#/components/parameters/Stream'
+        - $ref: '#/components/parameters/PeerProtocol'
+        - $ref: '#/components/parameters/PeerDate'
+        - $ref: '#/components/parameters/PeerSignature'
+        - $ref: '#/components/parameters/PeerSignatureInput'
+        - $ref: '#/components/parameters/PeerContentDigest'
+      requestBody:
+        description: The kind of full sync asked for.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResyncRequest'
+      responses:
+        '204':
+          description: The full sync is started, or was already running.
+        '400':
+          description: The body is malformed, or the protocol major version is not this instance's.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/PeerUnauthorized'
+        '403':
+          description: >-
+            This instance accepts no events from the caller on this stream: the caller does not hold the stream's use case, or this instance issued it only `federated-repo/r`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: >-
+            This instance does not exchange the stream with the caller, or takes no snapshots of the stream's kind.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/PeerInternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Ask for a full sync
+      tags:
+        - streams
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:stream
+        - body:/forced
+      x-cost: expensive
   /streams/{stream}/snapshot:
     get:
       description: >-
@@ -864,6 +922,16 @@ components:
           additionalProperties: true
           description: >-
             Required within this object. The repository in the form `GET /artifactory/api/repositories/{repoKey}` answers, with `rclass` `federated` and `members` listing every member, this instance's included. Its `key` is the key in the path.
+    ResyncRequest:
+      type: object
+      description: >-
+        A request for a full sync of a stream. Version 1.0; a later minor version may add fields, which the receiver ignores.
+      required: [forced]
+      properties:
+        forced:
+          type: boolean
+          description: >-
+            Required within this object. True for a forced full sync, which discards what the receiver holds of the stream that the caller's snapshot does not; false for one that settles each item by the conflict rule.
     SnapshotEntry:
       type: object
       description: >-

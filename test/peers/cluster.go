@@ -74,6 +74,11 @@ type Options struct {
 	Instances int
 	// Driver is SQLite (the default) or Postgres.
 	Driver Driver
+	// Retention is each instance's federation.outbox_retention; zero
+	// keeps the default of seven days. A scenario that partitions a member
+	// past the window sets the minimum, a minute, and the instance then
+	// prunes every ten seconds.
+	Retention time.Duration
 	// PeerProbeInterval is each instance's federation.peer_probe_interval,
 	// how often it reads its peers' status; zero keeps the default.
 	PeerProbeInterval time.Duration
@@ -141,6 +146,7 @@ func Start(t *testing.T, opts Options) *Cluster {
 			masterKey:     "peer-master-key-" + strings.ToLower(rand.Text()),
 			cluster:       c,
 			probe:         opts.PeerProbeInterval,
+			retention:     opts.Retention,
 			work:          filepath.Join(work, name),
 			done:          make(chan struct{}),
 			// Both relays listen before any instance starts: the ingress
@@ -404,9 +410,12 @@ type Instance struct {
 	AdminPassword string
 
 	cluster *Cluster
-	probe   time.Duration
-	work    string
-	dsn     string
+	// probe and retention are the configuration's federation section:
+	// peer_probe_interval and outbox_retention, left out when zero.
+	probe     time.Duration
+	retention time.Duration
+	work      string
+	dsn       string
 	// config is the configuration file the instance process loads.
 	config string
 	// ingress forwards URL to addr; egress is the instance's platform
@@ -624,9 +633,12 @@ func (in *Instance) startOnce(origins []string) error {
 	if in.dsn != "" {
 		database = map[string]string{"driver": string(Postgres), "dsn": in.dsn}
 	}
-	var federation map[string]string
+	federation := map[string]string{}
 	if in.probe > 0 {
-		federation = map[string]string{"peer_probe_interval": in.probe.String()}
+		federation["peer_probe_interval"] = in.probe.String()
+	}
+	if in.retention > 0 {
+		federation["outbox_retention"] = in.retention.String()
 	}
 	data, err := yaml.Marshal(instanceConfig{
 		Listen: addr, BaseURL: in.URL, DataDir: in.DataDir,

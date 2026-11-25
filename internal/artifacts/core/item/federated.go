@@ -322,3 +322,78 @@ func (s *Service) DeleteFederated(ctx context.Context, cfg repo.Config, p string
 		return err
 	})
 }
+
+// DiscardFederated removes whatever is at p of cfg, a folder with
+// everything below it, as a client's delete does
+// (artapi.FederatedItems.Discard). Nothing at p is not an error.
+func (s *Service) DiscardFederated(ctx context.Context, cfg repo.Config, p string) error {
+	ctx = federated(ctx)
+	full := strings.Trim(p, "/")
+	if full == "" {
+		return fmt.Errorf("%w: a federated discard needs a path", kernel.ErrInvalidItemPath)
+	}
+	return s.Store.Tx(ctx, func(ctx context.Context) error { //nolint:wrapcheck // the callback names its failures
+		_, err := s.Store.Items().Get(ctx, cfg.Key, false, full)
+		switch {
+		case errors.Is(err, kernel.ErrNotFound):
+			return nil
+		case err != nil:
+			return fmt.Errorf("item: get %s: %w", full, err)
+		}
+		_, err = s.Delete(ctx, Target{Repo: cfg, Path: full}, "")
+		return err
+	})
+}
+
+// ListFederated lists up to limit of cfg's files and folders after the
+// full path after, in byte order of full path, each as the change that
+// would leave another member's copy so (artapi.FederatedItems.List).
+func (s *Service) ListFederated(
+	ctx context.Context, cfg repo.Config, after string, limit int, properties bool,
+) ([]artapi.ItemChange, error) {
+	page := kernel.Page{Limit: limit}
+	if after != "" {
+		page.After = kernel.Cursor(after)
+	}
+	items, _, err := s.Store.Items().DescendantsByFullPath(ctx, cfg.Key, false, kernel.RootPath, page)
+	if err != nil {
+		return nil, fmt.Errorf("item: list %s: %w", cfg.Key, err)
+	}
+	out := make([]artapi.ItemChange, 0, len(items))
+	for _, it := range items {
+		c := change(it)
+		if properties {
+			if c.Properties, err = s.propertySnapshot(ctx, it); err != nil {
+				return nil, err
+			}
+		}
+		out = append(out, c)
+	}
+	return out, nil
+}
+
+// HoldsFederated reports whether a file of cfg has the content sha256
+// (artapi.FederatedItems.Holds). The content index is per blob, not per
+// repository, so it pages through every file of that content until one
+// is cfg's.
+func (s *Service) HoldsFederated(ctx context.Context, cfg repo.Config, sha256 string) (bool, error) {
+	if sha256 == "" {
+		return false, nil
+	}
+	page := kernel.Page{Limit: 100}
+	for {
+		items, next, err := s.Store.Items().FindByChecksum(ctx, kernel.Checksums{SHA256: sha256}, page)
+		if err != nil {
+			return false, fmt.Errorf("item: find %s: %w", sha256, err)
+		}
+		for _, it := range items {
+			if it.RepoKey == cfg.Key && !it.Cached && !it.Folder {
+				return true, nil
+			}
+		}
+		if next == "" {
+			return false, nil
+		}
+		page.After = next
+	}
+}

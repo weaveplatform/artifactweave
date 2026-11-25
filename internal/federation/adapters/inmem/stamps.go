@@ -100,3 +100,23 @@ func (st stampStore) Clear(ctx context.Context, repoKey string) error {
 		return nil
 	})
 }
+
+func (st stampStore) List(ctx context.Context, repoKey, after string, limit int) ([]model.ItemStamp, error) {
+	var out []model.ItemStamp
+	err := st.s.Do(ctx, func() error {
+		out = st.t().First(func(k stampKey, _ model.ItemStamp) bool {
+			return k.repo == repoKey && k.path > after
+		}, byPath, limit)
+		return nil
+	})
+	return out, err
+}
+
+func (st stampStore) Remove(ctx context.Context, repoKey, path string, below bool) error {
+	return st.s.Do(ctx, func() error {
+		st.t().DeleteWhere(func(k stampKey, _ model.ItemStamp) bool {
+			return k.repo == repoKey && (k.path == path || below && strings.HasPrefix(k.path, path+"/"))
+		})
+		return nil
+	})
+}

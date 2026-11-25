@@ -33,6 +33,14 @@ type ItemStampStore interface {
 	// PruneTombstones removes the tombstones stamped before before, of
 	// every repository, and returns how many.
 	PruneTombstones(ctx context.Context, before outbox.HLC) (int64, error)
+	// List returns up to limit of repoKey's records, tombstones and
+	// changes pending a blob included, whose paths follow after in byte
+	// order, in that order: what a full sync merges with the items.
+	List(ctx context.Context, repoKey, after string, limit int) ([]model.ItemStamp, error)
+	// Remove removes the record of the item at path, tombstone included,
+	// and with below the records of every item under it as a folder: what
+	// a forced full sync discards. None there is not an error.
+	Remove(ctx context.Context, repoKey, path string, below bool) error
 	// Clear removes every record of repoKey, when the repository is
 	// deleted or stops being federated.
 	Clear(ctx context.Context, repoKey string) error

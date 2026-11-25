@@ -210,6 +210,13 @@ func (o faultOutbox) ClearFailedFetch(ctx context.Context, s, sha256 string) err
 	return o.OutboxStore.ClearFailedFetch(ctx, s, sha256) //nolint:wrapcheck // passed through
 }
 
+func (o faultOutbox) DeleteCursor(ctx context.Context, peer, s string) error {
+	if err := o.f.check("Outbox.DeleteCursor"); err != nil {
+		return err
+	}
+	return o.OutboxStore.DeleteCursor(ctx, peer, s) //nolint:wrapcheck // passed through
+}
+
 // faultBlobs is a node's blob store, failing where f says.
 type faultBlobs struct {
 	blob.Store

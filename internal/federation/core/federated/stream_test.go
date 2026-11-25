@@ -26,9 +26,16 @@ func (s store) Instance() instance.InstanceStore { return s.platform.Instance() 
 // items is the artifacts module's FederatedItems over a map, recording
 // what was applied.
 type items struct {
-	put     []artifactsapi.ItemChange
-	deleted []string
-	err     error
+	put       []artifactsapi.ItemChange
+	deleted   []string
+	discarded []string
+	// held is what List lists, in order of path.
+	held    []artifactsapi.ItemChange
+	listErr error
+	// holds is the content Holds reports; holdsErr fails it.
+	holds    map[string]bool
+	holdsErr error
+	err      error
 	// during runs inside Put, as a local write racing the apply would.
 	during func(ctx context.Context) error
 }
@@ -52,6 +59,35 @@ func (i *items) Delete(_ context.Context, repoKey, path string, _ bool) error {
 	}
 	i.deleted = append(i.deleted, repoKey+":"+path)
 	return nil
+}
+
+func (i *items) Discard(_ context.Context, repoKey, path string) error {
+	if i.err != nil {
+		return i.err
+	}
+	i.discarded = append(i.discarded, repoKey+":"+path)
+	return nil
+}
+
+// List lists the items the fixture holds, held, after after.
+func (i *items) List(_ context.Context, _, after string, limit int, properties bool) ([]artifactsapi.ItemChange, error) {
+	if i.listErr != nil {
+		return nil, i.listErr
+	}
+	var out []artifactsapi.ItemChange
+	for _, c := range i.held {
+		if c.Path > after && len(out) < limit {
+			if !properties {
+				c.Properties = nil
+			}
+			out = append(out, c)
+		}
+	}
+	return out, nil
+}
+
+func (i *items) Holds(_ context.Context, _, sha256 string) (bool, error) {
+	return i.holds[sha256], i.holdsErr
 }
 
 const sha1 = "1111111111111111111111111111111111111111111111111111111111111111"

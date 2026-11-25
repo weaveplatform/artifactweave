@@ -238,6 +238,20 @@ func (q *Queue) Enqueue(ctx context.Context, kind, key string, payload []byte) e
 	return nil
 }
 
+// EnqueueAhead is Enqueue for work that goes before the rest: a new item
+// is due lead earlier than now, and Lease hands out the longest due
+// first, so of the items due together it is taken ahead of any enqueued
+// within lead after it. A pending item keeps its schedule, as Enqueue's
+// does. Federation's prioritized repositories use it to dispatch ahead of
+// standard ones.
+func (q *Queue) EnqueueAhead(ctx context.Context, kind, key string, payload []byte, lead time.Duration) error {
+	if err := q.q.Enqueue(ctx, kind, key, payload, q.o.Now().Add(-lead)); err != nil {
+		return fmt.Errorf("work: enqueue %s/%s: %w", kind, key, err)
+	}
+	q.st.AfterCommit(ctx, q.signal)
+	return nil
+}
+
 // signal wakes one idle worker, if any.
 func (q *Queue) signal() {
 	select {

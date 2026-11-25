@@ -33,12 +33,16 @@ func (d Deps) membership() (federated.Membership, error) {
 		ms.Changed = func(ctx context.Context, key string) error {
 			return e.Wake(ctx, model.RepositoryStream(key)) //nolint:wrapcheck // the engine names the stream
 		}
+		ms.Dropped = func(ctx context.Context, key, peer string) error {
+			return e.Forget(ctx, peer, model.RepositoryStream(key)) //nolint:wrapcheck // the engine names the stream
+		}
 	}
 	return ms, nil
 }
 
 // Operations returns the federation API's configSync, migrate,
-// convertToLocal and member URL rewrite, for administrators only.
+// convertToLocal, member URL rewrite, full sync, recovery, member removal,
+// prioritization and propagateCreatedTime, for administrators only.
 func (m *Module) Operations() (federated.Operations, error) {
 	ms, err := m.deps.membership()
 	if err != nil {
@@ -46,6 +50,7 @@ func (m *Module) Operations() (federated.Operations, error) {
 	}
 	return federated.Operations{
 		Membership: ms, Repositories: m.deps.Repositories, Authorize: m.deps.pairingAdministrator,
+		Streams: m.Streams,
 	}, nil
 }
 
@@ -85,6 +90,10 @@ func (m *Module) registerConfigSyncWork(queue *work.Queue) error {
 	sender := federated.Sender{Membership: ms, Repositories: m.deps.Repositories, Remote: remote, Log: log}
 	if err := queue.Handle(federated.ConfigSyncKind, sender.Send); err != nil {
 		return fmt.Errorf("register federated configSync: %w", err)
+	}
+	resyncer := federated.Resyncer{Membership: ms, Remote: remote, Log: log}
+	if err := queue.Handle(federated.FullSyncRequestKind, resyncer.Send); err != nil {
+		return fmt.Errorf("register federated full-sync requests: %w", err)
 	}
 	return nil
 }

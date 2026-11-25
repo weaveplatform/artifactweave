@@ -17289,40 +17289,50 @@
     "route": "POST /artifactory/api/federation/forceFullSync/{repoKey}",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "federatedRepositoryForceFullSync",
-    "state": "stub: 501",
+    "state": "partial: handwritten override of generated operation",
     "contract": "Starts a full synchronization of a federated repository, interrupting one already in progress. Use it when a full sync appears stuck.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "handler": "internal/app/router.go: handwritten routes precede generated handlers",
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended none (external-effect)",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "none (external-effect): no retry protection; the effect reaches another service, peer, upstream or the file system and cannot roll back; reconcile before repeating",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
     "response_collections": [
       "200 application/json.resultPaths[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "POST /artifactory/api/federation/fullSync/{repoKey}",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "federatedRepositoryFullSync",
-    "state": "stub: 501",
+    "state": "partial: handwritten override of generated operation",
     "contract": "Runs a full synchronization: members compare their item sets by path and checksum and each side sends what the other lacks. Where both sides changed an item, the change with the later event time wins and the originating instance id breaks ties (decision 0022). With `isDry=true` nothing is transferred and the comparison writes a report of the differences.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "handler": "internal/app/router.go: handwritten routes precede generated handlers",
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended none (external-effect)",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "none (external-effect): no retry protection; the effect reaches another service, peer, upstream or the file system and cannot roll back; reconcile before repeating",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
     "response_collections": [
       "200 application/json.resultPaths[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -17351,51 +17361,66 @@
     "route": "POST /artifactory/api/federation/reconnect",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "reconnectToFederationClient",
-    "state": "stub: 501",
+    "state": "partial: handwritten override of generated operation",
     "contract": "Re-establishes the link between the repository service and the federation sync worker, which runs inside the server process. The call restarts that worker: it re-reads the peer keys, re-opens the outbound queues and returns once the worker is running. Administrators only.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "handler": "internal/app/router.go: handwritten routes precede generated handlers",
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on route",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "natural on route: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "POST /artifactory/api/federation/recovery",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "federationRecovery",
-    "state": "stub: 501",
+    "state": "partial: handwritten override of generated operation",
     "contract": "Clears the error state of outgoing event queues that exhausted their retries, so delivery to members resumes without waiting for the auto-healing job (every 20 seconds by default). Applies to one repository, or to every federated repository when repoKey is omitted. A member whose missing events were already purged stays out of sync and needs a full sync.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "handler": "internal/app/router.go: handwritten routes precede generated handlers",
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on query:repoKey",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "natural on query:repoKey: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "POST /artifactory/api/federation/removeMember",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "removeFederationMember",
-    "state": "stub: 501",
+    "state": "partial: handwritten override of generated operation",
     "contract": "Removes a member, identified by its base URL, from every federation on this instance. The removed instance keeps its copies; it stops receiving events.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "handler": "internal/app/router.go: handwritten routes precede generated handlers",
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on body:",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "natural on body:: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -20636,6 +20661,23 @@
     ]
   },
   {
+    "route": "POST /artifactweave/peer/v1/streams/{stream}/resync",
+    "spec": "peer.openapi.yaml",
+    "operation_id": "requestResync",
+    "state": "stub: 501",
+    "contract": "Asks this instance to resynchronise the stream from the caller with a full sync, as an operator's fullSync or forceFullSync on the caller asks of each member it names. This instance starts the full sync, reading the caller's snapshot with GET /streams/{stream}/snapshot, and answers once it is started; a full sync already running is answered for, made forced when forced asks for it, rather than started again. A forced full sync discards what this instance holds of the stream that the caller's snapshot does not.",
+    "handler": "internal/platform/gen/peer/unimplemented.gen.go",
+    "review_family": "content-and-configuration",
+    "effects": "no operation effect; user authentication skips the peer API, admission still limits",
+    "retry": "501 is not transient; do not retry until support changes; intended natural on path:stream, body:/forced",
+    "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
+    "pagination_execution": "schema-only; no collection query executes",
+    "evidence": [
+      "internal/platform/gen/peer/unimplemented.gen.go",
+      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+    ]
+  },
+  {
     "route": "POST /distribution/api/release/import",
     "spec": "distribution.openapi.yaml",
     "operation_id": "importReleaseBundleV1Version",
@@ -22816,34 +22858,44 @@
     "route": "PUT /artifactory/api/federation/prioritization/{repoKey}",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "prioritizeFederatedRepository",
-    "state": "stub: 501",
+    "state": "partial: handwritten override of generated operation",
     "contract": "Gives a federated repository's outgoing event queue priority over standard queues when the outbox is busy. At most 10 repositories can be high priority at once.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "handler": "internal/app/router.go: handwritten routes precede generated handlers",
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on path:repoKey",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "natural on path:repoKey: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "PUT /artifactory/api/federation/propagateCreatedTime",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "propagateCreationTimeMetadataDuringFullSync",
-    "state": "stub: 501",
+    "state": "partial: handwritten override of generated operation",
     "contract": "Instance-wide switch: when enabled, full sync gives each received item its original creation time instead of the time of transfer.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "handler": "internal/app/router.go: handwritten routes precede generated handlers",
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on route",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "natural on route: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {

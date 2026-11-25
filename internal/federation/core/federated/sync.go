@@ -34,10 +34,15 @@ func (e *RemoteRefusal) Error() string {
 
 // Remote sends a federated repository's configuration to a member: the peer
 // API's PUT /repositories/{repoKey} through the signed peer client
-// (decision 0021). It wraps ErrUnavailable when no verified answer arrived
-// and returns *RemoteRefusal for any status but 204.
+// (decision 0021), and asks it for a full sync. It wraps ErrUnavailable
+// when no verified answer arrived and returns *RemoteRefusal for any
+// status but 204.
 type Remote interface {
 	PutConfiguration(ctx context.Context, peer model.Peer, remoteKey string, stream string, cfg map[string]any) error
+	// RequestResync asks the member to resynchronise stream from this
+	// instance with a full sync (the peer API's POST
+	// /streams/{stream}/resync), with the same errors.
+	RequestResync(ctx context.Context, peer model.Peer, stream string, forced bool) error
 }
 
 // Sender runs ConfigSyncKind: it sends a repository's current configuration
@@ -65,7 +70,10 @@ func (s Sender) log() *slog.Logger {
 // work.ErrUnsettled, which the queue retries with its capped backoff and
 // never parks, so a member that returns after any outage receives the
 // configuration. A member's refusal is logged and parked (work.ErrPermanent)
-// until the next change or configSync queues the item again.
+// until the next change or configSync queues the item again; a 5xx is a
+// failure on the member's side, not a refusal, and is retried, or a
+// passing fault there would leave the member's copy stale with only a log
+// line to show it.
 func (s Sender) Send(ctx context.Context, item work.WorkItem) error {
 	peerID, key, ok := parseSyncKey(item.Key)
 	if !ok {
@@ -115,7 +123,7 @@ func (s Sender) Send(ctx context.Context, item work.WorkItem) error {
 	switch {
 	case err == nil:
 		return nil
-	case errors.As(err, &refusal):
+	case errors.As(err, &refusal) && refusal.Status < http.StatusInternalServerError:
 		s.log().ErrorContext(ctx, "federated member refused the repository configuration",
 			"repository", key, "member", repo.MemberURL(member.BaseURL, member.RemoteRepoKey),
 			"status", refusal.Status, "message", refusal.Message)

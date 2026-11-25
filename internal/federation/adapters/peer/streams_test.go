@@ -37,6 +37,12 @@ type fakeStreams struct {
 	blob    func(sha string) (io.ReadSeekCloser, blob.Info, error)
 	// snapshot answers GET snapshot; stream is the stream asked for.
 	snapshot func(stream, cursor string, limit int) (streamsync.SnapshotPage, error)
+	// fullSync answers POST resync: the caller's id, the stream and forced.
+	fullSync func(peerID, stream string, forced bool) (model.FullSyncRun, error)
+}
+
+func (f *fakeStreams) FullSync(_ context.Context, peerID, stream string, forced bool) (model.FullSyncRun, error) {
+	return f.fullSync(peerID, stream, forced)
 }
 
 func (f *fakeStreams) Snapshot(_ context.Context, caller model.Peer, stream, cursor string, limit int) (streamsync.SnapshotPage, error) {
@@ -76,6 +82,10 @@ func (a streamAPI) PullEvents(ctx context.Context, r peergen.PullEventsRequestOb
 
 func (a streamAPI) GetSnapshot(ctx context.Context, r peergen.GetSnapshotRequestObject) (peergen.GetSnapshotResponseObject, error) {
 	return a.s.GetSnapshot(ctx, r)
+}
+
+func (a streamAPI) RequestResync(ctx context.Context, r peergen.RequestResyncRequestObject) (peergen.RequestResyncResponseObject, error) {
+	return a.s.RequestResync(ctx, r)
 }
 
 func (a streamAPI) GetBlob(ctx context.Context, r peergen.GetBlobRequestObject) (peergen.GetBlobResponseObject, error) {

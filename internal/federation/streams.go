@@ -15,7 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/work"
 )
 
-// TombstonePruneKind runs every streamsync.PruneInterval: it removes the
+// TombstonePruneKind runs as often as the engine prunes: it removes the
 // federated repositories' tombstones older than the outbox retention
 // window. The kind string is persisted in work items, so it never changes.
 const TombstonePruneKind = "federation.repo-tombstone-prune"
@@ -70,6 +70,7 @@ func (m *Module) OpenStreams(o StreamOptions) (*streamsync.Engine, error) {
 			Store: ms.Store, Engine: e, Items: o.Items, Repositories: m.deps.Repositories,
 			SelfBase: ms.SelfBase, Log: o.Log,
 		}
+		e.Priority = federated.Priority(ms.Store.Settings())
 		if err := e.Kinds.Register(k); err != nil {
 			return nil, fmt.Errorf("register the repository stream: %w", err)
 		}
@@ -126,7 +127,7 @@ func (m *Module) registerStreamWork(ctx context.Context, queue *work.Queue) erro
 		}
 		return nil
 	}
-	if err := queue.HandleEvery(TombstonePruneKind, streamsync.PruneInterval, func(ctx context.Context, _ work.WorkItem) error {
+	if err := queue.HandleEvery(TombstonePruneKind, e.PruneEvery(), func(ctx context.Context, _ work.WorkItem) error {
 		if _, err := k.PruneTombstones(ctx, time.Now(), retention); err != nil {
 			return err //nolint:wrapcheck // the stream names what failed
 		}
