@@ -29,7 +29,7 @@ Start with the [common setup](README.md). Each recipe names the tested client, e
 | [Gradle Maven-layout repositories](gradle.md) | Gradle 9.8.2 on Temurin 27; optional JFrog CLI 2.131.0 wrapper | local, virtual, federated | local, remote, virtual, federated |
 | [Classic Helm charts](helm.md) | Helm 4.3.1 | local, federated | local, remote, virtual, federated |
 | [Helm OCI charts](helmoci.md) | Helm 4.3.1; JFrog CLI 2.131.0 | local, virtual, federated | local, remote, virtual, federated |
-| [Signed Hex repositories](hex.md) | Hex 2.6.0; Elixir 1.20.5; OTP 29.1.2 | local | local, remote, virtual |
+| [Signed Hex repositories](hex.md) | Hex 2.6.0; Elixir 1.20.5; OTP 29.1.3 | local | local, remote, virtual |
 | [Hugging Face models and datasets](huggingfaceml.md) | huggingface_hub 2.4.0; hf-xet 1.8.0 | local, federated | local, remote, virtual, federated |
 | [Apache Ivy](ivy.md) | Apache Ivy 2.6.0 on the pinned Maven/Temurin image | local, virtual, federated | local, remote, virtual, federated |
 | [JetBrains Marketplace plugins](jetbrainsplugins.md) | IntelliJ IDEA 2026.2.4 | none | remote |
