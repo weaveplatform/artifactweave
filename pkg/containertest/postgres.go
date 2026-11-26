@@ -13,7 +13,7 @@ import (
 )
 
 // postgresDigest pins postgres:17-alpine, the multi-platform index digest,
-// the release internal/platform/sql/sqltest names by tag; bump it
+// used by both the shared SQL harness and isolated servers; bump it
 // deliberately, here only, and check the second source serves it.
 const postgresDigest = "sha256:f9cf3e1f0066f0eb0c48707d864f0ac5941e9ff454a072077d97a4d278d07d73"
 
@@ -49,14 +49,26 @@ func Postgres(t *testing.T) PostgresEndpoint {
 	return ep
 }
 
+// ResolvePostgresImage ensures the pinned PostgreSQL image is present on the
+// engine, trying its byte-identical sources in order, and returns its reference.
+// Callers that configure their own PostgreSQL container use the same checked
+// pull as RunPostgres.
+func ResolvePostgresImage(ctx context.Context) (string, error) {
+	return requireImage(ctx, postgresSources...)
+}
+
 // RunPostgres starts a PostgreSQL server and returns its endpoint and a
 // function that removes it, for callers without a *testing.T; check
 // CheckLinux first. It returns once the server accepts connections.
 func RunPostgres(ctx context.Context) (PostgresEndpoint, func(), error) {
-	image, err := requireImage(ctx, postgresSources...)
+	image, err := ResolvePostgresImage(ctx)
 	if err != nil {
 		return PostgresEndpoint{}, nil, fmt.Errorf("start postgres: %w", err)
 	}
+	return runPostgres(ctx, image)
+}
+
+func runPostgres(ctx context.Context, image string) (PostgresEndpoint, func(), error) {
 	ctr, err := tcpostgres.Run(ctx, image,
 		tcpostgres.WithDatabase("postgres"),
 		tcpostgres.WithUsername("aw"),

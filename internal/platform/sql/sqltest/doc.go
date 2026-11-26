@@ -51,9 +51,10 @@
 //
 //   - A test process starts at most one PostgreSQL container: PostgresDSN
 //     starts it on its first call, and every PostgreSQL run of the process
-//     shares it. The image is pinned to postgres:17-alpine so that a
-//     PostgreSQL release cannot change behaviour under the suites; a bump is
-//     deliberate.
+//     shares it. pkg/containertest owns its digest pin and checked pull,
+//     trying Docker Hub and then the byte-identical mirror.gcr.io source.
+//     PostgreSQL releases cannot change behaviour under the suites; a bump
+//     is deliberate.
 //   - Unless ARTIFACTWEAVE_TEST_POSTGRES_DSN names a server, PostgresDSN skips
 //     the calling test in a -short run and where no Docker engine that runs
 //     Linux containers answers, so the suites run everywhere and their

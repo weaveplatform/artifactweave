@@ -3,6 +3,7 @@ package sqltest_test
 import (
 	"database/sql"
 	"net/url"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -48,6 +49,13 @@ func TestAccPostgresDSN(t *testing.T) {
 	}
 	if err := openPostgres(t, dsn).PingContext(t.Context()); err != nil {
 		t.Fatal(err)
+	}
+	if os.Getenv("ARTIFACTWEAVE_TEST_POSTGRES_DSN") == "" {
+		var database, user string
+		err := openPostgres(t, dsn).QueryRowContext(t.Context(), "SELECT current_database(), current_user").Scan(&database, &user)
+		if err != nil || database != "artifactweave" || user != "aw" {
+			t.Fatalf("shared server database/user = %q/%q (%v), want artifactweave/aw", database, user, err)
+		}
 	}
 }
 

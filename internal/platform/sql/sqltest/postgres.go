@@ -16,10 +16,6 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/containertest"
 )
 
-// postgresImage is pinned so a PostgreSQL release cannot change behaviour
-// under the suite; bump it deliberately.
-const postgresImage = "postgres:17-alpine"
-
 var (
 	pgOnce sync.Once
 	pgDSN  string
@@ -28,7 +24,7 @@ var (
 
 // PostgresDSN returns the DSN of the PostgreSQL server that every test of the
 // process shares: ARTIFACTWEAVE_TEST_POSTGRES_DSN when it is set, or else that
-// of a postgres:17-alpine container, database artifactweave with user and
+// of a digest-pinned PostgreSQL 17 container, database artifactweave with user and
 // password aw, which the first call starts and later calls reuse. Without the
 // variable it skips t in a -short run and where Docker cannot run Linux
 // containers, and it fails t when the container does not start; a failed
@@ -43,7 +39,12 @@ func PostgresDSN(t *testing.T) string {
 	containertest.RequireLinux(t)
 	pgOnce.Do(func() {
 		ctx := context.Background()
-		c, err := tcpostgres.Run(ctx, postgresImage,
+		image, err := containertest.ResolvePostgresImage(ctx)
+		if err != nil {
+			pgErr = err
+			return
+		}
+		c, err := tcpostgres.Run(ctx, image,
 			tcpostgres.WithDatabase("artifactweave"),
 			tcpostgres.WithUsername("aw"),
 			tcpostgres.WithPassword("aw"),
