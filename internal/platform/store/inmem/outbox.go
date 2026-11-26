@@ -238,6 +238,33 @@ func (o outboxStore) FailedFetches(
 	return out, err
 }
 
+func (o outboxStore) RetryFailedFetch(ctx context.Context, stream, sha256, reason string) error {
+	return o.s.Do(ctx, func() error {
+		k := peersPair{stream, sha256}
+		cur, ok := o.failed().Get(k)
+		if !ok {
+			return memtx.NotFound("failed blob fetch", stream+" "+sha256)
+		}
+		cur.Failures++
+		cur.LastError = reason
+		o.failed().Put(k, cur)
+		return nil
+	})
+}
+
+func (o outboxStore) ResetFailedFetch(ctx context.Context, stream, sha256 string) error {
+	return o.s.Do(ctx, func() error {
+		k := peersPair{stream, sha256}
+		cur, ok := o.failed().Get(k)
+		if !ok {
+			return memtx.NotFound("failed blob fetch", stream+" "+sha256)
+		}
+		cur.Failures, cur.LastError = 0, ""
+		o.failed().Put(k, cur)
+		return nil
+	})
+}
+
 func (o outboxStore) ClearFailedFetch(ctx context.Context, stream, sha256 string) error {
 	return o.s.Do(ctx, func() error {
 		if !o.failed().Del(peersPair{stream, sha256}) {

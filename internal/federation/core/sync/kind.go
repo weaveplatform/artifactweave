@@ -69,6 +69,13 @@ type Kind interface {
 	References(ctx context.Context, stream, sha256 string) (bool, error)
 }
 
+// FailureDetails supplies a kind's optional SHA-1 for the public failed-binary
+// controls. It runs in the transaction that keeps the pending change and its
+// failed fetch, so the checksum survives a later replacement or deletion.
+type FailureDetails interface {
+	FailedSHA1(ctx context.Context, stream, sha256 string) (string, error)
+}
+
 // SnapshotProvider is the part of a kind that lists a stream's current
 // state for a snapshot on the sending instance (decision 0021, Full sync).
 // A kind without one takes no snapshots, and a receiver cannot resync its

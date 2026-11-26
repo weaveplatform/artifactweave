@@ -1,8 +1,8 @@
 // Package federated manages federated repositories: their members, the
 // configuration sync between them (FED-01), and the repo:<key> stream kind
 // that converges their content under the conflict rule (FED-02), with its
-// full sync and the member operations (FED-04); as P13 continues, lag and
-// replay.
+// full sync and the member operations (FED-04), and failed-binary controls
+// (FED-06); as P13 continues, lag.
 //
 // # Role
 //
@@ -42,8 +42,13 @@
 // in instance settings. A member dropped from a repository is forgotten by
 // the sync engine (Membership.Dropped).
 //
-// Planned: status, lag and failed-binary replay (decision 0022; plan P13,
-// FED-05 and FED-06).
+// Binaries lists, immediately replays and deletes failed content fetches,
+// with repository task counts for administrators and a Read-authorized
+// repoState projection. Replay never performs network I/O in a metadata
+// transaction and never publishes a superseded change or an operator-cancelled
+// task. A normal full sync repairs same-stamp pending content too.
+//
+// Planned: status and lag (decision 0022; plan P13, FED-05).
 //
 // # References
 //
@@ -66,5 +71,6 @@
 //
 // Members and configuration sync implemented (FED-01, issue #1930); change
 // propagation implemented (FED-02, issue #1931); full sync and the member
-// operations implemented (FED-04, issue #1932); the rest of P13 to follow.
+// operations implemented (FED-04, issue #1932); failed binaries implemented
+// (FED-06, issue #1935); the rest of P13 to follow.
 package federated

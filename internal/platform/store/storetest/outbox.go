@@ -437,6 +437,9 @@ func testFailedFetches(t *testing.T, s Store) {
 	second := first
 	second.Failures, second.LastError = 2, "404"
 	storekit.Same(t, "second RecordFailedFetch", second, got)
+	storekit.Must(t, ob.ResetFailedFetch(ctx, f.Stream, f.SHA256))
+	storekit.Must(t, ob.RetryFailedFetch(ctx, f.Stream, f.SHA256, "retry timeout"))
+	second.Failures, second.LastError = 1, "retry timeout"
 
 	a := outbox.FailedBlobFetch{
 		Stream:      "repo:a",
@@ -460,6 +463,8 @@ func testFailedFetches(t *testing.T, s Store) {
 
 	storekit.Must(t, ob.ClearFailedFetch(ctx, "repo:b", f.SHA256))
 	storekit.WantErr(t, ob.ClearFailedFetch(ctx, "repo:b", f.SHA256), kernel.ErrNotFound)
+	storekit.WantErr(t, ob.RetryFailedFetch(ctx, "repo:b", f.SHA256, "too late"), kernel.ErrNotFound)
+	storekit.WantErr(t, ob.ResetFailedFetch(ctx, "repo:b", f.SHA256), kernel.ErrNotFound)
 	storekit.Same(t, "FailedFetches after clear", []outbox.FailedBlobFetch{b2},
 		storekit.Get[[]outbox.FailedBlobFetch](t)(ob.FailedFetches(ctx, "repo:b")))
 	//nolint:wrapcheck // each case checks only that the call fails
@@ -467,5 +472,7 @@ func testFailedFetches(t *testing.T, s Store) {
 		"RecordFailedFetch": func(ctx context.Context) error { _, err := ob.RecordFailedFetch(ctx, a); return err },
 		"FailedFetches":     func(ctx context.Context) error { _, err := ob.FailedFetches(ctx, ""); return err },
 		"ClearFailedFetch":  func(ctx context.Context) error { return ob.ClearFailedFetch(ctx, a.Stream, a.SHA256) },
+		"RetryFailedFetch":  func(ctx context.Context) error { return ob.RetryFailedFetch(ctx, a.Stream, a.SHA256, "retry") },
+		"ResetFailedFetch":  func(ctx context.Context) error { return ob.ResetFailedFetch(ctx, a.Stream, a.SHA256) },
 	})
 }

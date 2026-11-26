@@ -5,6 +5,7 @@ import (
 	"io"
 	"testing"
 
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/federation"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/model"
@@ -29,6 +30,29 @@ func federatedMatrix() []matrixRow {
 		}
 	}
 	return []matrixRow{
+		row("GET "+base+"/binaries/failures/list", base+"/binaries/failures/list?repoKey=fbin-{p}", "", administrators, 200).seeding(create("fbin-", repo.Federated)),
+		row("PUT "+base+"/binaries/failures/replay", base+"/binaries/failures/replay?repoKey=fbinr-{p}", "", administrators, 200).seeding(create("fbinr-", repo.Federated)),
+		row("DELETE "+base+"/binaries/failures/delete", base+"/binaries/failures/delete?repoKey=fbind-{p}", "", administrators, 200).seeding(create("fbind-", repo.Federated)),
+		row("GET "+base+"/binaries/tasks/{repoKey}", base+"/binaries/tasks/fbinc-{p}", "", administrators, 200).seeding(create("fbinc-", repo.Federated)),
+		row(
+			"GET "+base+"/status/repoState/{repoKey}/binaries/",
+			base+"/status/repoState/libs-local/binaries/",
+			"",
+			holds("libs-local", "", accessapi.ActionRead),
+			200,
+		).seeding(func(t *testing.T, f *matrixFixture, _ string) {
+			t.Helper()
+			c, err := f.db.Repos().Get(t.Context(), "libs-local")
+			if err != nil {
+				t.Fatal(err)
+			}
+			c.Class = repo.Federated
+			if err := f.db.Repos().Update(t.Context(), c); err != nil {
+				t.Fatal(err)
+			}
+		}).
+			alone(),
+
 		row("POST "+base+"/configSync/{repoKey}", base+"/configSync/fsync-{p}", "", administrators, 200).
 			seeding(create("fsync-", repo.Federated)),
 		row("POST "+base+"/migrate/{repoKey}", base+"/migrate/fmig-{p}", "", administrators, 200).

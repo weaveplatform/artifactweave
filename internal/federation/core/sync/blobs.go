@@ -88,9 +88,25 @@ func (e *Engine) RetryFetch(ctx context.Context, stream, sha256 string) error {
 		return fmt.Errorf("items of %s pending %s: %w", stream, sha256, err)
 	}
 	if !waiting {
-		// Nothing would show the content: fetching it would only store
-		// what nothing refers to.
-		return e.clearFailure(ctx, stream, sha256)
+		// Claim before checking again: a newer event can have started
+		// waiting since Pending returned. Its failure record's insert or
+		// update serialises behind this delete on PostgreSQL. If it is
+		// pending now, roll the claim back and let the queue retry.
+		return e.Store.Tx(ctx, func(ctx context.Context) error { //nolint:wrapcheck // the callback names its failures
+			if err := e.Store.Outbox().ClearFailedFetch(ctx, stream, sha256); errors.Is(err, kernel.ErrNotFound) {
+				return nil
+			} else if err != nil {
+				return fmt.Errorf("claim obsolete failed fetch: %w", err)
+			}
+			_, pending, err := k.Pending(ctx, stream, sha256)
+			if err != nil {
+				return fmt.Errorf("recheck pending content: %w", err)
+			}
+			if pending {
+				return fmt.Errorf("pending content changed while clearing failed fetch: %w", kernel.ErrConflict)
+			}
+			return nil
+		})
 	}
 	subs, err := k.Subscribers(ctx, stream)
 	if err != nil {
@@ -113,24 +129,44 @@ func (e *Engine) RetryFetch(ctx context.Context, stream, sha256 string) error {
 		return err
 	}
 	if !held {
-		if err := e.recordFailure(ctx, stream, sha256, reason); err != nil {
-			return err
+		if err := e.Store.Outbox().RetryFailedFetch(ctx, stream, sha256, reason); errors.Is(err, kernel.ErrNotFound) {
+			return nil
+		} else if err != nil {
+			return fmt.Errorf("record failed retry of %s: %w", sha256, err)
 		}
-		return fmt.Errorf("fetch blob %s for %s: %s", sha256, stream, reason) //nolint:err113 // the reason a peer gave
+		return fmt.Errorf("fetch blob %s for %s: %s: %w", sha256, stream, reason, ErrFetchUnavailable)
 	}
 	return e.Store.Tx(ctx, func(ctx context.Context) error { //nolint:wrapcheck // the callback names its failures
+		// Content is verified by digest, so any still-authorized member
+		// can supply it. A peer snapshot taken before the network call
+		// cannot grant publication after every source has been revoked.
+		allowed := false
+		for _, p := range from {
+			if _, err := e.regrant(ctx, p.InstanceID, stream, Receive); errors.Is(err, ErrRefused) || errors.Is(err, ErrNoStream) {
+				continue
+			} else if err != nil {
+				return err
+			}
+			allowed = true
+			break
+		}
+		if !allowed {
+			return errors.Join(ErrFetchUnavailable, ErrRefused)
+		}
+		// Claim the record before publishing. DELETE serialises concurrent
+		// retries and operator deletion on PostgreSQL too; if deletion won
+		// while the fetch was in flight, the item must stay absent. A failed
+		// publication rolls the claim back with its item changes.
+		if err := e.Store.Outbox().ClearFailedFetch(ctx, stream, sha256); errors.Is(err, kernel.ErrNotFound) {
+			return nil
+		} else if err != nil {
+			return fmt.Errorf("claim failed fetch of %s: %w", sha256, err)
+		}
 		if err := k.Publish(ctx, stream, sha256); err != nil {
 			return fmt.Errorf("publish %s on %s: %w", sha256, stream, err)
 		}
-		return e.clearFailure(ctx, stream, sha256)
+		return nil
 	})
-}
-
-func (e *Engine) clearFailure(ctx context.Context, stream, sha256 string) error {
-	if err := e.Store.Outbox().ClearFailedFetch(ctx, stream, sha256); err != nil && !errors.Is(err, kernel.ErrNotFound) {
-		return fmt.Errorf("clear failed fetch of %s: %w", sha256, err)
-	}
-	return nil
 }
 
 func hasFailure(failed []outbox.FailedBlobFetch, sha256 string) bool {

@@ -1432,17 +1432,22 @@
     "route": "DELETE /artifactory/api/federation/binaries/failures/delete",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "deleteFailedBinaryTasks",
-    "state": "stub: 501",
+    "state": "partial: handwritten override of generated operation",
     "contract": "Deletes binary transfer tasks of a federated repository that exhausted their retries: all of them, or only the task for one SHA-1. Use it once the missing content has been dealt with another way, for example re-deployed.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "handler": "internal/app/router.go: handwritten routes precede generated handlers",
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on query:repoKey, query:sha1",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "natural on query:repoKey, query:sha1: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -5916,12 +5921,12 @@
     "route": "GET /artifactory/api/federation/binaries/failures/list",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "getListOfFailedBinaryTasks",
-    "state": "stub: 501",
+    "state": "partial: handwritten override of generated operation",
     "contract": "Lists binary transfer tasks of a federated repository that failed because the content could not be fetched from the originating member within the attempt limit (10 by default). Metadata for these items arrived; their content did not.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "handler": "internal/app/router.go: handwritten routes precede generated handlers",
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "declared_page_controls": [
       "query limit: Optional query parameter. Page size. Defaults to 1000.",
@@ -5930,10 +5935,37 @@
     "response_collections": [
       "200 application/json[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes; declared page",
+    "pagination_execution": "page (position page, size limit, next link); content-and-configuration: singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "GET /artifactory/api/federation/binaries/tasks/{repoKey}",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "getFederatedBinaryTasks",
+    "state": "partial: handwritten override of generated operation",
+    "contract": "Returns failed content-fetch counts for a federated repository. Administrators only. The closed-source DTO shape is inferred.",
+    "handler": "internal/app/router.go: handwritten routes precede generated handlers",
+    "review_family": "content-and-configuration",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -6034,6 +6066,28 @@
     "evidence": [
       "internal/platform/gen/artifactory/unimplemented.gen.go",
       "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+    ]
+  },
+  {
+    "route": "GET /artifactory/api/federation/status/repoState/{repoKey}/binaries/",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "getFederatedRepositoryBinaryState",
+    "state": "partial: handwritten override of generated operation",
+    "contract": "Returns failed content-fetch counts for a federated repository. Requires read permission on the repository. The closed-source DTO shape is inferred.",
+    "handler": "internal/app/router.go: handwritten routes precede generated handlers",
+    "review_family": "content-and-configuration",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -22841,17 +22895,22 @@
     "route": "PUT /artifactory/api/federation/binaries/failures/replay",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "replayFailedBinaryTasks",
-    "state": "stub: 501",
-    "contract": "Queues failed binary transfer tasks again, all of a repository's or only the one for a SHA-1, with their attempt count reset.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "state": "partial: handwritten override of generated operation",
+    "contract": "Queues failed binary transfer tasks again, all of a repository's or only the one for a SHA-1, with their attempt count reset (an inferred server choice retained from the existing contract).",
+    "handler": "internal/app/router.go: handwritten routes precede generated handlers",
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on query:repoKey, query:sha1",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "natural on query:repoKey, query:sha1: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {

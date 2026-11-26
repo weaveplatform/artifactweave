@@ -198,7 +198,36 @@ them against a live 7.x in P19):
   status body uses 7.161.26's `mirrorEventsStatusInfo` and `federatedArtifactStatus` fields
   ([research 40 §7](../40-federated-repositories-7x.md#status-payloads)).
 - The failed-binary endpoints list, replay and delete the failed blob fetches recorded by
-  0021.
+  0021 (FED-06, #1935). Tasks are one per repository and SHA-256, ordered by SHA-256;
+  list pages start at one with 1000 tasks by default and a maximum of 1000, with a
+  next-page Link. The documented task fields carry SHA-1, repository, first-failure
+  epoch milliseconds and failed-attempt count. `path` is an inferred extension naming
+  the first still-pending path in byte order; a superseded task has no path. SHA-1 is
+  captured from pending metadata when failure is first recorded, so a later deletion
+  or replacement does not lose the filter identity. Old records lacking SHA-1 derive
+  it from still-pending metadata when available.
+- Replay resets attempts ([I], preserving artifactweave's existing spec; the public
+  JFrog page promises marking tasks for reprocessing, not an attempt-counter reset)
+  and fetches every matching binary immediately, outside any
+  metadata transaction. An unavailable source remains recorded for automatic retry;
+  `replayTasks` counts attempted tasks. Local store failures are surfaced after the
+  other selected tasks are attempted. The engine publishes only still-current pending
+  changes. Publication claims the failed row in its metadata transaction, so a task
+  deleted while its download is in flight cannot publish. Publication rechecks current
+  Receive authority for the stream: any still-authorized member from the prefetch
+  candidate set permits digest-verified content to publish; if every candidate loses
+  its trust or membership, the content stays pending with its failed task.
+  A failed in-flight retry
+  updates only an existing row and cannot recreate a deleted task. Deleting a task
+  preserves the applied cursor and pending conflict stamp: the content stays absent
+  until a newer event or full sync. A normal full sync reconciles a same-stamp pending
+  item too, rather than mistaking metadata delivery for complete content delivery.
+- `binaries/tasks/{repoKey}` and `status/repoState/{repoKey}/binaries/` project
+  `{failedTasks: <count>}` from the repository's failed-fetch records. Their DTO is
+  closed source; this field and the shape are [I], marked `x-unverified` for #216.
+  Task controls and `binaries/tasks` are administrator-only; `repoState` requires
+  current Read on the repository. Missing repositories answer 404; existing
+  non-federated repositories and invalid filters/paging answer 400 after authority.
 
 **Endpoints only a separate federation service would serve.** artifactweave has no RTFS: it
 presents itself as an instance whose federation service is connected and whose migration

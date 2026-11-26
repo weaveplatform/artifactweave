@@ -274,6 +274,10 @@ type StreamResync struct {
 // change that produced it, and the state in the stream kind's form. A
 // tombstone is Deleted and has no payload or blob.
 type SnapshotEntry struct {
+	// Pending is local inventory metadata: the winning change's content has
+	// not arrived. It never travels in the peer snapshot. A full sync must
+	// reconcile the same stamp again to supply that missing content.
+	Pending    bool
 	Key        string
 	Time       outbox.HLC
 	Origin     string

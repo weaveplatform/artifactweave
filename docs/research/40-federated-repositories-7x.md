@@ -485,3 +485,25 @@ Posted on [#216](https://github.com/weaveplatform/artifactweave/issues/216) for 
     artifactweave answers `Proxy '<key>' does not exist`.
 11. Whether 7.x refuses `migrate` for a repository with push replication. artifactweave
     does, as decision 0022 forbids a repository being both federated and a push target.
+
+### FED-06 implemented failed-binary choices
+
+[I] artifactweave's failed-binary list retains the documented `repoKey`, `sha1`,
+`creationTime` (epoch milliseconds) and `failuresCount`. Its `path` extension names
+one current pending path; superseded failures omit it. The content task is keyed by
+repository and SHA-256, while replay/delete accept the documented SHA-1 filter.
+List defaults to page 1 and limit 1000, allows limits 1..1000 and emits a next-page
+Link. Invalid paging and digests are 400; an unknown repository is 404.
+
+[I] The two closed-source task-count DTOs use `{failedTasks: <count>}`, marked
+`x-unverified` in the spec, for comparison on #216. These are failed content fetches,
+not a claim about private RTFS task queues. The repository-state form requires
+current repository Read; the other four operations require an administrator.
+
+Project choice [I] (decision 0022): replay resets attempts (the public reprocessing
+contract does not specify this reset) and immediately retries each
+selected binary. Unavailable content remains for automatic retry and contributes to
+`replayTasks`; a local metadata/blob-store failure is returned after attempting the
+remaining selected tasks. Deletion cancels queued or in-flight retry publication.
+A newer event or normal full sync can supply content after cancellation; full sync
+repairs pending content even when its conflict stamp already matches the sender.

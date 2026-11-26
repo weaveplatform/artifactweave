@@ -153,6 +153,15 @@ func (e *Engine) recordFailure(ctx context.Context, stream, sha256, reason strin
 	if kind, rest, err := model.ParseStream(stream); err == nil && kind == model.StreamRepository {
 		f.RepoKey = rest
 	}
+	if k, ok := e.Kinds.For(stream); ok {
+		if details, ok := k.(FailureDetails); ok {
+			var err error
+			f.SHA1, err = details.FailedSHA1(ctx, stream, sha256)
+			if err != nil {
+				return fmt.Errorf("failed binary metadata of %s: %w", stream, err)
+			}
+		}
+	}
 	if _, err := e.Store.Outbox().RecordFailedFetch(ctx, f); err != nil {
 		return fmt.Errorf("record failed fetch of %s: %w", sha256, err)
 	}

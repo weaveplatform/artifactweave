@@ -42,6 +42,10 @@
 // (TombstonePruneKind). Membership changes wake the repository's stream,
 // so a member added or enabled again receives at once.
 //
+// Module.Binaries supplies failed-binary list/replay/delete and task counts
+// over the outbox and current pending item stamps (FED-06). The HTTP adapter
+// keeps wire types outside core; repoState uses current repository Read.
+//
 // # References
 //
 //   - Context map, federation row, as

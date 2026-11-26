@@ -4454,6 +4454,30 @@ type ExportSettings struct {
 	Verbose *bool `json:"verbose,omitempty"`
 }
 
+// FederatedBinaryTaskCounts Counts derived from failed-fetch records. The proprietary DTO is unavailable; these fields are inferred.
+type FederatedBinaryTaskCounts struct {
+	// FailedTasks Required within this object. Content fetches currently recorded as failed for this repository.
+	FailedTasks int `json:"failedTasks"`
+}
+
+// FederatedFailedBinary One failed content fetch. The path is this server's inferred extension over the documented task fields.
+type FederatedFailedBinary struct {
+	// CreationTime Optional within this object. First failure, in epoch milliseconds.
+	CreationTime *int64 `json:"creationTime,omitempty"`
+
+	// FailuresCount Optional within this object. Fetch attempts that failed.
+	FailuresCount *int `json:"failuresCount,omitempty"`
+
+	// Path Optional within this object. First pending repository-relative path in byte order, when the content is still pending.
+	Path *string `json:"path,omitempty"`
+
+	// RepoKey Optional within this object. The federated repository key.
+	RepoKey *string `json:"repoKey,omitempty"`
+
+	// Sha1 Optional within this object. SHA-1 of the pending content.
+	Sha1 *string `json:"sha1,omitempty"`
+}
+
 // FederatedReplaceUrl A member base URL and its replacement (7.161.26's ReplaceUrlConfig).
 type FederatedReplaceUrl struct {
 	// NewBaseUrl Required within this object. The base URL they should name, with or without /artifactory.
@@ -10535,10 +10559,17 @@ type ClientInterface interface {
 
 	// ReplayFailedBinaryTasks Replay failed binary transfer tasks
 	//
-	// Queues failed binary transfer tasks again, all of a repository's or only the one for a SHA-1, with their attempt count reset.
+	// Queues failed binary transfer tasks again, all of a repository's or only the one for a SHA-1, with their attempt count reset (an inferred server choice retained from the existing contract).
 	//
 	// Corresponds with PUT /api/federation/binaries/failures/replay (the `ReplayFailedBinaryTasks` operationId).
 	ReplayFailedBinaryTasks(ctx context.Context, params *ReplayFailedBinaryTasksParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetFederatedBinaryTasks Get federated binary task counts
+	//
+	// Returns failed content-fetch counts for a federated repository. Administrators only. The closed-source DTO shape is inferred.
+	//
+	// Corresponds with GET /api/federation/binaries/tasks/{repoKey} (the `GetFederatedBinaryTasks` operationId).
+	GetFederatedBinaryTasks(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SynchronizeFederatedMemberConfiguration Push federated repository configuration to members
 	//
@@ -10690,6 +10721,13 @@ type ClientInterface interface {
 	//
 	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	GetFederatedRepositoryStatus(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetFederatedRepositoryBinaryState Get read-authorized repository binary state
+	//
+	// Returns failed content-fetch counts for a federated repository. Requires read permission on the repository. The closed-source DTO shape is inferred.
+	//
+	// Corresponds with GET /api/federation/status/repoState/{repoKey}/binaries/ (the `GetFederatedRepositoryBinaryState` operationId).
+	GetFederatedRepositoryBinaryState(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetFederationStateDetails List federations and member states
 	//
@@ -15187,11 +15225,28 @@ func (c *Client) GetListOfFailedBinaryTasks(ctx context.Context, params *GetList
 
 // ReplayFailedBinaryTasks Replay failed binary transfer tasks
 //
-// Queues failed binary transfer tasks again, all of a repository's or only the one for a SHA-1, with their attempt count reset.
+// Queues failed binary transfer tasks again, all of a repository's or only the one for a SHA-1, with their attempt count reset (an inferred server choice retained from the existing contract).
 //
 // Corresponds with PUT /api/federation/binaries/failures/replay (the `ReplayFailedBinaryTasks` operationId).
 func (c *Client) ReplayFailedBinaryTasks(ctx context.Context, params *ReplayFailedBinaryTasksParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewReplayFailedBinaryTasksRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetFederatedBinaryTasks Get federated binary task counts
+//
+// Returns failed content-fetch counts for a federated repository. Administrators only. The closed-source DTO shape is inferred.
+//
+// Corresponds with GET /api/federation/binaries/tasks/{repoKey} (the `GetFederatedBinaryTasks` operationId).
+func (c *Client) GetFederatedBinaryTasks(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetFederatedBinaryTasksRequest(c.Server, repoKey)
 	if err != nil {
 		return nil, err
 	}
@@ -15530,6 +15585,23 @@ func (c *Client) GetFederationMirrorLagTime(ctx context.Context, params *GetFede
 // Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 func (c *Client) GetFederatedRepositoryStatus(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetFederatedRepositoryStatusRequest(c.Server, repoKey)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetFederatedRepositoryBinaryState Get read-authorized repository binary state
+//
+// Returns failed content-fetch counts for a federated repository. Requires read permission on the repository. The closed-source DTO shape is inferred.
+//
+// Corresponds with GET /api/federation/status/repoState/{repoKey}/binaries/ (the `GetFederatedRepositoryBinaryState` operationId).
+func (c *Client) GetFederatedRepositoryBinaryState(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetFederatedRepositoryBinaryStateRequest(c.Server, repoKey)
 	if err != nil {
 		return nil, err
 	}
@@ -25601,6 +25673,40 @@ func NewReplayFailedBinaryTasksRequest(server string, params *ReplayFailedBinary
 	return req, nil
 }
 
+// NewGetFederatedBinaryTasksRequest constructs an http.Request for the GetFederatedBinaryTasks method
+func NewGetFederatedBinaryTasksRequest(server string, repoKey string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "repoKey", repoKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/binaries/tasks/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewSynchronizeFederatedMemberConfigurationRequest constructs an http.Request for the SynchronizeFederatedMemberConfiguration method
 func NewSynchronizeFederatedMemberConfigurationRequest(server string, repoKey string) (*http.Request, error) {
 	var err error
@@ -26282,6 +26388,40 @@ func NewGetFederatedRepositoryStatusRequest(server string, repoKey string) (*htt
 	}
 
 	operationPath := fmt.Sprintf("/api/federation/status/repo/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetFederatedRepositoryBinaryStateRequest constructs an http.Request for the GetFederatedRepositoryBinaryState method
+func NewGetFederatedRepositoryBinaryStateRequest(server string, repoKey string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "repoKey", repoKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/status/repoState/%s/binaries/", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -38280,12 +38420,21 @@ type ClientWithResponsesInterface interface {
 
 	// ReplayFailedBinaryTasksWithResponse Replay failed binary transfer tasks
 	//
-	// Queues failed binary transfer tasks again, all of a repository's or only the one for a SHA-1, with their attempt count reset.
+	// Queues failed binary transfer tasks again, all of a repository's or only the one for a SHA-1, with their attempt count reset (an inferred server choice retained from the existing contract).
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PUT /api/federation/binaries/failures/replay (the `ReplayFailedBinaryTasks` operationId).
 	ReplayFailedBinaryTasksWithResponse(ctx context.Context, params *ReplayFailedBinaryTasksParams, reqEditors ...RequestEditorFn) (*ReplayFailedBinaryTasksResponse, error)
+
+	// GetFederatedBinaryTasksWithResponse Get federated binary task counts
+	//
+	// Returns failed content-fetch counts for a federated repository. Administrators only. The closed-source DTO shape is inferred.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/federation/binaries/tasks/{repoKey} (the `GetFederatedBinaryTasks` operationId).
+	GetFederatedBinaryTasksWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*GetFederatedBinaryTasksResponse, error)
 
 	// SynchronizeFederatedMemberConfigurationWithResponse Push federated repository configuration to members
 	//
@@ -38463,6 +38612,15 @@ type ClientWithResponsesInterface interface {
 	//
 	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	GetFederatedRepositoryStatusWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*GetFederatedRepositoryStatusResponse, error)
+
+	// GetFederatedRepositoryBinaryStateWithResponse Get read-authorized repository binary state
+	//
+	// Returns failed content-fetch counts for a federated repository. Requires read permission on the repository. The closed-source DTO shape is inferred.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/federation/status/repoState/{repoKey}/binaries/ (the `GetFederatedRepositoryBinaryState` operationId).
+	GetFederatedRepositoryBinaryStateWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*GetFederatedRepositoryBinaryStateResponse, error)
 
 	// GetFederationStateDetailsWithResponse List federations and member states
 	//
@@ -49382,6 +49540,8 @@ type DeleteFailedBinaryTasksResponse struct {
 	JSON401 *ErrorResponse
 	// JSON403 the response for an HTTP 403 `application/json` response
 	JSON403 *ErrorResponse
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
 	// JSON429 the response for an HTTP 429 `application/json` response
 	JSON429 *TooManyRequests
 	// JSON500 the response for an HTTP 500 `application/json` response
@@ -49415,6 +49575,11 @@ func (r DeleteFailedBinaryTasksResponse) GetJSON401() *ErrorResponse {
 // GetJSON403 returns the response for an HTTP 403 `application/json` response
 func (r DeleteFailedBinaryTasksResponse) GetJSON403() *ErrorResponse {
 	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r DeleteFailedBinaryTasksResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
 }
 
 // GetJSON429 returns the response for an HTTP 429 `application/json` response
@@ -49461,6 +49626,11 @@ func (r DeleteFailedBinaryTasksResponse) ContentType() string {
 	return ""
 }
 
+// GetListOfFailedBinaryTasksResponse200Headers the declared response headers of an HTTP 200 response for GetListOfFailedBinaryTasks
+type GetListOfFailedBinaryTasksResponse200Headers struct {
+	Link *string
+}
+
 // GetListOfFailedBinaryTasksResponse429Headers the declared response headers of an HTTP 429 response for GetListOfFailedBinaryTasks
 type GetListOfFailedBinaryTasksResponse429Headers struct {
 	RateLimit       *string
@@ -49479,31 +49649,23 @@ type GetListOfFailedBinaryTasksResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *[]struct {
-		// CreationTime Optional within this object. Time the task was created, in epoch milliseconds.
-		CreationTime *int64 `json:"creationTime,omitempty"`
-
-		// FailuresCount Optional within this object. Attempts made so far.
-		FailuresCount *int `json:"failuresCount,omitempty"`
-
-		// RepoKey Optional within this object. Federated repository the task belongs to.
-		RepoKey *string `json:"repoKey,omitempty"`
-
-		// Sha1 Optional within this object. SHA-1 of the content that could not be fetched.
-		Sha1 *string `json:"sha1,omitempty"`
-	}
+	JSON200 *[]FederatedFailedBinary
 	// JSON400 the response for an HTTP 400 `application/json` response
 	JSON400 *ErrorResponse
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *ErrorResponse
 	// JSON403 the response for an HTTP 403 `application/json` response
 	JSON403 *ErrorResponse
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
 	// JSON429 the response for an HTTP 429 `application/json` response
 	JSON429 *TooManyRequests
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *ErrorResponse
 	// JSON503 the response for an HTTP 503 `application/json` response
 	JSON503 *ServiceUnavailable
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *GetListOfFailedBinaryTasksResponse200Headers
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *GetListOfFailedBinaryTasksResponse429Headers
 	// Headers503 the parsed response headers for an HTTP 503 response
@@ -49511,19 +49673,7 @@ type GetListOfFailedBinaryTasksResponse struct {
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r GetListOfFailedBinaryTasksResponse) GetJSON200() *[]struct {
-	// CreationTime Optional within this object. Time the task was created, in epoch milliseconds.
-	CreationTime *int64 `json:"creationTime,omitempty"`
-
-	// FailuresCount Optional within this object. Attempts made so far.
-	FailuresCount *int `json:"failuresCount,omitempty"`
-
-	// RepoKey Optional within this object. Federated repository the task belongs to.
-	RepoKey *string `json:"repoKey,omitempty"`
-
-	// Sha1 Optional within this object. SHA-1 of the content that could not be fetched.
-	Sha1 *string `json:"sha1,omitempty"`
-} {
+func (r GetListOfFailedBinaryTasksResponse) GetJSON200() *[]FederatedFailedBinary {
 	return r.JSON200
 }
 
@@ -49540,6 +49690,11 @@ func (r GetListOfFailedBinaryTasksResponse) GetJSON401() *ErrorResponse {
 // GetJSON403 returns the response for an HTTP 403 `application/json` response
 func (r GetListOfFailedBinaryTasksResponse) GetJSON403() *ErrorResponse {
 	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetListOfFailedBinaryTasksResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
 }
 
 // GetJSON429 returns the response for an HTTP 429 `application/json` response
@@ -49614,6 +49769,8 @@ type ReplayFailedBinaryTasksResponse struct {
 	JSON401 *ErrorResponse
 	// JSON403 the response for an HTTP 403 `application/json` response
 	JSON403 *ErrorResponse
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
 	// JSON429 the response for an HTTP 429 `application/json` response
 	JSON429 *TooManyRequests
 	// JSON500 the response for an HTTP 500 `application/json` response
@@ -49647,6 +49804,11 @@ func (r ReplayFailedBinaryTasksResponse) GetJSON401() *ErrorResponse {
 // GetJSON403 returns the response for an HTTP 403 `application/json` response
 func (r ReplayFailedBinaryTasksResponse) GetJSON403() *ErrorResponse {
 	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r ReplayFailedBinaryTasksResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
 }
 
 // GetJSON429 returns the response for an HTTP 429 `application/json` response
@@ -49687,6 +49849,114 @@ func (r ReplayFailedBinaryTasksResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r ReplayFailedBinaryTasksResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetFederatedBinaryTasksResponse429Headers the declared response headers of an HTTP 429 response for GetFederatedBinaryTasks
+type GetFederatedBinaryTasksResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// GetFederatedBinaryTasksResponse503Headers the declared response headers of an HTTP 503 response for GetFederatedBinaryTasks
+type GetFederatedBinaryTasksResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type GetFederatedBinaryTasksResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *FederatedBinaryTaskCounts
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ErrorResponse
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *ErrorResponse
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *ErrorResponse
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *ErrorResponse
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *GetFederatedBinaryTasksResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *GetFederatedBinaryTasksResponse503Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetFederatedBinaryTasksResponse) GetJSON200() *FederatedBinaryTaskCounts {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r GetFederatedBinaryTasksResponse) GetJSON400() *ErrorResponse {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetFederatedBinaryTasksResponse) GetJSON401() *ErrorResponse {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetFederatedBinaryTasksResponse) GetJSON403() *ErrorResponse {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetFederatedBinaryTasksResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r GetFederatedBinaryTasksResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r GetFederatedBinaryTasksResponse) GetJSON500() *ErrorResponse {
+	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetFederatedBinaryTasksResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r GetFederatedBinaryTasksResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetFederatedBinaryTasksResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetFederatedBinaryTasksResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetFederatedBinaryTasksResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -51561,6 +51831,114 @@ func (r GetFederatedRepositoryStatusResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r GetFederatedRepositoryStatusResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetFederatedRepositoryBinaryStateResponse429Headers the declared response headers of an HTTP 429 response for GetFederatedRepositoryBinaryState
+type GetFederatedRepositoryBinaryStateResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// GetFederatedRepositoryBinaryStateResponse503Headers the declared response headers of an HTTP 503 response for GetFederatedRepositoryBinaryState
+type GetFederatedRepositoryBinaryStateResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type GetFederatedRepositoryBinaryStateResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *FederatedBinaryTaskCounts
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ErrorResponse
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *ErrorResponse
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *ErrorResponse
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *ErrorResponse
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *GetFederatedRepositoryBinaryStateResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *GetFederatedRepositoryBinaryStateResponse503Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetFederatedRepositoryBinaryStateResponse) GetJSON200() *FederatedBinaryTaskCounts {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r GetFederatedRepositoryBinaryStateResponse) GetJSON400() *ErrorResponse {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetFederatedRepositoryBinaryStateResponse) GetJSON401() *ErrorResponse {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetFederatedRepositoryBinaryStateResponse) GetJSON403() *ErrorResponse {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetFederatedRepositoryBinaryStateResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r GetFederatedRepositoryBinaryStateResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r GetFederatedRepositoryBinaryStateResponse) GetJSON500() *ErrorResponse {
+	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetFederatedRepositoryBinaryStateResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r GetFederatedRepositoryBinaryStateResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetFederatedRepositoryBinaryStateResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetFederatedRepositoryBinaryStateResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetFederatedRepositoryBinaryStateResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -76353,7 +76731,7 @@ func (c *ClientWithResponses) GetListOfFailedBinaryTasksWithResponse(ctx context
 
 // ReplayFailedBinaryTasksWithResponse Replay failed binary transfer tasks
 //
-// Queues failed binary transfer tasks again, all of a repository's or only the one for a SHA-1, with their attempt count reset.
+// Queues failed binary transfer tasks again, all of a repository's or only the one for a SHA-1, with their attempt count reset (an inferred server choice retained from the existing contract).
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -76364,6 +76742,21 @@ func (c *ClientWithResponses) ReplayFailedBinaryTasksWithResponse(ctx context.Co
 		return nil, err
 	}
 	return ParseReplayFailedBinaryTasksResponse(rsp)
+}
+
+// GetFederatedBinaryTasksWithResponse Get federated binary task counts
+//
+// Returns failed content-fetch counts for a federated repository. Administrators only. The closed-source DTO shape is inferred.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/federation/binaries/tasks/{repoKey} (the `GetFederatedBinaryTasks` operationId).
+func (c *ClientWithResponses) GetFederatedBinaryTasksWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*GetFederatedBinaryTasksResponse, error) {
+	rsp, err := c.GetFederatedBinaryTasks(ctx, repoKey, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetFederatedBinaryTasksResponse(rsp)
 }
 
 // SynchronizeFederatedMemberConfigurationWithResponse Push federated repository configuration to members
@@ -76655,6 +77048,21 @@ func (c *ClientWithResponses) GetFederatedRepositoryStatusWithResponse(ctx conte
 		return nil, err
 	}
 	return ParseGetFederatedRepositoryStatusResponse(rsp)
+}
+
+// GetFederatedRepositoryBinaryStateWithResponse Get read-authorized repository binary state
+//
+// Returns failed content-fetch counts for a federated repository. Requires read permission on the repository. The closed-source DTO shape is inferred.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/federation/status/repoState/{repoKey}/binaries/ (the `GetFederatedRepositoryBinaryState` operationId).
+func (c *ClientWithResponses) GetFederatedRepositoryBinaryStateWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*GetFederatedRepositoryBinaryStateResponse, error) {
+	rsp, err := c.GetFederatedRepositoryBinaryState(ctx, repoKey, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetFederatedRepositoryBinaryStateResponse(rsp)
 }
 
 // GetFederationStateDetailsWithResponse List federations and member states
@@ -91044,6 +91452,13 @@ func ParseDeleteFailedBinaryTasksResponse(rsp *http.Response) (*DeleteFailedBina
 		}
 		response.JSON403 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
 		var dest TooManyRequests
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -91136,19 +91551,7 @@ func ParseGetListOfFailedBinaryTasksResponse(rsp *http.Response) (*GetListOfFail
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest []struct {
-			// CreationTime Optional within this object. Time the task was created, in epoch milliseconds.
-			CreationTime *int64 `json:"creationTime,omitempty"`
-
-			// FailuresCount Optional within this object. Attempts made so far.
-			FailuresCount *int `json:"failuresCount,omitempty"`
-
-			// RepoKey Optional within this object. Federated repository the task belongs to.
-			RepoKey *string `json:"repoKey,omitempty"`
-
-			// Sha1 Optional within this object. SHA-1 of the content that could not be fetched.
-			Sha1 *string `json:"sha1,omitempty"`
-		}
+		var dest []FederatedFailedBinary
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -91175,6 +91578,13 @@ func ParseGetListOfFailedBinaryTasksResponse(rsp *http.Response) (*GetListOfFail
 		}
 		response.JSON403 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
 		var dest TooManyRequests
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -91199,6 +91609,16 @@ func ParseGetListOfFailedBinaryTasksResponse(rsp *http.Response) (*GetListOfFail
 	}
 
 	switch {
+	case rsp.StatusCode == 200:
+		var headers GetListOfFailedBinaryTasksResponse200Headers
+		if values := rsp.Header.Values("Link"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Link", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.Link = &value
+		}
+		response.Headers200 = &headers
 	case rsp.StatusCode == 429:
 		var headers GetListOfFailedBinaryTasksResponse429Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
@@ -91297,6 +91717,13 @@ func ParseReplayFailedBinaryTasksResponse(rsp *http.Response) (*ReplayFailedBina
 		}
 		response.JSON403 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
 		var dest TooManyRequests
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -91347,6 +91774,132 @@ func ParseReplayFailedBinaryTasksResponse(rsp *http.Response) (*ReplayFailedBina
 		response.Headers429 = &headers
 	case rsp.StatusCode == 503:
 		var headers ReplayFailedBinaryTasksResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetFederatedBinaryTasksResponse parses an HTTP response from a GetFederatedBinaryTasksWithResponse call
+func ParseGetFederatedBinaryTasksResponse(rsp *http.Response) (*GetFederatedBinaryTasksResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetFederatedBinaryTasksResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest FederatedBinaryTaskCounts
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers GetFederatedBinaryTasksResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers GetFederatedBinaryTasksResponse503Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -93383,6 +93936,132 @@ func ParseGetFederatedRepositoryStatusResponse(rsp *http.Response) (*GetFederate
 		response.Headers429 = &headers
 	case rsp.StatusCode == 503:
 		var headers GetFederatedRepositoryStatusResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetFederatedRepositoryBinaryStateResponse parses an HTTP response from a GetFederatedRepositoryBinaryStateWithResponse call
+func ParseGetFederatedRepositoryBinaryStateResponse(rsp *http.Response) (*GetFederatedRepositoryBinaryStateResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetFederatedRepositoryBinaryStateResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest FederatedBinaryTaskCounts
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers GetFederatedRepositoryBinaryStateResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers GetFederatedRepositoryBinaryStateResponse503Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {

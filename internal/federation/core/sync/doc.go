@@ -66,7 +66,13 @@
 //   - A failed blob fetch records a failed binary and queues its retry in
 //     the apply transaction; the position still advances, so later entries
 //     apply. The kind keeps the item pending, and Publish shows it unless a
-//     later entry deleted or replaced it.
+//     later entry deleted or replaced it. Operator replay resets attempts
+//     and retries immediately. Publication rechecks the current Receive grant
+//     of at least one candidate source member. Successful retry claims the failed row in the
+//     publication transaction; a deletion that wins cancels publication. A
+//     failed in-flight retry updates only an existing row, never recreates
+//     an operator-cancelled task. Obsolete cleanup claims the row and
+//     rechecks pending content before committing.
 //   - Pruning keeps every entry a subscribed peer has not acknowledged
 //     inside the retention window. A peer whose position falls below the
 //     pruned floor is flagged and sent only the first entry still held,
@@ -104,7 +110,8 @@
 // # Status
 //
 // Implemented P13 (PEER-04, PEER-05); Pauser, Observe and Wake for the
-// repository stream (FED-02); recovery, Forget and priority (FED-04).
+// repository stream (FED-02); recovery, Forget and priority (FED-04);
+// operator retry cancellation and same-stamp pending full-sync repair (FED-06).
 //
 // # Testing
 //

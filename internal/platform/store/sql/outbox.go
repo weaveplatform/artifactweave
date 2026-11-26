@@ -325,3 +325,14 @@ func (o outboxStore) ClearFailedFetch(ctx context.Context, stream, sha256 string
 	return o.s.ExecOne(ctx, "clear failed fetch "+stream+" "+sha256,
 		"DELETE FROM failed_blob_fetches WHERE stream = ? AND sha256 = ?", stream, sha256)
 }
+
+func (o outboxStore) RetryFailedFetch(ctx context.Context, stream, sha256, reason string) error {
+	return o.s.ExecOne(ctx, "retry failed fetch", "UPDATE failed_blob_fetches "+
+		"SET failures = failures + 1, last_error = ? WHERE stream = ? AND sha256 = ?",
+		reason, stream, sha256)
+}
+
+func (o outboxStore) ResetFailedFetch(ctx context.Context, stream, sha256 string) error {
+	return o.s.ExecOne(ctx, "reset failed fetch", "UPDATE failed_blob_fetches "+
+		"SET failures = 0, last_error = '' WHERE stream = ? AND sha256 = ?", stream, sha256)
+}

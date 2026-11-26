@@ -35,7 +35,9 @@
 //   - OutboxStore: Append, Read, LastSeq, Streams and Prune for the entries;
 //     PutCursor, Cursor, Cursors and DeleteCursors for peers' positions;
 //     Applied, LockApplied and SetApplied for the receiver's; and RecordFailedFetch,
-//     FailedFetches and ClearFailedFetch for failed blob fetches.
+//     FailedFetches and ClearFailedFetch for failed blob fetches;
+//     RetryFailedFetch updates an existing failed task without recreating
+//     an operator-deleted one, and ResetFailedFetch resets replay attempts.
 //   - HLC, with Compare, Next, Merge and String, and ParseHLC with its
 //     sentinel ErrInvalidHLC.
 //   - OutboxEntry; PeerCursor, with Behind; AppliedMarker, with Expect; and

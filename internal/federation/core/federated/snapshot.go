@@ -153,6 +153,7 @@ func entryOf(self string, it *artifactsapi.ItemChange, stamp *model.ItemStamp, s
 	case stamp != nil && len(stamp.Pending) > 0:
 		en := model.SnapshotEntry{
 			Key: stamp.Path, Time: stamp.Time, Origin: stamp.Origin, BlobSHA256: stamp.SHA256, BlobSize: stamp.Size,
+			Pending: !state,
 		}
 		if state {
 			var p payload
