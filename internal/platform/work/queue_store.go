@@ -32,6 +32,11 @@ type WorkQueue interface {
 	// kernel.ErrInvalid for an empty or overlong kind or key, or a payload
 	// that is not JSON or exceeds MaxWorkPayload.
 	Enqueue(ctx context.Context, kind, key string, payload []byte, now time.Time) error
+	// Expedite resets attempts and makes pending work due now. A leased
+	// item keeps its generation and lease but its attempts reset to zero;
+	// paired with Enqueue's dirty mark, its settlement starts fresh work
+	// without the old run's backoff or parking. kernel.ErrNotFound if absent.
+	Expedite(ctx context.Context, kind, key string, now time.Time) error
 	// Lease takes up to req.Limit due items of req.Kinds (every kind when
 	// empty) for req.Holder until req.Until: pending items from their
 	// NotBefore on, and leased items whose lease ran out, the longest due

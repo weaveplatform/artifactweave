@@ -42,7 +42,7 @@
 // in instance settings. A member dropped from a repository is forgotten by
 // the sync engine (Membership.Dropped).
 //
-// Binaries lists, immediately replays and deletes failed content fetches,
+// Binaries lists, queues immediate replay and deletes failed content fetches,
 // with repository task counts for administrators and a Read-authorized
 // repoState projection. Replay never performs network I/O in a metadata
 // transaction and never publishes a superseded change or an operator-cancelled

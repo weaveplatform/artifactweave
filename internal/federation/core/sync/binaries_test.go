@@ -45,7 +45,7 @@ func TestUnitOperatorDeletionCancelsInflightRetry(t *testing.T) {
 			}
 			b.engine.Remote = hook
 			if err := b.engine.RetryFetch(t.Context(), stream, sum); err != nil {
-				t.Fatal(err)
+				t.Error(err)
 			}
 			if !b.state(a).Items["f"].Pending {
 				t.Fatal("cancelled retry published content")
@@ -55,7 +55,7 @@ func TestUnitOperatorDeletionCancelsInflightRetry(t *testing.T) {
 			}
 			b.engine.Remote = hook.Remote
 			if err := b.engine.RetryFetch(t.Context(), stream, sum); err != nil {
-				t.Fatal(err)
+				t.Error(err)
 			}
 			if !b.state(a).Items["f"].Pending {
 				t.Fatal("queued retry published a deleted task")

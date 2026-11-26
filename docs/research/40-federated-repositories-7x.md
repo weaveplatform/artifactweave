@@ -486,13 +486,24 @@ Posted on [#216](https://github.com/weaveplatform/artifactweave/issues/216) for 
 11. Whether 7.x refuses `migrate` for a repository with push replication. artifactweave
     does, as decision 0022 forbids a repository being both federated and a push target.
 
+14. When a failed binary first appears in the list: the public list documentation mentions
+    a default maximum of ten attempts without defining visibility timing. artifactweave
+    exposes recorded failures from the first failed fetch while retries remain queued.
+15. The list's `path` extension names the first still-pending path in byte order. The
+    published task fields do not include it; compare the extension separately from
+    the sourced checksum, repository, first-failure time and attempt count.
+16. The closed task-count bodies use `{failedTasks: <count>}` for both task endpoints
+    as artifactweave's inferred projection of recorded failed fetches (item 5).
+17. Whether replay resets attempts in 7.x. The public API promises reprocessing, while
+    artifactweave retains its existing attempt-reset choice.
+
 ### FED-06 implemented failed-binary choices
 
 [I] artifactweave's failed-binary list retains the documented `repoKey`, `sha1`,
 `creationTime` (epoch milliseconds) and `failuresCount`. Its `path` extension names
 one current pending path; superseded failures omit it. The content task is keyed by
 repository and SHA-256, while replay/delete accept the documented SHA-1 filter.
-List defaults to page 1 and limit 1000, allows limits 1..1000 and emits a next-page
+List defaults to page 1 and limit 1000, accepts positive limits and emits a next-page
 Link. Invalid paging and digests are 400; an unknown repository is 404.
 
 [I] The two closed-source task-count DTOs use `{failedTasks: <count>}`, marked
@@ -501,9 +512,11 @@ not a claim about private RTFS task queues. The repository-state form requires
 current repository Read; the other four operations require an administrator.
 
 Project choice [I] (decision 0022): replay resets attempts (the public reprocessing
-contract does not specify this reset) and immediately retries each
-selected binary. Unavailable content remains for automatic retry and contributes to
-`replayTasks`; a local metadata/blob-store failure is returned after attempting the
-remaining selected tasks. Deletion cancels queued or in-flight retry publication.
+contract does not specify this reset) and durably queues each selected binary for
+retry without backoff. `replayTasks` counts tasks marked; the request returns without
+a network call. Attempt resets and all enqueues commit or roll back together.
+Workers retry unavailable content using the ordinary queue policy. An in-flight
+lease stays held, and its eventual settlement cannot back off or park the fresh
+replay. Deletion cancels queued or in-flight retry publication.
 A newer event or normal full sync can supply content after cancellation; full sync
 repairs pending content even when its conflict stamp already matches the sender.

@@ -34,7 +34,7 @@
 // 501 before it for a use case a later phase serves (model.PairingFor).
 // revoke changes nothing and exchange always answers 400 (DV-205).
 //
-// FederatedAPI also serves the FED-06 failed-binary list, immediate replay,
+// FederatedAPI also serves the FED-06 failed-binary list, queued replay,
 // deletion and task counts. The three controls and binaries/tasks are
 // administrator-only; status/repoState/{repoKey}/binaries/ requires current
 // repository Read. Inferred count/path fields are marked x-unverified.

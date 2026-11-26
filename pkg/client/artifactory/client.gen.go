@@ -10545,14 +10545,14 @@ type ClientInterface interface {
 
 	// DeleteFailedBinaryTasks Delete failed binary transfer tasks
 	//
-	// Deletes binary transfer tasks of a federated repository that exhausted their retries: all of them, or only the task for one SHA-1. Use it once the missing content has been dealt with another way, for example re-deployed.
+	// Deletes recorded failed content-fetch tasks of a federated repository, all of them or only the tasks for one SHA-1. Cancellation prevents their queued or in-flight retries from publishing; a newer event or full sync can supply the content later.
 	//
 	// Corresponds with DELETE /api/federation/binaries/failures/delete (the `DeleteFailedBinaryTasks` operationId).
 	DeleteFailedBinaryTasks(ctx context.Context, params *DeleteFailedBinaryTasksParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetListOfFailedBinaryTasks List failed binary transfer tasks
 	//
-	// Lists binary transfer tasks of a federated repository that failed because the content could not be fetched from the originating member within the attempt limit (10 by default). Metadata for these items arrived; their content did not.
+	// Lists recorded failed content fetches of a federated repository, including tasks awaiting another attempt. Metadata for these items arrived; their content did not. Visibility from the first failed fetch is an inferred server choice; the source documents a default attempt limit of 10 without specifying when a task becomes visible in the list.
 	//
 	// Corresponds with GET /api/federation/binaries/failures/list (the `GetListOfFailedBinaryTasks` operationId).
 	GetListOfFailedBinaryTasks(ctx context.Context, params *GetListOfFailedBinaryTasksParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -15191,7 +15191,7 @@ func (c *Client) ExportSystemWithApplicationVndOrgJfrogArtifactorySystemExportSe
 
 // DeleteFailedBinaryTasks Delete failed binary transfer tasks
 //
-// Deletes binary transfer tasks of a federated repository that exhausted their retries: all of them, or only the task for one SHA-1. Use it once the missing content has been dealt with another way, for example re-deployed.
+// Deletes recorded failed content-fetch tasks of a federated repository, all of them or only the tasks for one SHA-1. Cancellation prevents their queued or in-flight retries from publishing; a newer event or full sync can supply the content later.
 //
 // Corresponds with DELETE /api/federation/binaries/failures/delete (the `DeleteFailedBinaryTasks` operationId).
 func (c *Client) DeleteFailedBinaryTasks(ctx context.Context, params *DeleteFailedBinaryTasksParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -15208,7 +15208,7 @@ func (c *Client) DeleteFailedBinaryTasks(ctx context.Context, params *DeleteFail
 
 // GetListOfFailedBinaryTasks List failed binary transfer tasks
 //
-// Lists binary transfer tasks of a federated repository that failed because the content could not be fetched from the originating member within the attempt limit (10 by default). Metadata for these items arrived; their content did not.
+// Lists recorded failed content fetches of a federated repository, including tasks awaiting another attempt. Metadata for these items arrived; their content did not. Visibility from the first failed fetch is an inferred server choice; the source documents a default attempt limit of 10 without specifying when a task becomes visible in the list.
 //
 // Corresponds with GET /api/federation/binaries/failures/list (the `GetListOfFailedBinaryTasks` operationId).
 func (c *Client) GetListOfFailedBinaryTasks(ctx context.Context, params *GetListOfFailedBinaryTasksParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -38402,7 +38402,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteFailedBinaryTasksWithResponse Delete failed binary transfer tasks
 	//
-	// Deletes binary transfer tasks of a federated repository that exhausted their retries: all of them, or only the task for one SHA-1. Use it once the missing content has been dealt with another way, for example re-deployed.
+	// Deletes recorded failed content-fetch tasks of a federated repository, all of them or only the tasks for one SHA-1. Cancellation prevents their queued or in-flight retries from publishing; a newer event or full sync can supply the content later.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -38411,7 +38411,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetListOfFailedBinaryTasksWithResponse List failed binary transfer tasks
 	//
-	// Lists binary transfer tasks of a federated repository that failed because the content could not be fetched from the originating member within the attempt limit (10 by default). Metadata for these items arrived; their content did not.
+	// Lists recorded failed content fetches of a federated repository, including tasks awaiting another attempt. Metadata for these items arrived; their content did not. Visibility from the first failed fetch is an inferred server choice; the source documents a default attempt limit of 10 without specifying when a task becomes visible in the list.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -76701,7 +76701,7 @@ func (c *ClientWithResponses) ExportSystemWithApplicationVndOrgJfrogArtifactoryS
 
 // DeleteFailedBinaryTasksWithResponse Delete failed binary transfer tasks
 //
-// Deletes binary transfer tasks of a federated repository that exhausted their retries: all of them, or only the task for one SHA-1. Use it once the missing content has been dealt with another way, for example re-deployed.
+// Deletes recorded failed content-fetch tasks of a federated repository, all of them or only the tasks for one SHA-1. Cancellation prevents their queued or in-flight retries from publishing; a newer event or full sync can supply the content later.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -76716,7 +76716,7 @@ func (c *ClientWithResponses) DeleteFailedBinaryTasksWithResponse(ctx context.Co
 
 // GetListOfFailedBinaryTasksWithResponse List failed binary transfer tasks
 //
-// Lists binary transfer tasks of a federated repository that failed because the content could not be fetched from the originating member within the attempt limit (10 by default). Metadata for these items arrived; their content did not.
+// Lists recorded failed content fetches of a federated repository, including tasks awaiting another attempt. Metadata for these items arrived; their content did not. Visibility from the first failed fetch is an inferred server choice; the source documents a default attempt limit of 10 without specifying when a task becomes visible in the list.
 //
 // Returns a wrapper object for the known response body format(s).
 //

@@ -40,7 +40,7 @@ type FailedBinary struct {
 type BinaryCounts struct{ FailedTasks int }
 
 // Binaries supplies FED-06's operator controls. Reads and deletions run under
-// current authority in one transaction. Replay fetches outside transactions;
+// current authority in one transaction. Replay queues fresh work atomically; workers fetch outside transactions;
 // the stream engine atomically publishes the still-current pending change
 // and claims its failure record, so an operator deletion cancels a retry.
 type Binaries struct {
@@ -78,7 +78,7 @@ func (b Binaries) repository(ctx context.Context, key string, read bool) error {
 }
 
 // List returns one page in SHA-256 order, and whether another page remains.
-// A page holds 1..1000 tasks; page numbers start at one.
+// Page sizes and page numbers must be positive.
 func (b Binaries) List(ctx context.Context, key string, limit, page int) ([]FailedBinary, bool, error) {
 	var out []FailedBinary
 	var more bool
@@ -86,8 +86,8 @@ func (b Binaries) List(ctx context.Context, key string, limit, page int) ([]Fail
 		if err := b.repository(ctx, key, false); err != nil {
 			return err
 		}
-		if limit < 1 || limit > 1000 || page < 1 {
-			return refuse("limit must be between 1 and 1000 and page must be at least 1")
+		if limit < 1 || page < 1 {
+			return refuse("limit and page must be at least 1")
 		}
 		all, err := b.tasks(ctx, key, "")
 		if err != nil {
@@ -99,7 +99,7 @@ func (b Binaries) List(ctx context.Context, key string, limit, page int) ([]Fail
 			return nil
 		}
 		start := (page - 1) * limit
-		end := min(start+limit, len(all))
+		end := start + min(limit, len(all)-start)
 		out, more = all[start:end], end < len(all)
 		return nil
 	})
@@ -170,11 +170,11 @@ func (b Binaries) Delete(ctx context.Context, key, sha1 string) (int, error) {
 	return n, err //nolint:wrapcheck // the callback names its failures
 }
 
-// Replay immediately retries each matching failed content fetch. A source that
-// is still unavailable remains recorded for automatic retry; replayTasks counts
-// the tasks attempted, as a replay request does not promise their success.
+// Replay marks every matching failed task for immediate durable retry, resetting
+// its attempts and overriding backoff in the current-authority transaction.
+// Workers fetch outside that transaction; the response counts tasks marked.
 func (b Binaries) Replay(ctx context.Context, key, sha1 string) (int, error) {
-	var tasks []FailedBinary
+	n := 0
 	err := b.Store.Tx(ctx, func(ctx context.Context) error {
 		if err := b.repository(ctx, key, false); err != nil {
 			return err
@@ -182,44 +182,34 @@ func (b Binaries) Replay(ctx context.Context, key, sha1 string) (int, error) {
 		if err := checkSHA1(sha1); err != nil {
 			return err
 		}
-		var err error
-		tasks, err = b.tasks(ctx, key, sha1)
+		tasks, err := b.tasks(ctx, key, sha1)
 		if err != nil {
 			return err
 		}
-		if len(tasks) > 0 && (b.Streams == nil || b.Streams() == nil) {
+		if len(tasks) == 0 {
+			return nil
+		}
+		if b.Streams == nil {
+			return ErrNoStreams
+		}
+		e := b.Streams()
+		if e == nil {
 			return ErrNoStreams
 		}
 		for _, task := range tasks {
-			if err := b.Store.Outbox().ResetFailedFetch(ctx, model.RepositoryStream(key), task.SHA256); err != nil && !errors.Is(err, kernel.ErrNotFound) {
+			if err := b.Store.Outbox().ResetFailedFetch(ctx, model.RepositoryStream(key), task.SHA256); errors.Is(err, kernel.ErrNotFound) {
+				continue
+			} else if err != nil {
 				return fmt.Errorf("reset failed binary: %w", err)
 			}
+			if err := e.QueueFetch(ctx, model.RepositoryStream(key), task.SHA256); err != nil {
+				return err
+			}
+			n++
 		}
 		return nil
 	})
-	if err != nil {
-		return 0, err //nolint:wrapcheck // the callback names its failures
-	}
-	if len(tasks) == 0 {
-		return 0, nil
-	}
-	if b.Streams == nil {
-		return 0, ErrNoStreams
-	}
-	e := b.Streams()
-	if e == nil {
-		return 0, ErrNoStreams
-	}
-	var failures []error
-	for _, task := range tasks {
-		if err := ctx.Err(); err != nil {
-			return 0, fmt.Errorf("replay failed binaries: %w", err)
-		}
-		if err := e.RetryFetch(ctx, model.RepositoryStream(key), task.SHA256); err != nil && !errors.Is(err, streamsync.ErrFetchUnavailable) {
-			failures = append(failures, fmt.Errorf("replay failed binary: %w", err))
-		}
-	}
-	return len(tasks), errors.Join(failures...)
+	return n, err //nolint:wrapcheck // the callback names its failures
 }
 
 // Counts is the repository's failed-fetch count. read chooses repository Read

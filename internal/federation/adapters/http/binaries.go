@@ -70,8 +70,8 @@ func (a FederatedAPI) DeleteFailedBinaryTasks(
 	return artgen.DeleteFailedBinaryTasks200JSONResponse{DeletedTasks: &n}, nil
 }
 
-// ReplayFailedBinaryTasks immediately fetches matching content again. The
-// engine publishes only the pending changes still current after the fetch.
+// ReplayFailedBinaryTasks marks matching content for immediate durable retry.
+// The request performs no network I/O; workers publish only current changes.
 func (a FederatedAPI) ReplayFailedBinaryTasks(
 	ctx context.Context, req artgen.ReplayFailedBinaryTasksRequestObject,
 ) (artgen.ReplayFailedBinaryTasksResponseObject, error) {

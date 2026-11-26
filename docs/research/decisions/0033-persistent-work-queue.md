@@ -249,3 +249,14 @@ These assignments describe planned work, not current runtime support.
   `internal/app/reindex_internal_test.go`: each P8 reindex operation's permission, classes,
   timing and answer through a test-only format, and its 501 without one;
   `status_reindex_test.go` and `matrix_reindex_test.go`: their rows.
+
+### Explicit operator replay
+
+`Queue.EnqueueNow` is the opt-in path for failed-binary operator replay (P13
+FED-06). It enqueues and expedites inside the authorization transaction: pending
+work becomes due now with attempts reset; parked work is revived. A running item
+keeps its generation and lease and gets a dirty mark with attempts reset to zero.
+When that old generation settles, its failure cannot apply its backoff or park the
+fresh request. Normal `Enqueue` retains its existing coalescing/backoff semantics.
+`WorkExpedite` in the common store contract covers due-time reset, rollback, lease
+preservation, settlement and parked recovery on every store implementation.

@@ -7,6 +7,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/federated"
@@ -16,6 +17,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 	"github.com/weaveplatform/artifactweave/internal/platform/outbox"
+	"github.com/weaveplatform/artifactweave/internal/platform/work"
 )
 
 func binaryFixture(t *testing.T) (federated.Binaries, store) {
@@ -33,7 +35,7 @@ func binaryFixture(t *testing.T) (federated.Binaries, store) {
 			RecordFailedFetch(t.Context(), outbox.FailedBlobFetch{Stream: "repo:fed", RepoKey: "fed", SHA256: sha, SHA1: fmt.Sprintf("%040x", i+1), FirstFailed: t0}); err != nil {
 			t.Fatal(err)
 		}
-		if err := s.Stamps().Record(t.Context(), model.ItemStamp{RepoKey: "fed", Path: fmt.Sprint("file", i), SHA256: sha, Pending: []byte(`{"path":"x"}`)}); err != nil {
+		if err := s.Stamps().Record(t.Context(), model.ItemStamp{RepoKey: "fed", Path: fmt.Sprint("file", i), SHA256: sha, Pending: []byte(fmt.Sprintf(`{"path":"file%d","actual":{"sha1":"%040x"}}`, i, i+1))}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -49,7 +51,7 @@ func TestUnitFailedBinariesPagesFiltersAndCounts(t *testing.T) {
 	for _, tc := range []struct {
 		page, limit, want int
 		more              bool
-	}{{1, 2, 2, true}, {2, 2, 1, false}, {3, 2, 0, false}, {int(^uint(0) >> 1), 1000, 0, false}} {
+	}{{1, 2, 2, true}, {2, 2, 1, false}, {3, 2, 0, false}, {1, 1001, 3, false}, {1, int(^uint(0) >> 1), 3, false}, {int(^uint(0) >> 1), 1000, 0, false}} {
 		got, more, err := b.List(ctx, "fed", tc.limit, tc.page)
 		if err != nil || len(got) != tc.want || more != tc.more {
 			t.Fatalf("page %d: %+v, %t, %v", tc.page, got, more, err)
@@ -58,7 +60,7 @@ func TestUnitFailedBinariesPagesFiltersAndCounts(t *testing.T) {
 			t.Fatalf("task %+v", got[0])
 		}
 	}
-	for _, tc := range []struct{ limit, page int }{{0, 1}, {1001, 1}, {1, 0}} {
+	for _, tc := range []struct{ limit, page int }{{0, 1}, {-1, 1}, {1, 0}} {
 		if _, _, err := b.List(ctx, "fed", tc.limit, tc.page); !errors.Is(err, kernel.ErrInvalid) {
 			t.Fatalf("bad page accepted: %v", err)
 		}
@@ -145,7 +147,7 @@ func (b selectiveBlobs) Exists(_ context.Context, sha string) (bool, error) {
 	return sha == b.held, nil
 }
 
-func TestUnitReplayAttemptsEveryTaskAndResetsAttempts(t *testing.T) {
+func TestUnitReplayQueuesEveryTaskAndResetsAttempts(t *testing.T) {
 	b, s := binaryFixture(t)
 	if err := s.Federation().SetMembers(t.Context(), "fed", []model.FederationMember{{RepoKey: "fed", PeerInstanceID: "b", Enabled: true}}); err != nil {
 		t.Fatal(err)
@@ -155,11 +157,37 @@ func TestUnitReplayAttemptsEveryTaskAndResetsAttempts(t *testing.T) {
 	if err := e.Kinds.Register(k); err != nil {
 		t.Fatal(err)
 	}
+	q, err := work.New(s, work.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.Queue = q
+	if err := e.Register(t.Context(), q, s.WorkQueue()); err != nil {
+		t.Fatal(err)
+	}
 	b.Streams = func() *streamsync.Engine { return e }
 	if n, err := b.Replay(t.Context(), "fed", ""); err != nil || n != 3 {
 		t.Fatalf("replay %d %v", n, err)
 	}
 	fs, err := s.Outbox().FailedFetches(t.Context(), "repo:fed")
+	if err != nil || len(fs) != 3 {
+		t.Fatalf("replay performed network work: %+v %v", fs, err)
+	}
+	for _, f := range fs {
+		if f.Failures != 0 {
+			t.Fatalf("attempt reset %+v", f)
+		}
+		key := "repo:fed " + f.SHA256
+		it, err := s.WorkQueue().Get(t.Context(), streamsync.FetchKind, key)
+		if err != nil || it.State != work.WorkPending {
+			t.Fatalf("durable replay not queued: %+v %v", it, err)
+		}
+		err = q.EnsureFresh(t.Context(), streamsync.FetchKind, key)
+		if err != nil && !errors.Is(err, streamsync.ErrFetchUnavailable) {
+			t.Fatal(err)
+		}
+	}
+	fs, err = s.Outbox().FailedFetches(t.Context(), "repo:fed")
 	if err != nil || len(fs) != 2 {
 		t.Fatalf("failures %+v %v", fs, err)
 	}
@@ -316,4 +344,96 @@ type unavailableBinaryRemote struct{ streamsync.Remote }
 
 func (unavailableBinaryRemote) FetchBlob(context.Context, model.Peer, string, func(io.Reader) error) error {
 	return errors.New("source unavailable")
+}
+
+func TestUnitReplayQueueAndAttemptResetRollBackTogether(t *testing.T) {
+	b, s := binaryFixture(t)
+	q, err := work.New(s, work.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := &streamsync.Engine{Store: s, Queue: q}
+	b.Streams = func() *streamsync.Engine { return e }
+	boom := errors.New("operator transaction rolled back")
+	err = s.Tx(t.Context(), func(ctx context.Context) error {
+		if _, err := b.Replay(ctx, "fed", ""); err != nil {
+			return err
+		}
+		return boom
+	})
+	if !errors.Is(err, boom) {
+		t.Fatal(err)
+	}
+	fs, err := s.Outbox().FailedFetches(t.Context(), "repo:fed")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range fs {
+		if f.Failures != 1 {
+			t.Fatalf("attempt reset escaped rollback: %+v", f)
+		}
+		if _, err := s.WorkQueue().Get(t.Context(), streamsync.FetchKind, "repo:fed "+f.SHA256); !errors.Is(err, kernel.ErrNotFound) {
+			t.Fatalf("replay work escaped rollback: %v", err)
+		}
+	}
+}
+
+type replayWorkStore struct {
+	store
+	queue work.WorkQueue
+}
+
+func (s replayWorkStore) WorkQueue() work.WorkQueue { return s.queue }
+
+type replayQueueFailure struct {
+	work.WorkQueue
+	calls    int
+	expedite bool
+	failure  error
+}
+
+func (q *replayQueueFailure) Enqueue(ctx context.Context, k, key string, p []byte, now time.Time) error {
+	q.calls++
+	if !q.expedite && q.calls == 2 {
+		return q.failure
+	}
+	return q.WorkQueue.Enqueue(ctx, k, key, p, now)
+}
+
+func (q *replayQueueFailure) Expedite(ctx context.Context, k, key string, now time.Time) error {
+	if q.expedite && q.calls == 2 {
+		return q.failure
+	}
+	return q.WorkQueue.Expedite(ctx, k, key, now)
+}
+
+func TestUnitReplayEnqueueFailureRollsBackWholeRequest(t *testing.T) {
+	for _, expedite := range []bool{false, true} {
+		t.Run(map[bool]string{false: "enqueue", true: "expedite"}[expedite], func(t *testing.T) {
+			b, s := binaryFixture(t)
+			boom := errors.New("queue unavailable")
+			st := replayWorkStore{store: s, queue: &replayQueueFailure{WorkQueue: s.WorkQueue(), expedite: expedite, failure: boom}}
+			q, err := work.New(st, work.Options{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			e := &streamsync.Engine{Store: s, Queue: q}
+			b.Streams = func() *streamsync.Engine { return e }
+			if _, err := b.Replay(t.Context(), "fed", ""); !errors.Is(err, boom) {
+				t.Fatal(err)
+			}
+			fs, err := s.Outbox().FailedFetches(t.Context(), "repo:fed")
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, f := range fs {
+				if f.Failures != 1 {
+					t.Fatalf("partial reset escaped failure: %+v", f)
+				}
+				if _, err := s.WorkQueue().Get(t.Context(), streamsync.FetchKind, "repo:fed "+f.SHA256); !errors.Is(err, kernel.ErrNotFound) {
+					t.Fatalf("partial enqueue escaped failure: %v", err)
+				}
+			}
+		})
+	}
 }

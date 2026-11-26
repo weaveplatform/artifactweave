@@ -67,7 +67,7 @@
 //     the apply transaction; the position still advances, so later entries
 //     apply. The kind keeps the item pending, and Publish shows it unless a
 //     later entry deleted or replaced it. Operator replay resets attempts
-//     and retries immediately. Publication rechecks the current Receive grant
+//     and queues immediate work without retry backoff. Publication rechecks the current Receive grant
 //     of at least one candidate source member. Successful retry claims the failed row in the
 //     publication transaction; a deletion that wins cancels publication. A
 //     failed in-flight retry updates only an existing row, never recreates

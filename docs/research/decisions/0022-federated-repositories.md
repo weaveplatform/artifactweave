@@ -198,8 +198,10 @@ them against a live 7.x in P19):
   status body uses 7.161.26's `mirrorEventsStatusInfo` and `federatedArtifactStatus` fields
   ([research 40 §7](../40-federated-repositories-7x.md#status-payloads)).
 - The failed-binary endpoints list, replay and delete the failed blob fetches recorded by
-  0021 (FED-06, #1935). Tasks are one per repository and SHA-256, ordered by SHA-256;
-  list pages start at one with 1000 tasks by default and a maximum of 1000, with a
+  0021 (FED-06, #1935), from the first failed attempt while retries remain queued
+  ([I]; the public page names ten default attempts but not list visibility timing).
+  Tasks are one per repository and SHA-256, ordered by SHA-256;
+  list pages start at one with 1000 tasks by default and positive page sizes, with a
   next-page Link. The documented task fields carry SHA-1, repository, first-failure
   epoch milliseconds and failed-attempt count. `path` is an inferred extension naming
   the first still-pending path in byte order; a superseded task has no path. SHA-1 is
@@ -208,10 +210,13 @@ them against a live 7.x in P19):
   it from still-pending metadata when available.
 - Replay resets attempts ([I], preserving artifactweave's existing spec; the public
   JFrog page promises marking tasks for reprocessing, not an attempt-counter reset)
-  and fetches every matching binary immediately, outside any
-  metadata transaction. An unavailable source remains recorded for automatic retry;
-  `replayTasks` counts attempted tasks. Local store failures are surfaced after the
-  other selected tasks are attempted. The engine publishes only still-current pending
+  and marks every matching binary for immediate durable retry in the same current-
+  authority transaction. The HTTP request makes no peer call. Pending backoff is
+  cleared, parked work is revived, and an active lease is retained with a fresh run
+  owed immediately after settlement. Workers fetch outside metadata transactions.
+  An unavailable source remains recorded for automatic retry; `replayTasks` counts
+  tasks marked for replay. An enqueue failure rolls back every reset and enqueue
+  in that request. The engine publishes only still-current pending
   changes. Publication claims the failed row in its metadata transaction, so a task
   deleted while its download is in flight cannot publish. Publication rechecks current
   Receive authority for the stream: any still-authorized member from the prefetch

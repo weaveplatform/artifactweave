@@ -44,7 +44,7 @@
 //
 // # Outputs
 //
-//   - Queue, with Handle, HandleEvery, Enqueue, Run, RunDue, EnsureFresh and
+//   - Queue, with Handle, HandleEvery, Enqueue, EnqueueNow, Run, RunDue, EnsureFresh and
 //     WaitIdle; Handler, Options, Backoff and the defaults; the sentinels
 //     ErrPermanent, ErrParked, ErrNoHandler, ErrOptions, ErrDuplicateHandler
 //     ErrPanic and ErrUnsettled.

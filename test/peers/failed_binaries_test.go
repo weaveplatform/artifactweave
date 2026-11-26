@@ -94,8 +94,20 @@ func testFailedFederatedBinaries(t *testing.T, driver peers.Driver) {
 	if status != http.StatusCreated {
 		t.Fatalf("replace %d %s", status, body)
 	}
-	// Wait for the replacement metadata: a second failure for its new content.
-	eventually(t, b, "replacement failed task", func() (bool, string) { got := failedBinaries(t, b); return len(got) == 4, "tasks" })
+	// Superseded failures may already have been cleared by automatic retry;
+	// wait for the replacement content's checksum rather than their count.
+	replacement := sha1.Sum([]byte("new-content")) // #nosec G401 -- protocol checksum
+	replacementSHA := hex.EncodeToString(replacement[:])
+	eventually(t, b, "replacement failed task", func() (bool, string) {
+		tasks := failedBinaries(t, b)
+		for _, task := range tasks {
+			if task.SHA1 == replacementSHA {
+				return true, task.Path
+			}
+		}
+		raw, _ := json.Marshal(tasks)
+		return false, string(raw)
+	})
 	c.Restore(1, 0)
 	binaryCall(t, b, http.MethodPut, "binaries/failures/replay?repoKey=failed")
 	binaryCall(t, b, http.MethodPut, "binaries/failures/replay?repoKey=failed")

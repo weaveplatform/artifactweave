@@ -48,9 +48,9 @@ components:
 paths:
   /api/federation/binaries/failures/delete:
     delete:
-      description: 'Deletes binary transfer tasks of a federated repository that exhausted their retries: all of
-        them, or only the task for one SHA-1. Use it once the missing content has been dealt with another way, for
-        example re-deployed.'
+      description: Deletes recorded failed content-fetch tasks of a federated repository, all of them or only
+        the tasks for one SHA-1. Cancellation prevents their queued or in-flight retries from publishing; a newer
+        event or full sync can supply the content later.
       operationId: deleteFailedBinaryTasks
       parameters:
       - description: Required query parameter. Key of the federated repository.
@@ -120,9 +120,10 @@ paths:
       x-cost: expensive
   /api/federation/binaries/failures/list:
     get:
-      description: Lists binary transfer tasks of a federated repository that failed because the content could not
-        be fetched from the originating member within the attempt limit (10 by default). Metadata for these items
-        arrived; their content did not.
+      description: Lists recorded failed content fetches of a federated repository, including tasks awaiting
+        another attempt. Metadata for these items arrived; their content did not. Visibility from the first failed
+        fetch is an inferred server choice; the source documents a default attempt limit of 10 without specifying
+        when a task becomes visible in the list.
       operationId: getListOfFailedBinaryTasks
       parameters:
       - description: Required query parameter. Key of the federated repository.
