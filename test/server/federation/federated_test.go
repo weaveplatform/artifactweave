@@ -112,6 +112,48 @@ func (w *federatedWorld) members(key string) []string {
 	return out
 }
 
+func TestAccFederatedConnectionStatesNoBaseURL(t *testing.T) {
+	t.Parallel()
+	w := newFederatedWorld(t, "")
+	w.call("admin", http.MethodPut, "/artifactory/api/repositories/empty-fed",
+		`{"rclass":"federated","packageType":"generic"}`, http.StatusOK, "")
+	path := "/artifactory/api/federation/status/connectionStates/empty-fed"
+	w.call("", http.MethodGet, path, "", http.StatusUnauthorized, "")
+	w.call("dev", http.MethodGet, path, "", http.StatusForbidden, "")
+	body := w.call("admin", http.MethodGet, path, "", http.StatusBadRequest, "")
+	if strings.TrimSpace(body) != `{"memberConnections":[]}` {
+		t.Fatalf("no-base connection envelope: %s", body)
+	}
+}
+
+func TestAccFederatedConnectionStatesEmptyRepositories(t *testing.T) {
+	for _, key := range []string{"missing", "local", "remote", "virtual"} {
+		t.Run(key, func(t *testing.T) {
+			w := newFederatedWorld(t, "")
+			w.call("admin", http.MethodPut, "/artifactory/api/repositories/virtual",
+				`{"rclass":"virtual","packageType":"generic"}`, http.StatusOK, "")
+			path := "/artifactory/api/federation/status/connectionStates/" + key
+			w.call("", http.MethodGet, path, "", http.StatusUnauthorized, "")
+			w.call("dev", http.MethodGet, path, "", http.StatusForbidden, "")
+			body := w.call("admin", http.MethodGet, path, "", http.StatusOK, "")
+			if strings.TrimSpace(body) != `{"memberConnections":[]}` {
+				t.Fatalf("empty connection envelope: %s", body)
+			}
+		})
+	}
+}
+
+func TestAccFederatedConnectionStatesEmptyFederation(t *testing.T) {
+	t.Parallel()
+	w := newFederatedWorld(t, "https://a.example")
+	w.call("admin", http.MethodPut, "/artifactory/api/repositories/empty-fed",
+		`{"rclass":"federated","packageType":"generic"}`, http.StatusOK, "")
+	body := w.call("admin", http.MethodGet, "/artifactory/api/federation/status/connectionStates/empty-fed", "", http.StatusOK, "")
+	if strings.TrimSpace(body) != `{"memberConnections":[]}` {
+		t.Fatalf("empty federation envelope: %s", body)
+	}
+}
+
 // Federated repository members through the repositories API (#1930): each
 // member must be a paired peer, the instance lists itself at its base URL
 // whatever form it was given in, and refusals are 400s that store nothing.

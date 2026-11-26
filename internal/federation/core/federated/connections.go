@@ -35,6 +35,10 @@ type Connection struct {
 // It is a project choice; a fresh in-flight event remains HEALTHY.
 const ConnectionLagThreshold = time.Minute
 
+// ErrNoConnectionBaseURL selects the source-backed empty 400 response when
+// a federated repository exists but its instance has no configured base URL.
+var ErrNoConnectionBaseURL = errors.New("federation connection base URL is not configured")
+
 type connectionStore interface {
 	Outbox() outbox.OutboxStore
 	Instance() instance.InstanceStore
@@ -47,25 +51,24 @@ type connectionStore interface {
 func (o Operations) Connections(ctx context.Context, key string) ([]Connection, error) {
 	var out []Connection
 	err := o.tx(ctx, func(ctx context.Context) error {
-		c, err := o.federated(ctx, key)
-		if err != nil {
-			return err
-		}
-		self, err := o.Membership.SelfBase(ctx)
-		if err != nil {
+		c, self, err := o.connectionConfig(ctx, key)
+		if err != nil || c.Class != repo.Federated {
 			return err
 		}
 		st, ok := o.Membership.Store.(connectionStore)
 		if !ok {
 			return fmt.Errorf("federation connection status store: %w", kernel.ErrStore)
 		}
-		id, err := st.Instance().Get(ctx)
-		if err != nil {
-			return fmt.Errorf("federation connection identity: %w", err)
-		}
 		members, err := o.Membership.Store.Federation().Members(ctx, key)
 		if err != nil {
 			return fmt.Errorf("federated repository members: %w", err)
+		}
+		if len(members) == 0 {
+			return nil
+		}
+		id, err := st.Instance().Get(ctx)
+		if err != nil {
+			return fmt.Errorf("federation connection identity: %w", err)
 		}
 		head, err := st.Outbox().LastSeq(ctx, id.InstanceID, model.RepositoryStream(key))
 		if err != nil {
@@ -133,6 +136,28 @@ func (o Operations) Connections(ctx context.Context, key string) ([]Connection, 
 		return nil
 	})
 	return out, err
+}
+
+// connectionConfig classifies the repository before reading its base URL,
+// preserving the empty-response order at the source resource boundary.
+func (o Operations) connectionConfig(ctx context.Context, key string) (repo.Config, string, error) {
+	c, err := o.Repositories.Get(ctx, key)
+	switch {
+	case errors.Is(err, kernel.ErrNotFound):
+		return repo.Config{}, "", nil
+	case err != nil:
+		return repo.Config{}, "", fmt.Errorf("read repository %s: %w", key, err)
+	case c.Class != repo.Federated:
+		return c, "", nil
+	}
+	self, err := o.Membership.SelfBase(ctx)
+	if err != nil {
+		return c, "", err
+	}
+	if self == "" {
+		return c, "", ErrNoConnectionBaseURL
+	}
+	return c, self, nil
 }
 
 // connectionSync reads the bounded per-peer flags and the two request keys;

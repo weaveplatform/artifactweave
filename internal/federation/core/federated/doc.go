@@ -56,7 +56,9 @@
 // stamps are forgotten on local changes so a sender's authoritative full sync
 // reconciles divergence. Peer receiving-only grants and membership roles bind
 // every push, pull, blob fetch and snapshot. connectionStates reports mode
-// independently from health.
+// independently from health. After authorization, unknown/non-federated keys
+// return an empty list; an existing federation without a base URL selects
+// the source-backed empty 400 envelope.
 //
 // Planned: broader status and lag (decision 0022; plan P13, FED-05).
 //

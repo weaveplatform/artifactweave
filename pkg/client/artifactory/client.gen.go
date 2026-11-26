@@ -51378,13 +51378,14 @@ type GetFederationConnectionDetailsResponse struct {
 		MemberConnections *[]FederationConnection `json:"memberConnections,omitempty"`
 	}
 	// JSON400 the response for an HTTP 400 `application/json` response
-	JSON400 *ErrorResponse
+	JSON400 *struct {
+		// MemberConnections Optional within this object. Empty when the base URL is not configured.
+		MemberConnections *[]FederationConnection `json:"memberConnections,omitempty"`
+	}
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *ErrorResponse
 	// JSON403 the response for an HTTP 403 `application/json` response
 	JSON403 *ErrorResponse
-	// JSON404 the response for an HTTP 404 `application/json` response
-	JSON404 *ErrorResponse
 	// JSON405 the response for an HTTP 405 `application/json` response
 	JSON405 *ErrorResponse
 	// JSON429 the response for an HTTP 429 `application/json` response
@@ -51408,7 +51409,10 @@ func (r GetFederationConnectionDetailsResponse) GetJSON200() *struct {
 }
 
 // GetJSON400 returns the response for an HTTP 400 `application/json` response
-func (r GetFederationConnectionDetailsResponse) GetJSON400() *ErrorResponse {
+func (r GetFederationConnectionDetailsResponse) GetJSON400() *struct {
+	// MemberConnections Optional within this object. Empty when the base URL is not configured.
+	MemberConnections *[]FederationConnection `json:"memberConnections,omitempty"`
+} {
 	return r.JSON400
 }
 
@@ -51420,11 +51424,6 @@ func (r GetFederationConnectionDetailsResponse) GetJSON401() *ErrorResponse {
 // GetJSON403 returns the response for an HTTP 403 `application/json` response
 func (r GetFederationConnectionDetailsResponse) GetJSON403() *ErrorResponse {
 	return r.JSON403
-}
-
-// GetJSON404 returns the response for an HTTP 404 `application/json` response
-func (r GetFederationConnectionDetailsResponse) GetJSON404() *ErrorResponse {
-	return r.JSON404
 }
 
 // GetJSON405 returns the response for an HTTP 405 `application/json` response
@@ -93504,7 +93503,10 @@ func ParseGetFederationConnectionDetailsResponse(rsp *http.Response) (*GetFedera
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest ErrorResponse
+		var dest struct {
+			// MemberConnections Optional within this object. Empty when the base URL is not configured.
+			MemberConnections *[]FederationConnection `json:"memberConnections,omitempty"`
+		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -93523,13 +93525,6 @@ func ParseGetFederationConnectionDetailsResponse(rsp *http.Response) (*GetFedera
 			return nil, err
 		}
 		response.JSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest ErrorResponse
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 405:
 		var dest ErrorResponse

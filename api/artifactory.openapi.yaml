@@ -6542,13 +6542,20 @@ paths:
                       $ref: '#/components/schemas/FederationConnection'
                     type: array
                 type: object
-          description: Connection state per member.
+          description: Connection state per member. Unknown or non-federated repositories return an empty memberConnections array.
         '400':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: The request was malformed or a value is invalid.
+                description: Empty connection state when the federated instance has no configured base URL.
+                properties:
+                  memberConnections:
+                    description: Optional within this object. Empty when the base URL is not configured.
+                    items:
+                      $ref: '#/components/schemas/FederationConnection'
+                    type: array
+                type: object
+          description: The repository is federated but the base URL is not configured; memberConnections is empty.
         '401':
           content:
             application/json:
@@ -6561,13 +6568,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs.
-        '404':
-          description: The repository does not exist. This follows the federation error policy; the closed 7.x service's missing-repository answer is unverified.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          x-unverified: true
         '405':
           content:
             application/json:

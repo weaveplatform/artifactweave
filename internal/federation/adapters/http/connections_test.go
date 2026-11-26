@@ -38,7 +38,19 @@ func TestUnitConnectionStatesAdapter(t *testing.T) {
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"mode":"Receiving_Only"`) || !strings.Contains(w.Body.String(), `"status":"HEALTHY"`) {
 		t.Fatal(w.Code, w.Body.String())
 	}
-	for _, failure := range []error{kernel.ErrForbidden, federated.ErrNoRepository, kernel.ErrStore} {
+	a.Connections = connections{err: federated.ErrNoConnectionBaseURL}
+	response, err = a.GetFederationConnectionDetails(t.Context(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w = httptest.NewRecorder()
+	if err := response.VisitGetFederationConnectionDetailsResponse(w); err != nil {
+		t.Fatal(err)
+	}
+	if w.Code != http.StatusBadRequest || strings.TrimSpace(w.Body.String()) != `{"memberConnections":[]}` {
+		t.Fatal(w.Code, w.Body.String())
+	}
+	for _, failure := range []error{kernel.ErrForbidden, kernel.ErrStore} {
 		a.Connections = connections{err: failure}
 		if _, err := a.GetFederationConnectionDetails(t.Context(), req); err == nil {
 			t.Fatal("service error lost")

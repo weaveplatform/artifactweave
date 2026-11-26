@@ -43,6 +43,8 @@
 // FederationConnection DTO; receiver mode is independent of health. All
 // connection reads require a current administrator and collect at most the
 // nine remote members allowed by the ten-member federation limit.
+// Unknown/non-federated keys return 200 with an empty connection array; a
+// federation without a configured base URL returns 400 with that same envelope.
 //
 // # References
 //

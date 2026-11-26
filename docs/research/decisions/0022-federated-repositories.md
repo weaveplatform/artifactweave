@@ -99,6 +99,11 @@ copy (`configSync`); a member that cannot be reached is reported as unavailable 
   (`status: HEALTHY` when healthy). The mode field name is inferred and marked
   `x-unverified`; the receiving-only documentation states both values but does not
   publish the mode field name. Receiver mode is never substituted for health.
+- After authorization, `connectionStates` returns 200 with an empty
+  `memberConnections` array for an unknown or non-federated repository, before
+  checking the base URL. A federated repository without a configured base URL
+  returns 400 with the same empty envelope (7.161.26's
+  `FederatedStatusResource.java:232-243,293-295`). Store failures remain errors.
 - Receiver local changes remove any previous inbound conflict stamp without appending
   an event. A sender's full sync is authoritative on a receiver, including a normal
   request: it restores local deletes/changes and removes receiver-only additions.

@@ -6030,7 +6030,8 @@
     "handler": "internal/federation/adapters/http/connections.go: FederatedAPI.GetFederationConnectionDetails",
     "direct_calls": [
       "a.Connections.Connections",
-      "artgen.FederationConnectionStatus"
+      "artgen.FederationConnectionStatus",
+      "errors.Is"
     ],
     "review_family": "federation-member-connections",
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",

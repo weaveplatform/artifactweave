@@ -302,7 +302,7 @@ Paths are under `/artifactory/api/`. Line numbers are the `@Path` lines in
 | `GET v2/federation/status/repo/{repoKey}` and `.../{federatedKey}` | `FederatedStatusResourceV2.java:34`, `:41` | yes | P13 FED-05 | |
 | `GET federation/status/mirrorsLag`, `.../unavailableMirrors` | `FederatedStatusResource.java:91`, `:108` | yes | P13 FED-05 | Legacy monitoring, served |
 | `GET federation/status/stateList`, `.../stateSummary` | `:155`, `:183` | yes | P13 FED-05 | |
-| `GET federation/status/connectionStates/{repoKey}` | `:216` | yes | P13 FED-03 (connectionStates); FED-05 (other status) | Receiver `mode` reads `Receiving_Only` [I] field name; health remains `HEALTHY` when healthy |
+| `GET federation/status/connectionStates/{repoKey}` | `:216`, `:232-243`, `:293-295` | yes | P13 FED-03 (connectionStates); FED-05 (other status) | Unknown/non-federated: 200 empty `memberConnections`; federated without a base URL: 400 with the same empty envelope. Receiver `mode` reads `Receiving_Only` [I] field name; health remains `HEALTHY` when healthy |
 | `GET federation/rtfs` | `FederatedRepoResource.java:682` | no | P13 FED-05 | 200 `text/plain` `true` |
 | `GET federation/migration/status` | `:820` | no | P13 FED-05 | 200 `text/plain` `MIGRATION_COMPLETED` |
 | `PUT federation/rtfs`, `PUT federation/migration`, `PUT federation/migration/status/verbose` | `:800`, `:836`, `:1011` | no | Deviation (FED-05) | 400 "Access denied: This endpoint is restricted to migration tool calls only.", to every caller |
@@ -511,9 +511,12 @@ Posted on [#216](https://github.com/weaveplatform/artifactweave/issues/216) for 
     documentation publishes `Receiving_Only` as the target mode separately from
     connection health but its API schema has no mode property. Registered on
     [#216](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-7198643299).
-13. A missing repository in `connectionStates` returns 404 under artifactweave's
-    existing federation error policy; the closed 7.x service's answer is unverified.
-    Its response is marked `x-unverified` and recorded in the same #216 comparison.
+13. **Superseded/resolved by source:** the earlier missing-repository 404 inference
+    is retracted. `FederatedStatusResource.java:232-234,293-295` returns 200 with
+    empty `memberConnections` for unknown or non-federated repositories, before
+    checking the base URL; `:237-243` returns 400 with that empty envelope for a
+    federated repository without a configured base URL. The mode-field inference
+    in item 12 remains open. The existing #216 comparison records this correction.
 
 14. When a failed binary first appears in the list: the public list documentation mentions
     a default maximum of ten attempts without defining visibility timing. artifactweave

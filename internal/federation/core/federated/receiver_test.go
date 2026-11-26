@@ -231,8 +231,13 @@ func TestUnitReceiverConnectionModeAndHealth(t *testing.T) {
 	if err != nil || rows[0].Status != "ERROR" {
 		t.Fatalf("failed send: %+v %v", rows, err)
 	}
-	if _, err := ops.Connections(ctx, "missing"); !errors.Is(err, federated.ErrNoRepository) {
-		t.Fatal(err)
+	for _, key := range []string{"missing", "local", "remote", "virtual"} {
+		if key != "missing" {
+			f.repos.values[key] = repo.Config{Key: key, Class: repo.Class(key)}
+		}
+		if got, err := ops.Connections(ctx, key); err != nil || len(got) != 0 {
+			t.Fatalf("non-federated connections %s: %+v, %v", key, got, err)
+		}
 	}
 	ops.Authorize = func(context.Context) error { return kernel.ErrForbidden }
 	if _, err := ops.Connections(ctx, "missing"); !errors.Is(err, kernel.ErrForbidden) {
@@ -301,6 +306,32 @@ func TestUnitReceiverConnectionProgressStates(t *testing.T) {
 		t.Fatal(err)
 	}
 	status("N/A")
+}
+
+func TestUnitConnectionStatesEmptyAndMissingBase(t *testing.T) {
+	f, ops := fullSyncOps(t)
+	ops.Membership.BaseURL = ""
+	for _, class := range []repo.Class{repo.Local, repo.Remote, repo.Virtual} {
+		f.repos.values[string(class)] = repo.Config{Key: string(class), Class: class}
+	}
+	for _, key := range []string{"missing", "local", "remote", "virtual"} {
+		if got, err := ops.Connections(t.Context(), key); err != nil || len(got) != 0 {
+			t.Fatalf("empty connection state before base lookup for %s: %+v, %v", key, got, err)
+		}
+	}
+	if _, err := ops.Connections(t.Context(), "fed"); !errors.Is(err, federated.ErrNoConnectionBaseURL) {
+		t.Fatalf("missing connection base: %v", err)
+	}
+	f.repos.getErr = kernel.ErrStore
+	if _, err := ops.Connections(t.Context(), "missing"); !errors.Is(err, kernel.ErrStore) {
+		t.Fatalf("repository read error concealed as empty: %v", err)
+	}
+	ops.Authorize = func(context.Context) error { return kernel.ErrForbidden }
+	for _, key := range []string{"missing", "local", "fed"} {
+		if _, err := ops.Connections(t.Context(), key); !errors.Is(err, kernel.ErrForbidden) {
+			t.Fatalf("authorization did not precede repository access for %s: %v", key, err)
+		}
+	}
 }
 
 // Authority failures must not allow a local change to enter the stream or

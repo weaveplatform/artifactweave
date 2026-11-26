@@ -2,7 +2,9 @@ package federationhttp
 
 import (
 	"context"
+	"errors"
 
+	"github.com/weaveplatform/artifactweave/internal/federation/core/federated"
 	artgen "github.com/weaveplatform/artifactweave/internal/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
@@ -17,6 +19,10 @@ func (a FederatedAPI) GetFederationConnectionDetails(
 		return nil, apierror.ErrNotImplemented
 	}
 	rows, err := a.Connections.Connections(ctx, req.RepoKey)
+	if errors.Is(err, federated.ErrNoConnectionBaseURL) {
+		empty := []artgen.FederationConnection{}
+		return artgen.GetFederationConnectionDetails400JSONResponse{MemberConnections: &empty}, nil
+	}
 	if err != nil {
 		return nil, federatedError(ctx, req.RepoKey, err)
 	}
