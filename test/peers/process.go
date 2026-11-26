@@ -54,25 +54,36 @@ func RunInstance(t *testing.T) {
 	}
 }
 
-// TestCommand returns a command that runs one test of this test binary, the
-// way Start runs InstanceTest: with the binary's -test.gocoverdir, so a
-// -cover run counts the process's coverage with its own, and env added to
-// this process's environment.
-func TestCommand(ctx context.Context, test string, env ...string) (*exec.Cmd, error) {
+// TestCommand runs one test of this binary with env added to its environment.
+// Call collect after the command exits, including a failed command: it moves
+// the child's isolated coverage into the parent's profile and reports any
+// collection failure separately from the child's exit status.
+func TestCommand(ctx context.Context, test string, env ...string) (*exec.Cmd, func() error, error) {
+	dir := ""
+	if f := flag.Lookup("test.gocoverdir"); f != nil {
+		dir = f.Value.String()
+	}
+	return testCommand(ctx, test, dir, env...)
+}
+
+func testCommand(ctx context.Context, test, coverDir string, env ...string) (*exec.Cmd, func() error, error) {
 	executable, err := os.Executable()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	args := []string{"-test.run=^" + test + "$", "-test.count=1", "-test.v"}
-	// go test -cover hands the binary a -test.gocoverdir it later reads
-	// every counter file from, so the processes' counters join the
-	// parent's profile; without it a process would write none.
-	if f := flag.Lookup("test.gocoverdir"); f != nil && f.Value.String() != "" {
-		args = append(args, "-test.gocoverdir="+f.Value.String())
+	collect := func() error { return nil }
+	if coverDir != "" {
+		dir, err := os.MkdirTemp(coverDir, "child-")
+		if err != nil {
+			return nil, nil, err
+		}
+		args = append(args, "-test.gocoverdir="+dir)
+		collect = func() error { return collectCoverage(coverDir, dir) }
 	}
 	cmd := exec.CommandContext(ctx, executable, args...)
 	cmd.Env = append(os.Environ(), env...)
-	return cmd, nil
+	return cmd, collect, nil
 }
 
 // startProcess starts InstanceTest over the configuration at path, with its
@@ -81,7 +92,7 @@ func TestCommand(ctx context.Context, test string, env ...string) (*exec.Cmd, er
 // its result.
 func startProcess(log *os.File, path string, done chan struct{}, exit *error) (io.WriteCloser, func(), error) {
 	ctx, kill := context.WithCancel(context.Background())
-	cmd, err := TestCommand(ctx, InstanceTest, instanceConfigEnv+"="+path)
+	cmd, collect, err := TestCommand(ctx, InstanceTest, instanceConfigEnv+"="+path)
 	if err != nil {
 		kill()
 		_ = log.Close()
@@ -95,10 +106,10 @@ func startProcess(log *os.File, path string, done chan struct{}, exit *error) (i
 	if err != nil {
 		kill()
 		_ = log.Close()
-		return nil, nil, errors.Join(errors.New("start instance process"), err)
+		return nil, nil, errors.Join(errors.New("start instance process"), err, collect())
 	}
 	go func() {
-		*exit = cmd.Wait()
+		*exit = errors.Join(cmd.Wait(), collect())
 		_ = log.Close()
 		kill()
 		close(done)

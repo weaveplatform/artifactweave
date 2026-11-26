@@ -221,6 +221,21 @@ jobs:
             make test UNIT_PKGS="$UNIT_PACKAGES" FUZZ_PKGS="$FUZZ_PACKAGES" UNIT_RUN="$UNIT_RUN" COVERPKG="$FORMAT_COVERPKG"
           fi
 
+      - name: Peer subprocess coverage isolation (set, count, atomic)
+        if: needs.impact.outputs.peers == 'true'
+        shell: bash
+        run: |
+          for mode in set count atomic; do
+            output="$RUNNER_TEMP/peer-coverage-$mode"
+            mkdir -p "$output"
+            flags=()
+            if [ "$mode" = atomic ]; then flags=(-race); fi
+            go test "${flags[@]}" -shuffle=on -count=1 -timeout=5m \
+              -cover -covermode="$mode" -coverpkg=github.com/weaveplatform/artifactweave/test/peers \
+              -run '^TestAccCoverageProcessIsolation$' ./test/peers \
+              -args -test.gocoverdir="$output"
+          done
+
       # The three jobs share this step, so the job id gives each artifact its
       # own name: cover-unit-linux, cover-unit-macos and cover-unit-windows.
       - name: Upload unit coverage

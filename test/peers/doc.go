@@ -30,7 +30,8 @@
 //     request that needs its own headers; Stop, which stops one instance;
 //     Close and Leftovers; on each Instance, Identity, Peer and SetPeerKey
 //     over its database.
-//   - Each instance's coverage in the binary's -test.gocoverdir.
+//   - Each instance's coverage, written in its own directory and collected
+//     into the binary's -test.gocoverdir after the instance exits.
 //   - Each instance's server log in a failing scenario's output.
 //   - The scenarios: the harness's own (harness_test.go) and pairing
 //     through service_trust (pairing_test.go), federated members and
