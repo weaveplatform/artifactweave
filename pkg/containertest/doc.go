@@ -42,7 +42,9 @@
 //     (postgres:17-alpine pinned by digest, mirror.gcr.io's copy as its
 //     second source), for a caller that must remove its container, such as
 //     the multi-instance harness in test/peers; and Removed, which proves the
-//     engine no longer has a container.
+//     engine no longer has a container. ResolvePostgresImage hands the same
+//     checked, digest-pinned image to the shared SQL harness, which chooses
+//     its own database and container lifetime.
 //   - Mailpit and RunMailpit: a real SMTP server with AUTH and STARTTLS over
 //     a certificate from a CA made per run (MailpitEndpoint.CA), with
 //     Messages and Clear over its message API, so mail tests check what an

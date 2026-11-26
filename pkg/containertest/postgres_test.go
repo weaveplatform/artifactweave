@@ -45,3 +45,32 @@ func TestAccPostgresIsRemovedByItsStop(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// TestAccPostgresStartsFromItsCopy reaches the pinned image through its
+// second source when the first source cannot resolve, then uses that image
+// to start a server and execute a query.
+func TestAccPostgresStartsFromItsCopy(t *testing.T) {
+	RequireLinux(t)
+	ctx := t.Context()
+	image, err := requireImage(ctx, "unavailable.invalid/library/postgres@"+postgresDigest, postgresSources[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if image != postgresSources[1] {
+		t.Fatalf("image %s, want the second source %s", image, postgresSources[1])
+	}
+	ep, stop, err := runPostgres(ctx, image)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(stop)
+	conn, err := pgx.Connect(ctx, ep.DSN)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = conn.Close(context.Background()) }()
+	var value int
+	if err := conn.QueryRow(ctx, "SELECT 1").Scan(&value); err != nil || value != 1 {
+		t.Fatalf("query = %d (%v), want 1", value, err)
+	}
+}
