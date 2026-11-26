@@ -3,7 +3,10 @@ package containertest
 import (
 	"context"
 	"errors"
+	"flag"
 	"net"
+	"os"
+	"os/exec"
 	"sync"
 	"testing"
 	"time"
@@ -78,6 +81,29 @@ func TestAccSkipUnlessSkipsOnSilentEngine(t *testing.T) {
 // that accepts connections and never answers, the state #458 found Docker
 // Desktop in, and requires the real check to give up at the deadline.
 func TestAccLinuxEngineBoundedOnSilentSocket(t *testing.T) {
+	const child = "ARTIFACTWEAVE_TEST_SILENT_ENGINE"
+	if os.Getenv(child) != "1" {
+		// testcontainers caches its Docker host across calls, so changing the
+		// environment only isolates the silent engine in a fresh process.
+		executable, err := os.Executable()
+		if err != nil {
+			t.Fatal(err)
+		}
+		ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+		defer cancel()
+		args := []string{"-test.run=^TestAccLinuxEngineBoundedOnSilentSocket$", "-test.count=1", "-test.v"}
+		if f := flag.Lookup("test.gocoverdir"); f != nil && f.Value.String() != "" {
+			args = append(args, "-test.gocoverdir="+f.Value.String())
+		}
+		cmd := exec.CommandContext(ctx, executable, args...)
+		cmd.Env = append(os.Environ(), child+"=1")
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("silent engine process: %v\n%s", err, output)
+		}
+		t.Logf("%s", output)
+		return
+	}
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -120,7 +146,11 @@ func TestAccLinuxEngineBoundedOnSilentSocket(t *testing.T) {
 	if !errors.Is(err, errNoAnswer) {
 		t.Fatalf("error %v, want %v", err, errNoAnswer)
 	}
-	if took := time.Since(start); took > timeout+2*time.Second {
+	took := time.Since(start)
+	if took > timeout+2*time.Second {
 		t.Fatalf("took %s with a %s deadline", took, timeout)
+	}
+	if took < timeout {
+		t.Fatalf("gave up after %s, before the %s deadline", took, timeout)
 	}
 }
