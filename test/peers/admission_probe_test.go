@@ -1,6 +1,7 @@
 package peers_test
 
 import (
+	"net/http"
 	"strconv"
 	"testing"
 
@@ -12,7 +13,13 @@ func TestAccAdmissionDeadlineProbe(t *testing.T) {
 	for n := range 8 {
 		t.Run(strconv.Itoa(n), func(t *testing.T) {
 			t.Parallel()
-			testFederatedFormats(t, peers.SQLite)
+			_, all := federation(t, peers.SQLite)
+			federate(t, all, "fed-maven", "maven")
+			federate(t, all, "fed-npm", "npm")
+			federate(t, all, "fed-docker", "docker")
+			const pom = `<project><modelVersion>4.0.0</modelVersion><groupId>com.example</groupId><artifactId>lib</artifactId><version>1.0</version></project>`
+			do(t, all[1], http.MethodPut, "/artifactory/fed-maven/com/example/lib/1.0/lib-1.0.pom", pom, http.StatusCreated)
+			do(t, all[1], http.MethodPut, "/artifactory/fed-maven/com/example/lib/1.0/lib-1.0.jar", "jar", http.StatusCreated)
 		})
 	}
 }
