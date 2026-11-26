@@ -37,7 +37,8 @@
 //     Applied, LockApplied and SetApplied for the receiver's; and RecordFailedFetch,
 //     FailedFetches and ClearFailedFetch for failed blob fetches;
 //     RetryFailedFetch updates an existing failed task without recreating
-//     an operator-deleted one, and ResetFailedFetch resets replay attempts.
+//     an operator-deleted one, ResetFailedFetch resets replay attempts, and
+//     ClearFailedFetches clears one ended stream lifetime without listing rows.
 //   - HLC, with Compare, Next, Merge and String, and ParseHLC with its
 //     sentinel ErrInvalidHLC.
 //   - OutboxEntry; PeerCursor, with Behind; AppliedMarker, with Expect; and

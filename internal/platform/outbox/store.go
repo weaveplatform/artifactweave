@@ -79,4 +79,8 @@ type OutboxStore interface {
 	// ClearFailedFetch removes one after a successful retry;
 	// kernel.ErrNotFound when there is none.
 	ClearFailedFetch(ctx context.Context, stream, sha256 string) error
+	// ClearFailedFetches drops every failed task of one nonempty stream,
+	// when its repository lifetime ends. None there is not an error;
+	// kernel.ErrInvalid for an empty stream, so no call clears all streams.
+	ClearFailedFetches(ctx context.Context, stream string) error
 }

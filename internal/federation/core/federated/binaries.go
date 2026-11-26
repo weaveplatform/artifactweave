@@ -40,8 +40,9 @@ type FailedBinary struct {
 type BinaryCounts struct{ FailedTasks int }
 
 // Binaries supplies FED-06's operator controls. Reads and deletions run under
-// current authority in one transaction. Replay queues fresh work atomically; workers fetch outside transactions;
-// the stream engine atomically publishes the still-current pending change
+// current authority in one transaction. Replay queues fresh work atomically;
+// workers fetch outside metadata transactions. The stream engine publishes the
+// still-current pending change in the transaction that claims its failed task
 // and claims its failure record, so an operator deletion cancels a retry.
 type Binaries struct {
 	Store        BinaryStore
@@ -203,7 +204,7 @@ func (b Binaries) Replay(ctx context.Context, key, sha1 string) (int, error) {
 				return fmt.Errorf("reset failed binary: %w", err)
 			}
 			if err := e.QueueFetch(ctx, model.RepositoryStream(key), task.SHA256); err != nil {
-				return err
+				return fmt.Errorf("replay failed binary of %s: %w", key, err)
 			}
 			n++
 		}

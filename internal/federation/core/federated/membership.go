@@ -14,6 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/federation/core/port"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
+	"github.com/weaveplatform/artifactweave/internal/platform/outbox"
 	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 	"github.com/weaveplatform/artifactweave/internal/platform/tx"
 	"github.com/weaveplatform/artifactweave/internal/platform/work"
@@ -39,6 +40,7 @@ type Store interface {
 	Peers() port.PeerStore
 	Federation() port.FederationStore
 	Stamps() port.ItemStampStore
+	Outbox() outbox.OutboxStore
 	Replications() port.ReplicationStore
 	Configs() configdoc.ConfigStore
 	Settings() settings.SettingsStore
@@ -245,8 +247,8 @@ func (m Membership) Reconcile(ctx context.Context, c repo.Config, sync bool) err
 		// The stamps settle a federated repository's changes; a local one
 		// has none to settle, and should it be federated again, its
 		// changes start from what it holds then.
-		if err := m.Store.Stamps().Clear(ctx, c.Key); err != nil {
-			return fmt.Errorf("clear federated repository stamps: %w", err)
+		if err := m.clearContent(ctx, c.Key); err != nil {
+			return err
 		}
 	}
 	if m.Changed != nil {
@@ -283,8 +285,8 @@ func sameMembers(a, b []model.FederationMember) bool {
 	})
 }
 
-// Clear drops a repository's members and its conflict-rule stamps, when
-// it is deleted, created anew or converted to a local repository.
+// Clear drops a repository's members, conflict-rule stamps and failed fetches,
+// when it is deleted, created anew or converted to a local repository.
 func (m Membership) Clear(ctx context.Context, key string) error {
 	before, err := m.Store.Federation().Members(ctx, key)
 	if err != nil {
@@ -296,8 +298,15 @@ func (m Membership) Clear(ctx context.Context, key string) error {
 	if err := m.drop(ctx, key, before, nil); err != nil {
 		return err
 	}
+	return m.clearContent(ctx, key)
+}
+
+func (m Membership) clearContent(ctx context.Context, key string) error {
 	if err := m.Store.Stamps().Clear(ctx, key); err != nil {
 		return fmt.Errorf("clear federated repository stamps: %w", err)
+	}
+	if err := m.Store.Outbox().ClearFailedFetches(ctx, model.RepositoryStream(key)); err != nil {
+		return fmt.Errorf("clear federated repository failed binaries: %w", err)
 	}
 	return nil
 }

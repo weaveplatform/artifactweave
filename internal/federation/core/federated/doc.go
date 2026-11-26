@@ -46,7 +46,9 @@
 // with repository task counts for administrators and a Read-authorized
 // repoState projection. Replay never performs network I/O in a metadata
 // transaction and never publishes a superseded change or an operator-cancelled
-// task. A normal full sync repairs same-stamp pending content too.
+// task. A normal full sync repairs same-stamp pending content too. Repository
+// reset or class exit clears failed rows with the pending stamps and members
+// in their transaction, so a new lifetime exposes no previous failed state.
 //
 // Planned: status and lag (decision 0022; plan P13, FED-05).
 //

@@ -35,7 +35,8 @@ func binaryFixture(t *testing.T) (federated.Binaries, store) {
 			RecordFailedFetch(t.Context(), outbox.FailedBlobFetch{Stream: "repo:fed", RepoKey: "fed", SHA256: sha, SHA1: fmt.Sprintf("%040x", i+1), FirstFailed: t0}); err != nil {
 			t.Fatal(err)
 		}
-		if err := s.Stamps().Record(t.Context(), model.ItemStamp{RepoKey: "fed", Path: fmt.Sprint("file", i), SHA256: sha, Pending: []byte(fmt.Sprintf(`{"path":"file%d","actual":{"sha1":"%040x"}}`, i, i+1))}); err != nil {
+		if err := s.Stamps().
+			Record(t.Context(), model.ItemStamp{RepoKey: "fed", Path: fmt.Sprint("file", i), SHA256: sha, Pending: []byte(fmt.Sprintf(`{"path":"file%d","actual":{"sha1":"%040x"}}`, i, i+1))}); err != nil {
 			t.Fatal(err)
 		}
 	}

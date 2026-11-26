@@ -414,6 +414,7 @@
       "execution_options_test.go",
       "execution_restart_test.go",
       "execution_runtime_test.go",
+      "failed_binaries_lifetime_test.go",
       "federated_test.go",
       "pull_catalog_test.go",
       "pull_failures_test.go",

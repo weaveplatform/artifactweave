@@ -474,10 +474,10 @@ func testWorkExpedite(t *testing.T, s Store) {
 	if !before.NotBefore.Equal(storekit.Want(storekit.At(99))) {
 		t.Fatalf("ordinary enqueue lost backoff: %+v, want %v", before, storekit.At(99))
 	}
-	rollback := errors.New("rollback replay")
+	rollback := errReplayRollback
 	err = s.Tx(ctx, func(ctx context.Context) error {
 		if err := q.Expedite(ctx, kind, key, storekit.At(4)); err != nil {
-			return err
+			return fmt.Errorf("expedite replay fixture: %w", err)
 		}
 		return rollback
 	})
@@ -519,3 +519,5 @@ func testWorkExpedite(t *testing.T, s Store) {
 	}
 	storekit.WantErr(t, q.Complete(ctx, kind, key, active.Generation, storekit.At(8)), kernel.ErrConflict)
 }
+
+var errReplayRollback = errors.New("rollback replay")

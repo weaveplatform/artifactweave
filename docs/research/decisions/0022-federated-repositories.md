@@ -225,7 +225,12 @@ them against a live 7.x in P19):
   A failed in-flight retry
   updates only an existing row and cannot recreate a deleted task. Deleting a task
   preserves the applied cursor and pending conflict stamp: the content stays absent
-  until a newer event or full sync. A normal full sync reconciles a same-stamp pending
+  until a newer event or full sync. Repository deletion/recreation and exit from
+  the federated class clear the repository stream's failed rows in the same
+  transaction as its pending stamps and membership, using a stream-scoped bulk
+  deletion. Rollback retains them and other streams are untouched. Queued old
+  retries then have no failed task to publish into the new repository lifetime.
+  A normal full sync reconciles a same-stamp pending
   item too, rather than mistaking metadata delivery for complete content delivery.
 - `binaries/tasks/{repoKey}` and `status/repoState/{repoKey}/binaries/` project
   `{failedTasks: <count>}` from the repository's failed-fetch records. Their DTO is

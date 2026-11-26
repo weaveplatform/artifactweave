@@ -3,6 +3,7 @@ package sql
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -324,6 +325,14 @@ func (o outboxStore) FailedFetches(
 func (o outboxStore) ClearFailedFetch(ctx context.Context, stream, sha256 string) error {
 	return o.s.ExecOne(ctx, "clear failed fetch "+stream+" "+sha256,
 		"DELETE FROM failed_blob_fetches WHERE stream = ? AND sha256 = ?", stream, sha256)
+}
+
+func (o outboxStore) ClearFailedFetches(ctx context.Context, stream string) error {
+	if stream == "" {
+		return fmt.Errorf("failed fetch stream is required: %w", kernel.ErrInvalid)
+	}
+	_, err := o.s.Exec(ctx, "clear failed fetches of "+stream, "DELETE FROM failed_blob_fetches WHERE stream = ?", stream)
+	return err
 }
 
 func (o outboxStore) RetryFailedFetch(ctx context.Context, stream, sha256, reason string) error {
