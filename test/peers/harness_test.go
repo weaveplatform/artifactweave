@@ -165,11 +165,14 @@ const failingScenario = "ARTIFACTWEAVE_PEERS_DELIBERATE_FAILURE"
 // test's, and requires its output to carry each instance's server log.
 func TestAccPeersFailurePrintsEachServerLog(t *testing.T) {
 	t.Parallel()
-	cmd, err := peers.TestCommand(t.Context(), "TestAccPeersDeliberateFailure", failingScenario+"=1")
+	cmd, collect, err := peers.TestCommand(t.Context(), "TestAccPeersDeliberateFailure", failingScenario+"=1")
 	if err != nil {
 		t.Fatal(err)
 	}
 	out, err := cmd.CombinedOutput()
+	if collectErr := collect(); collectErr != nil {
+		t.Fatalf("collect failing scenario coverage: %v", collectErr)
+	}
 	if err == nil {
 		t.Fatalf("the deliberately failing scenario passed:\n%s", out)
 	}
