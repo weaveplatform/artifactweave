@@ -141,7 +141,7 @@ func TestUnitFullSyncFailuresSurface(t *testing.T) {
 		// Blobs.BeginUpload is left out: a fetch that cannot be stored is a
 		// failed binary, which TestUnitFullSyncFailedFetchCompletesWithErrors
 		// covers, not an error of the run.
-		"Peers.Get", "Instance.ID", "Blobs.Exists",
+		"Peers.Get", "Instance.ID", "Blobs.Stat",
 	}
 	for _, name := range names {
 		for skip := range 4 {

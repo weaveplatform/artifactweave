@@ -275,19 +275,19 @@ func TestUnitStreamPending(t *testing.T) {
 	if len(f.items.put) != 0 {
 		t.Fatalf("applied before the blob: %+v", f.items.put)
 	}
-	if size, ok, err := f.k.Pending(ctx, "repo:fed", sha1); err != nil || !ok || size != 3 {
-		t.Fatalf("pending = %d, %v, %v", size, ok, err)
+	if sizes, err := f.k.Pending(ctx, "repo:fed", sha1); err != nil || !slices.Equal(sizes, []int64{3}) {
+		t.Fatalf("pending = %v, %v", sizes, err)
 	}
 	if held, _ := f.k.References(ctx, "repo:fed", sha1); held {
 		t.Fatal("pending content referenced")
 	}
-	if err := f.k.Publish(ctx, "repo:fed", sha1); err != nil {
+	if err := f.k.Publish(ctx, "repo:fed", sha1, 3); err != nil {
 		t.Fatal(err)
 	}
 	if len(f.items.put) != 1 || f.items.put[0].Path != "w" {
 		t.Fatalf("published = %+v", f.items.put)
 	}
-	if _, ok, _ := f.k.Pending(ctx, "repo:fed", sha1); ok {
+	if sizes, _ := f.k.Pending(ctx, "repo:fed", sha1); len(sizes) > 0 {
 		t.Fatal("still pending")
 	}
 	if held, _ := f.k.References(ctx, "repo:fed", sha1); !held {
@@ -300,14 +300,14 @@ func TestUnitStreamPending(t *testing.T) {
 	if err := f.k.Apply(ctx, entry(federated.EventDelete, "c", 400, `{"path":"v"}`), true); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.k.Publish(ctx, "repo:fed", sha1); err != nil || len(f.items.put) != 1 {
+	if err := f.k.Publish(ctx, "repo:fed", sha1, 3); err != nil || len(f.items.put) != 1 {
 		t.Fatalf("publish after delete = %v, %+v", err, f.items.put)
 	}
 	for _, stream := range []string{"test:x", "repo:"} {
-		if _, ok, err := f.k.Pending(ctx, stream, sha1); ok || err != nil {
-			t.Fatalf("%s pending = %v, %v", stream, ok, err)
+		if sizes, err := f.k.Pending(ctx, stream, sha1); len(sizes) > 0 || err != nil {
+			t.Fatalf("%s pending = %v, %v", stream, sizes, err)
 		}
-		if err := f.k.Publish(ctx, stream, sha1); err != nil {
+		if err := f.k.Publish(ctx, stream, sha1, 3); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -347,17 +347,17 @@ func TestUnitStreamApplySkips(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.items.err = kernel.ErrConflict
-	if err := f.k.Publish(ctx, "repo:fed", sha1); err != nil {
+	if err := f.k.Publish(ctx, "repo:fed", sha1, 3); err != nil {
 		t.Fatal(err)
 	}
-	if _, ok, _ := f.k.Pending(ctx, "repo:fed", sha1); ok {
+	if sizes, _ := f.k.Pending(ctx, "repo:fed", sha1); len(sizes) > 0 {
 		t.Fatal("skipped change still pending")
 	}
 	f.items.err = kernel.ErrStore
 	if err := f.k.Apply(ctx, entry(federated.EventPut, "b", 9, `{"path":"r"}`), false); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.k.Publish(ctx, "repo:fed", sha1); !errors.Is(err, kernel.ErrStore) {
+	if err := f.k.Publish(ctx, "repo:fed", sha1, 3); !errors.Is(err, kernel.ErrStore) {
 		t.Fatalf("publish with a failing store = %v", err)
 	}
 	f.items.err = kernel.ErrStore

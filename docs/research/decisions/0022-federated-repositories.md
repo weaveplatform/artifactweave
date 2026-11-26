@@ -217,7 +217,14 @@ them against a live 7.x in P19):
   An unavailable source remains recorded for automatic retry; `replayTasks` counts
   tasks marked for replay. An enqueue failure rolls back every reset and enqueue
   in that request. The engine publishes only still-current pending
-  changes. Publication claims the failed row in its metadata transaction, so a task
+  changes whose declared size matches the validated content, including cached blobs.
+  When pending paths name one digest with inconsistent sizes, matching paths publish
+  and other paths stay pending. A conditional update claims the existing failed row
+  in the publication transaction; its original failure time is retained and the
+  attempt count increases if unmatched paths remain. The shared task is cleared only
+  when no path still waits, with the remaining-pending check in that same transaction.
+  A partial retry reports unavailable content after committing matching paths, so
+  automatic backoff does not roll those paths back. The claim also ensures a task
   deleted while its download is in flight cannot publish. Publication rechecks current
   Receive authority for the stream: any still-authorized member from the prefetch
   candidate set permits digest-verified content to publish; if every candidate loses

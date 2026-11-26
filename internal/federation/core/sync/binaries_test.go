@@ -71,9 +71,12 @@ type changingPending struct {
 	calls int
 }
 
-func (k *changingPending) Pending(context.Context, string, string) (int64, bool, error) {
+func (k *changingPending) Pending(context.Context, string, string) ([]int64, error) {
 	k.calls++
-	return 3, k.calls > 1, nil
+	if k.calls > 1 {
+		return []int64{3}, nil
+	}
+	return nil, nil
 }
 
 func TestUnitObsoleteFailureCleanupKeepsNewlyPendingTask(t *testing.T) {

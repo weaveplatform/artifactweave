@@ -61,7 +61,7 @@ var (
 	ErrFetchUnavailable = errors.New("content is unavailable from the stream's peers")
 	// errApplied reports an entry another transaction applied first.
 	errApplied = errors.New("entry already applied")
-	// errSize reports fetched content of another size than its entry gives.
+	// errSize reports content of another size than its reference gives.
 	errSize = errors.New("blob size mismatch")
 	// errAhead reports a peer that expects entries this outbox never held.
 	errAhead = errors.New("peer is ahead of this outbox")

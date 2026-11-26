@@ -144,8 +144,11 @@ type selectiveBlobs struct {
 	held string
 }
 
-func (b selectiveBlobs) Exists(_ context.Context, sha string) (bool, error) {
-	return sha == b.held, nil
+func (b selectiveBlobs) Stat(_ context.Context, sha string) (blob.Info, error) {
+	if sha != b.held {
+		return blob.Info{}, blob.ErrNotFound
+	}
+	return blob.Info{Digests: blob.Digests{SHA256: sha}}, nil
 }
 
 func TestUnitReplayQueuesEveryTaskAndResetsAttempts(t *testing.T) {

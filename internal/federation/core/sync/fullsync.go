@@ -283,17 +283,23 @@ func (e *Engine) snapshotPage(ctx context.Context, p model.Peer, rc Reconciler, 
 	return nil
 }
 
-// fetched is, per digest a snapshot page refers to, whether the receiver
-// now holds the content, and if not why.
-type fetched map[string]blobFetch
+// fetched is, per digest and declared size a snapshot page refers to,
+// whether the receiver holds the expected content, and if not why.
+type fetched map[blobReference]blobFetch
+
+type blobReference struct {
+	sha256 string
+	size   int64
+}
 
 type blobFetch struct {
 	held   bool
 	reason string
 }
 
-// fetchPage fetches the content ops refer to from p, once per digest,
-// outside any transaction.
+// fetchPage checks the content ops refer to from p, once per digest and
+// declared size, outside any transaction. Equal digests with different
+// sizes must not borrow each other's successful validation.
 func (e *Engine) fetchPage(ctx context.Context, p model.Peer, ops []op) (fetched, error) {
 	out := fetched{}
 	for _, o := range ops {
@@ -301,14 +307,15 @@ func (e *Engine) fetchPage(ctx context.Context, p model.Peer, ops []op) (fetched
 		if o.discard || sha == "" {
 			continue
 		}
-		if _, seen := out[sha]; seen {
+		ref := blobReference{sha, o.entry.BlobSize}
+		if _, seen := out[ref]; seen {
 			continue
 		}
 		ok, reason, err := e.ensureBlob(ctx, []model.Peer{p}, sha, o.entry.BlobSize)
 		if err != nil {
 			return nil, err
 		}
-		out[sha] = blobFetch{held: ok, reason: reason}
+		out[ref] = blobFetch{held: ok, reason: reason}
 	}
 	return out, nil
 }
@@ -328,14 +335,15 @@ func (e *Engine) applyPage(
 		}
 		e.observe(o.entry.Time)
 		sha := o.entry.BlobSHA256
-		ok := sha == "" || got[sha].held
+		ref := blobReference{sha, o.entry.BlobSize}
+		ok := sha == "" || got[ref].held
 		if err := rc.Reconcile(ctx, origin, stream, o.entry, ok); err != nil {
 			return false, fmt.Errorf("reconcile %s of %s: %w", o.key, stream, err)
 		}
 		if ok {
 			continue
 		}
-		reason := got[sha].reason
+		reason := got[ref].reason
 		if reason == "" {
 			// Not in the diff before the transaction: the item changed
 			// since, so its content was never asked for.

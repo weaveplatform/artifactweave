@@ -196,6 +196,13 @@ func (o faultOutbox) RecordFailedFetch(ctx context.Context, v outbox.FailedBlobF
 	return o.OutboxStore.RecordFailedFetch(ctx, v) //nolint:wrapcheck // passed through
 }
 
+func (o faultOutbox) RetryFailedFetch(ctx context.Context, stream, sha256, reason string) error {
+	if err := o.f.check("Outbox.RetryFailedFetch"); err != nil {
+		return err
+	}
+	return o.OutboxStore.RetryFailedFetch(ctx, stream, sha256, reason) //nolint:wrapcheck // passed through
+}
+
 func (o faultOutbox) FailedFetches(ctx context.Context, s string) ([]outbox.FailedBlobFetch, error) {
 	if err := o.f.check("Outbox.FailedFetches"); err != nil {
 		return nil, err
@@ -223,11 +230,11 @@ type faultBlobs struct {
 	f *faultSet
 }
 
-func (b faultBlobs) Exists(ctx context.Context, sha256 string) (bool, error) {
-	if err := b.f.check("Blobs.Exists"); err != nil {
-		return false, err
+func (b faultBlobs) Stat(ctx context.Context, sha256 string) (blob.Info, error) {
+	if err := b.f.check("Blobs.Stat"); err != nil {
+		return blob.Info{}, err
 	}
-	return b.Store.Exists(ctx, sha256) //nolint:wrapcheck // passed through
+	return b.Store.Stat(ctx, sha256) //nolint:wrapcheck // passed through
 }
 
 func (b faultBlobs) Open(ctx context.Context, sha256 string) (io.ReadSeekCloser, blob.Info, error) {
@@ -271,18 +278,18 @@ func (k faultKind) References(ctx context.Context, s, sha256 string) (bool, erro
 	return k.Kind.References(ctx, s, sha256) //nolint:wrapcheck // passed through
 }
 
-func (k faultKind) Pending(ctx context.Context, s, sha256 string) (int64, bool, error) {
+func (k faultKind) Pending(ctx context.Context, s, sha256 string) ([]int64, error) {
 	if err := k.f.check("Kind.Pending"); err != nil {
-		return 0, false, err
+		return nil, err
 	}
 	return k.Kind.Pending(ctx, s, sha256) //nolint:wrapcheck // passed through
 }
 
-func (k faultKind) Publish(ctx context.Context, s, sha256 string) error {
+func (k faultKind) Publish(ctx context.Context, s, sha256 string, size int64) error {
 	if err := k.f.check("Kind.Publish"); err != nil {
 		return err
 	}
-	return k.Kind.Publish(ctx, s, sha256) //nolint:wrapcheck // passed through
+	return k.Kind.Publish(ctx, s, sha256, size) //nolint:wrapcheck // passed through
 }
 
 func (k faultKind) Apply(ctx context.Context, e outbox.OutboxEntry, held bool) error {
@@ -306,9 +313,9 @@ func TestUnitStoreFailuresSurface(t *testing.T) {
 	for _, name := range []string{
 		"Outbox.Append", "Outbox.Read", "Outbox.LastSeq", "Outbox.Prune", "Outbox.PutCursor",
 		"Outbox.Cursor", "Outbox.Applied", "Outbox.LockApplied", "Outbox.SetApplied",
-		"Outbox.RecordFailedFetch", "Outbox.FailedFetches", "Outbox.ClearFailedFetch",
+		"Outbox.RecordFailedFetch", "Outbox.RetryFailedFetch", "Outbox.FailedFetches", "Outbox.ClearFailedFetch",
 		"Peers.Get", "Resyncs.Flag", "Resyncs.Clear", "Instance.ID",
-		"Blobs.Exists", "Blobs.Open", "Kind.Streams", "Kind.Subscribers", "Kind.References",
+		"Blobs.Stat", "Blobs.Open", "Kind.Streams", "Kind.Subscribers", "Kind.References",
 		"Kind.Pending", "Kind.Publish", "Kind.Apply",
 	} {
 		for skip := range 4 {
