@@ -1,0 +1,12 @@
+# Private negative control, added only after both qualification revisions.
+resource "artifactory_federated_generic_repository" "unpaired" {
+  key   = "${var.name_prefix}-unpaired"
+  member {
+    url     = "${var.url}/artifactory/${var.name_prefix}-unpaired"
+    enabled = true
+  }
+  member {
+    url     = "https://unpaired.invalid/artifactory/${var.name_prefix}-unpaired"
+    enabled = true
+  }
+}

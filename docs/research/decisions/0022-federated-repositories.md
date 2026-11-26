@@ -264,6 +264,10 @@ resources of provider 12.11.14 whose local type artifactweave implements, listed
 [research 40 §9](../40-federated-repositories-7x.md#9-terraform-exit-set). It leaves out
 `docker_v1` (Docker Registry V1 is superseded) and `releasebundles` (no local
 implementation until P15); the provider has no federated `terraformbackend`.
+The consumer [federated reference](../../../deploy/artifactweave/terraform/federated-repositories/README.md)
+and its three-instance provider lane implement this configuration qualification. The lane
+requires successful `configSync` after both revisions and remote deletion on every member;
+its sanitized ledger is separate from content-convergence and phase-exit evidence.
 
 ## Rationale
 

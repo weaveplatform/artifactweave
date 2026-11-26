@@ -436,6 +436,16 @@ artifactweave also federates `pub`, `nix`, `machinelearning`, `bazelmodules`, `l
 and `agentpackages`, which have no federated provider resource. P13's multi-instance
 scenarios cover them through the repositories API, outside the Terraform exit.
 
+The consumer configuration is
+[`federated-repositories`](../../deploy/artifactweave/terraform/federated-repositories/README.md).
+The required provider lane uses three owned, mutually paired instances and checks both
+configuration revisions, empty refreshed plans and readbacks on every member. It checks
+all 70 provider `configSync` responses rather than accepting the provider's warning path,
+and verifies `cleanup_on_delete` on all members. The private negative-control configuration
+exercises section 10 separately. The sanitized `p13-provider-evidence.json` records the
+35 resource outcomes and exclusions; it contains neither state nor member credentials.
+This is configuration qualification; content convergence remains the multi-instance exit.
+
 ## 10. An unpaired member in a Terraform run
 
 This answers the "Federated repository plans" question in [12](12-open-questions.md).

@@ -23,6 +23,7 @@ empty plan and destroys it, so a reference that stops working fails the build (s
 | [general-security](terraform/general-security/README.md) | Anonymous access and the password encryption policy (`artifactory_general_security`), enforced on requests without credentials and on HTTP Basic logins | `url`, `access_token` |
 | [ldap-groups](terraform/ldap-groups/README.md) | Two LDAP group settings through the Access API (`artifactory_ldap_group_setting_v2`), over a disabled connection with an optional user search and manager password (`artifactory_ldap_setting_v2`) | `url`, `access_token` |
 | [trashcan](terraform/trashcan/README.md) | The trash can policy (`artifactory_trashcan_config`): whether deletes go to the trash can and how many days a collection pass keeps them | `url`, `access_token` |
+| [federated-repositories](terraform/federated-repositories/README.md) | All 35 implemented federated provider resource types, each with three paired members, two configuration revisions and remote cleanup | `url`, `access_token`, `member_urls` |
 
 Every name a reference creates (repository keys, users, groups, permissions, OIDC providers)
 is an input with a default you can keep or change. Each README follows

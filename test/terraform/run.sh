@@ -50,6 +50,7 @@ python3 -I "$here/check-cleanup.py" --inventory "$root"
 python3 -I "$here/check-general-security.py" --inventory "$root"
 python3 -I "$here/check-ldap-groups.py" --inventory "$root"
 python3 -I "$here/check-p12.py" --inventory "$root"
+python3 -I "$here/check-p13.py" --inventory "$root"
 scenarios=("$@")
 [ ${#scenarios[@]} -gt 0 ] || scenarios=(deploy/artifactweave/terraform/repositories)
 if [ -n "${TERRAFORM_WORK:-}" ]; then
@@ -76,6 +77,7 @@ export NO_PROXY="$fixture_no_proxy" no_proxy="$fixture_no_proxy"
 server=
 forwarder=
 server_ready=
+source "$here/federated-driver.sh"
 require_server() {
 	if ! kill -0 "$server" 2>/dev/null; then
 		local status=0
@@ -94,6 +96,7 @@ require_server() {
 		echo "Terraform fixture frontend is quarantined after connection ownership failure" >&2
 		exit 1
 	fi
+	require_federated_servers
 }
 # Direct fixture HTTP must neither use an ambient proxy nor proceed after
 # the owned server has stopped. Mirror downloads run before server is set.
@@ -110,6 +113,7 @@ curl() {
 }
 cleanup() {
 	rc=$?
+	federated_cleanup || rc=1
 	if [ -n "$forwarder" ]; then
 		kill -TERM "$forwarder" 2>/dev/null || true
 		wait "$forwarder" 2>/dev/null || true
@@ -117,7 +121,7 @@ cleanup() {
 	if [ -f "$work/forwarder.failed" ]; then rc=1; fi
 	if [ -n "$server" ]; then
 		kill -TERM "$server" 2>/dev/null || true
-		wait "$server" 2>/dev/null || true
+		wait "$server" 2>/dev/null || rc=1
 	fi
 	# Terraform reports only the status of a failed call. The error behind a
 	# 5xx is in the server log, which goes when the work directory does.
@@ -217,6 +221,7 @@ export TERRAFORM_CLI_VERSION
 port=${TERRAFORM_PORT:-18081}
 url="http://127.0.0.1:$port"
 password=terraform-admin
+federated_prepare
 mkdir -p "${GOCOVERDIR:-$work/cover}"
 # Terraform deletes up to ten resources at once (its default parallelism).
 # On SQLite each request-budget check is a write that waits behind those
@@ -773,6 +778,7 @@ for scenario in "${scenarios[@]}"; do
 	deploy/artifactweave/terraform/general-security) apply_general_security ;;
 	deploy/artifactweave/terraform/ldap-groups) apply_ldap_groups ;;
 	deploy/artifactweave/terraform/trashcan) apply_trashcan ;;
+	deploy/artifactweave/terraform/federated-repositories) apply_federated_repositories ;;
 	*)
 		echo "run.sh has no apply steps for $scenario" >&2
 		exit 1
@@ -782,6 +788,13 @@ for scenario in "${scenarios[@]}"; do
 	# wrote.
 	tf plan -detailed-exitcode
 	tf destroy -auto-approve
+	if [ "$scenario" = deploy/artifactweave/terraform/federated-repositories ]; then
+		python3 -I "$here/check-p13.py" --step destroy
+		python3 -I "$here/check-p13.py" --deleted
+		tf state list >"$work/p13-remaining-resources.txt"
+		test ! -s "$work/p13-remaining-resources.txt"
+		unset TF_VAR_description TF_VAR_name_prefix
+	fi
 	p12_step destroy
 	case $scenario in
 	deploy/artifactweave/terraform/configuration | deploy/artifactweave/terraform/reverse-proxy | deploy/artifactweave/terraform/ldap-groups)
@@ -831,3 +844,5 @@ done
 # run's persistent data, logs and retained evidence no fixture secret, and
 # only then is the sanitized provenance written beside the coverage.
 python3 -I "$here/check-p12.py" --complete "$root" "$mirror" "$work" "${GOCOVERDIR:-$work/cover}" "${scenarios[@]}"
+
+python3 -I "$here/check-p13.py" --complete "$root" "$mirror" "$work" "${GOCOVERDIR:-$work/cover}" "${scenarios[@]}"
