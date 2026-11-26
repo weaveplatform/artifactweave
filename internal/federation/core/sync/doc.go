@@ -65,11 +65,20 @@
 //     stream's last entry.
 //   - A failed blob fetch records a failed binary and queues its retry in
 //     the apply transaction; the position still advances, so later entries
-//     apply. The kind keeps the item pending, and Publish shows it unless a
-//     later entry deleted or replaced it. Operator replay resets attempts
-//     and queues immediate work without retry backoff. Publication rechecks the current Receive grant
-//     of at least one candidate source member. Successful retry claims the failed row in the
-//     publication transaction; a deletion that wins cancels publication. A
+//     apply. A stored digest is available only when its Stat size matches
+//     the reference. A mismatch preserves valid bytes and other references,
+//     and follows the same pending path as a downloaded size mismatch.
+//     Snapshot validation is shared only by equal digest-and-size pairs.
+//     Errors reading local blob metadata stop the apply instead of being
+//     recorded as failures of peer content. Publish shows only items whose
+//     declared size matches validated content, unless a later entry deleted
+//     or replaced them. Other sizes retain the shared failure task; matching
+//     items commit before the retry returns ErrFetchUnavailable for the rest.
+//     Operator replay resets attempts and queues immediate work without
+//     retry backoff. Publication rechecks the current Receive grant of at
+//     least one candidate source member. A conditional update claims the
+//     failed row in the publication transaction; a deletion that wins
+//     cancels publication. The row clears only when no item waits. A
 //     failed in-flight retry updates only an existing row, never recreates
 //     an operator-cancelled task. Obsolete cleanup claims the row and
 //     rechecks pending content before committing.

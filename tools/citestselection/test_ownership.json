@@ -408,6 +408,7 @@
       "system_health_test.go"
     ],
     "test/server/federation": [
+      "blob_size_test.go",
       "execution_destination_test.go",
       "execution_lease_test.go",
       "execution_limit_test.go",

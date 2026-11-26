@@ -357,9 +357,9 @@ func change(repoKey string, p payload, sha256 string, size int64) artifactsapi.I
 }
 
 // Publish applies the changes of the stream's repository that waited for
-// the blob sha256, now that it has arrived. One a later entry deleted or
-// replaced meanwhile no longer waits, so it is not among them.
-func (s Stream) Publish(ctx context.Context, stream, sha256 string) error {
+// the blob sha256 with the validated size. Other declared sizes stay pending.
+// One a later entry deleted or replaced meanwhile no longer waits.
+func (s Stream) Publish(ctx context.Context, stream, sha256 string, size int64) error {
 	k, ok := key(stream)
 	if !ok {
 		return nil
@@ -369,6 +369,9 @@ func (s Stream) Publish(ctx context.Context, stream, sha256 string) error {
 		return fmt.Errorf("items of %s pending %s: %w", k, sha256, err)
 	}
 	for _, w := range waiting {
+		if w.Size != size {
+			continue
+		}
 		var p payload
 		if err := json.Unmarshal(w.Pending, &p); err != nil {
 			return fmt.Errorf("pending change of %s:%s: %w", k, w.Path, err)
@@ -389,21 +392,23 @@ func (s Stream) Publish(ctx context.Context, stream, sha256 string) error {
 	return nil
 }
 
-// Pending reports whether a change of the stream's repository waits for
-// the blob sha256, and the size its entry gave.
-func (s Stream) Pending(ctx context.Context, stream, sha256 string) (int64, bool, error) {
+// Pending lists the distinct sizes declared by changes of the stream's
+// repository still waiting for the blob sha256, in ascending order.
+func (s Stream) Pending(ctx context.Context, stream, sha256 string) ([]int64, error) {
 	k, ok := key(stream)
 	if !ok {
-		return 0, false, nil
+		return nil, nil
 	}
 	waiting, err := s.Store.Stamps().PendingOn(ctx, k, sha256)
 	if err != nil {
-		return 0, false, fmt.Errorf("items of %s pending %s: %w", k, sha256, err)
+		return nil, fmt.Errorf("items of %s pending %s: %w", k, sha256, err)
 	}
-	if len(waiting) == 0 {
-		return 0, false, nil
+	sizes := make([]int64, 0, len(waiting))
+	for _, w := range waiting {
+		sizes = append(sizes, w.Size)
 	}
-	return waiting[0].Size, true, nil
+	slices.Sort(sizes)
+	return slices.Compact(sizes), nil
 }
 
 // FailedSHA1 supplies the pending content's SHA-1 for the failed-binary API.

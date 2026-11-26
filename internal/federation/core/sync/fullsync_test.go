@@ -513,10 +513,10 @@ func (p plain) Apply(ctx context.Context, e outbox.OutboxEntry, held bool) error
 	return p.k.Apply(ctx, e, held)
 }
 
-func (p plain) Publish(ctx context.Context, s, sha256 string) error {
-	return p.k.Publish(ctx, s, sha256)
+func (p plain) Publish(ctx context.Context, s, sha256 string, size int64) error {
+	return p.k.Publish(ctx, s, sha256, size)
 }
 
-func (p plain) Pending(ctx context.Context, s, sha256 string) (int64, bool, error) {
+func (p plain) Pending(ctx context.Context, s, sha256 string) ([]int64, error) {
 	return p.k.Pending(ctx, s, sha256)
 }

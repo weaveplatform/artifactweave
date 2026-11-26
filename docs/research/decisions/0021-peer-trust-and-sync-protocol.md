@@ -246,6 +246,19 @@ payload and, for content events, the blob sha256 and size.
   appears on that member only when a back-off retry or a replay (`binaries/failures/replay`)
   fetches the blob, and not at all if a later event has deleted or replaced it in the
   meantime.
+- Every content reference must match both its SHA-256 and declared byte size, including
+  when the digest is already stored. A cached size mismatch follows the failed-binary
+  path: the item stays pending and the applied position advances. Existing valid bytes
+  and other item references remain intact; downloading the same digest again cannot
+  repair an incorrect declared size. A failure to read this instance's blob metadata
+  instead stops the apply, so a local storage failure is not misreported as bad peer
+  content. Full-sync pages track validation by `(SHA-256, declared size)`, so entries
+  sharing a digest cannot borrow a different size's successful validation.
+  Retry checks all distinct sizes still pending for a digest and publishes only paths
+  matching its validated size. If other sizes remain, matching paths commit while the
+  shared failed task, its original failure time and incremented attempt count remain.
+  The retry reports unavailable content after that commit, allowing backoff for the
+  remaining paths. A later correct event can replace an invalid pending declaration.
 - Outbox entries are pruned once every subscribed peer has acknowledged them or once they
   are older than the retention window (seven days by default). A peer whose cursor falls
   behind the pruned range needs a full sync.

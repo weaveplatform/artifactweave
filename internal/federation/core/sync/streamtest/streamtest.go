@@ -186,9 +186,9 @@ func (k *Kind) Apply(ctx context.Context, e outbox.OutboxEntry, held bool) error
 	})
 }
 
-// Publish makes items still pending sha256 visible. An item deleted, or put
-// again with other content, since it was pending no longer is.
-func (k *Kind) Publish(ctx context.Context, stream, sha256 string) error {
+// Publish makes items still pending sha256 at the validated size visible.
+// An item deleted, or put again with other content, no longer waits.
+func (k *Kind) Publish(ctx context.Context, stream, sha256 string, size int64) error {
 	keys, err := k.Store.Settings().Keys(ctx)
 	if err != nil {
 		return fmt.Errorf("streamtest keys: %w", err)
@@ -200,7 +200,7 @@ func (k *Kind) Publish(ctx context.Context, stream, sha256 string) error {
 		}
 		if err := k.update(ctx, stream, origin, func(s *State) {
 			for name, it := range s.Items {
-				if it.Pending && it.SHA256 == sha256 {
+				if it.Pending && it.SHA256 == sha256 && it.Size == size {
 					it.Pending = false
 					s.Items[name] = it
 				}
@@ -212,11 +212,18 @@ func (k *Kind) Publish(ctx context.Context, stream, sha256 string) error {
 	return nil
 }
 
-// Pending reports whether an item of stream, of any origin, still waits
-// for the content, and the size its entry gave.
-func (k *Kind) Pending(ctx context.Context, stream, sha256 string) (int64, bool, error) {
-	it, ok, err := k.find(ctx, stream, func(it Item) bool { return it.Pending && it.SHA256 == sha256 })
-	return it.Size, ok, err
+// Pending lists the distinct sizes declared by items of stream, of any
+// origin, still waiting for the content.
+func (k *Kind) Pending(ctx context.Context, stream, sha256 string) ([]int64, error) {
+	var sizes []int64
+	_, _, err := k.find(ctx, stream, func(it Item) bool {
+		if it.Pending && it.SHA256 == sha256 {
+			sizes = append(sizes, it.Size)
+		}
+		return false
+	})
+	slices.Sort(sizes)
+	return slices.Compact(sizes), err
 }
 
 // References reports whether a visible item of stream, of any origin, has

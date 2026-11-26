@@ -26,8 +26,8 @@ const (
 )
 
 // Applier applies one stream kind's entries on the receiving instance.
-// Both methods run inside the engine's transaction, which also records the
-// applied position, so an entry and its position commit together.
+// Mutation methods run inside the engine's transaction, which also records
+// the applied position, so an entry and its position commit together.
 type Applier interface {
 	// Apply applies an entry from its origin. held reports whether the
 	// content a content entry refers to is in this instance's blob store;
@@ -37,14 +37,15 @@ type Applier interface {
 	// applied.
 	Apply(ctx context.Context, e outbox.OutboxEntry, held bool) error
 	// Publish makes visible the items of stream that were pending the blob
-	// sha256, now that it has arrived, except those that a later entry has
-	// deleted or replaced meanwhile, which stay as that entry left them.
-	Publish(ctx context.Context, stream, sha256 string) error
-	// Pending reports whether an item of stream still waits for the blob
-	// sha256, and the size its entry gave, which the fetch holds the
-	// content to. None waits once later entries have deleted or replaced
-	// every item that did, and the failed binary is then cleared unfetched.
-	Pending(ctx context.Context, stream, sha256 string) (size int64, ok bool, err error)
+	// sha256 whose declared size matches the validated size. Items a later
+	// entry deleted or replaced stay as that entry left them; other sizes
+	// remain pending, even though the digest is stored.
+	Publish(ctx context.Context, stream, sha256 string, size int64) error
+	// Pending lists the distinct declared sizes of items of stream still
+	// waiting for sha256, which validation holds the content to. No sizes
+	// remain once later entries deleted or replaced every pending item,
+	// and the failed binary is then cleared without fetching.
+	Pending(ctx context.Context, stream, sha256 string) ([]int64, error)
 }
 
 // Kind is a family of streams: repo:<key> for a federated repository

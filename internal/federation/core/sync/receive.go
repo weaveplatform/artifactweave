@@ -172,17 +172,22 @@ func (e *Engine) recordFailure(ctx context.Context, stream, sha256, reason strin
 // fetching it from the first of from that serves it. held is false, with
 // the last failure as reason, when none did; err is a failure of this
 // instance's own store, which stops the apply rather than marking content
-// it may well hold as failed. No sha256 needs nothing.
+// it may well hold as failed. Stored content of another size is not held
+// for this reference: valid bytes and other references remain untouched.
+// No sha256 needs nothing.
 func (e *Engine) ensureBlob(ctx context.Context, from []model.Peer, sha256 string, size int64) (held bool, reason string, err error) {
 	if sha256 == "" {
 		return true, "", nil
 	}
-	ok, err := e.Blobs.Exists(ctx, sha256)
-	if err != nil {
-		return false, "", fmt.Errorf("look up blob %s: %w", sha256, err)
-	}
-	if ok {
+	info, err := e.Blobs.Stat(ctx, sha256)
+	if err == nil {
+		if info.Size != size {
+			return false, sizeMismatch(sha256, info.Size, size).Error(), nil
+		}
 		return true, "", nil
+	}
+	if !errors.Is(err, blob.ErrNotFound) {
+		return false, "", fmt.Errorf("look up blob %s: %w", sha256, err)
 	}
 	reason = "no peer to fetch the blob from"
 	for _, p := range from {
@@ -208,7 +213,7 @@ func (e *Engine) fetch(ctx context.Context, p model.Peer, sha256 string, size in
 		// One byte past the size is enough to tell that it is longer.
 		n, err := up.Append(ctx, io.LimitReader(r, size+1))
 		if err == nil && n != size {
-			err = fmt.Errorf("%w: blob %s has %d bytes, not the %d its entry gives", errSize, sha256, n, size)
+			err = sizeMismatch(sha256, n, size)
 		}
 		if err == nil {
 			_, err = up.Commit(ctx, blob.Digests{SHA256: sha256})
@@ -218,4 +223,8 @@ func (e *Engine) fetch(ctx context.Context, p model.Peer, sha256 string, size in
 		}
 		return nil
 	})
+}
+
+func sizeMismatch(sha256 string, actual, expected int64) error {
+	return fmt.Errorf("%w: blob %s has %d bytes, not the %d its entry gives", errSize, sha256, actual, expected)
 }
