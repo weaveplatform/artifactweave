@@ -358,6 +358,10 @@ func (UnimplementedStrict) ReplayFailedBinaryTasks(context.Context, ReplayFailed
 	return nil, apierror.ErrNotImplemented
 }
 
+func (UnimplementedStrict) GetFederatedBinaryTasks(context.Context, GetFederatedBinaryTasksRequestObject) (GetFederatedBinaryTasksResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
 func (UnimplementedStrict) SynchronizeFederatedMemberConfiguration(context.Context, SynchronizeFederatedMemberConfigurationRequestObject) (SynchronizeFederatedMemberConfigurationResponseObject, error) {
 	return nil, apierror.ErrNotImplemented
 }
@@ -419,6 +423,10 @@ func (UnimplementedStrict) GetFederationMirrorLagTime(context.Context, GetFedera
 }
 
 func (UnimplementedStrict) GetFederatedRepositoryStatus(context.Context, GetFederatedRepositoryStatusRequestObject) (GetFederatedRepositoryStatusResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) GetFederatedRepositoryBinaryState(context.Context, GetFederatedRepositoryBinaryStateRequestObject) (GetFederatedRepositoryBinaryStateResponseObject, error) {
 	return nil, apierror.ErrNotImplemented
 }
 

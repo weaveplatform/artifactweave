@@ -55,6 +55,10 @@ var (
 	// ErrNoSnapshot refuses a snapshot, or a full sync, of a stream whose
 	// kind takes none: 404.
 	ErrNoSnapshot = errors.New("this instance takes no snapshots of the stream")
+	// ErrFetchUnavailable reports content still unavailable from its peers.
+	// The failed record remains for automatic retry; operator replay can
+	// report the attempted tasks without disguising local store failures.
+	ErrFetchUnavailable = errors.New("content is unavailable from the stream's peers")
 	// errApplied reports an entry another transaction applied first.
 	errApplied = errors.New("entry already applied")
 	// errSize reports fetched content of another size than its entry gives.

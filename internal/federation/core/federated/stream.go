@@ -406,6 +406,26 @@ func (s Stream) Pending(ctx context.Context, stream, sha256 string) (int64, bool
 	return waiting[0].Size, true, nil
 }
 
+// FailedSHA1 supplies the pending content's SHA-1 for the failed-binary API.
+func (s Stream) FailedSHA1(ctx context.Context, stream, sha256 string) (string, error) {
+	k, ok := key(stream)
+	if !ok {
+		return "", nil
+	}
+	waiting, err := s.Store.Stamps().PendingOn(ctx, k, sha256)
+	if err != nil {
+		return "", fmt.Errorf("pending content of %s: %w", k, err)
+	}
+	if len(waiting) == 0 {
+		return "", nil
+	}
+	var p payload
+	if err := json.Unmarshal(waiting[0].Pending, &p); err != nil {
+		return "", fmt.Errorf("pending content of %s:%s: %w", k, waiting[0].Path, err)
+	}
+	return p.Actual.SHA1, nil
+}
+
 // PruneTombstones removes the tombstones older than retention, after
 // which the members' outboxes have pruned every entry they could still
 // order before (decision 0021: tombstones are kept for the retention

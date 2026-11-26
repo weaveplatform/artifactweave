@@ -148,6 +148,9 @@ func TestUnitStreamSnapshotItems(t *testing.T) {
 		if e.Payload != nil {
 			t.Fatalf("local %s carries a payload", e.Key)
 		}
+		if e.Pending != (e.Key == "d-pending") {
+			t.Fatalf("local pending marker: %+v", e)
+		}
 	}
 }
 

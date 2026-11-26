@@ -238,6 +238,20 @@ func (q *Queue) Enqueue(ctx context.Context, kind, key string, payload []byte) e
 	return nil
 }
 
+// EnqueueNow requests a fresh run without a pending retry's backoff. Use it
+// inside the transaction that authorizes operator replay. An active lease is
+// retained and marked dirty, so a stale worker cannot settle a newer run.
+func (q *Queue) EnqueueNow(ctx context.Context, kind, key string, payload []byte) error {
+	if err := q.q.Enqueue(ctx, kind, key, payload, q.o.Now()); err != nil {
+		return fmt.Errorf("work: enqueue %s/%s: %w", kind, key, err)
+	}
+	if err := q.q.Expedite(ctx, kind, key, q.o.Now()); err != nil {
+		return fmt.Errorf("work: expedite %s/%s: %w", kind, key, err)
+	}
+	q.st.AfterCommit(ctx, q.signal)
+	return nil
+}
+
 // EnqueueAhead is Enqueue for work that goes before the rest: a new item
 // is due lead earlier than now, and Lease hands out the longest due
 // first, so of the items due together it is taken ahead of any enqueued

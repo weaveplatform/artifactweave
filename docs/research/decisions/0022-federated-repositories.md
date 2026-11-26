@@ -198,7 +198,46 @@ them against a live 7.x in P19):
   status body uses 7.161.26's `mirrorEventsStatusInfo` and `federatedArtifactStatus` fields
   ([research 40 §7](../40-federated-repositories-7x.md#status-payloads)).
 - The failed-binary endpoints list, replay and delete the failed blob fetches recorded by
-  0021.
+  0021 (FED-06, #1935), from the first failed attempt while retries remain queued
+  ([I]; the public page names ten default attempts but not list visibility timing).
+  Tasks are one per repository and SHA-256, ordered by SHA-256;
+  list pages start at one with 1000 tasks by default and positive page sizes, with a
+  next-page Link. The documented task fields carry SHA-1, repository, first-failure
+  epoch milliseconds and failed-attempt count. `path` is an inferred extension naming
+  the first still-pending path in byte order; a superseded task has no path. SHA-1 is
+  captured from pending metadata when failure is first recorded, so a later deletion
+  or replacement does not lose the filter identity. Old records lacking SHA-1 derive
+  it from still-pending metadata when available.
+- Replay resets attempts ([I], preserving artifactweave's existing spec; the public
+  JFrog page promises marking tasks for reprocessing, not an attempt-counter reset)
+  and marks every matching binary for immediate durable retry in the same current-
+  authority transaction. The HTTP request makes no peer call. Pending backoff is
+  cleared, parked work is revived, and an active lease is retained with a fresh run
+  owed immediately after settlement. Workers fetch outside metadata transactions.
+  An unavailable source remains recorded for automatic retry; `replayTasks` counts
+  tasks marked for replay. An enqueue failure rolls back every reset and enqueue
+  in that request. The engine publishes only still-current pending
+  changes. Publication claims the failed row in its metadata transaction, so a task
+  deleted while its download is in flight cannot publish. Publication rechecks current
+  Receive authority for the stream: any still-authorized member from the prefetch
+  candidate set permits digest-verified content to publish; if every candidate loses
+  its trust or membership, the content stays pending with its failed task.
+  A failed in-flight retry
+  updates only an existing row and cannot recreate a deleted task. Deleting a task
+  preserves the applied cursor and pending conflict stamp: the content stays absent
+  until a newer event or full sync. Repository deletion/recreation and exit from
+  the federated class clear the repository stream's failed rows in the same
+  transaction as its pending stamps and membership, using a stream-scoped bulk
+  deletion. Rollback retains them and other streams are untouched. Queued old
+  retries then have no failed task to publish into the new repository lifetime.
+  A normal full sync reconciles a same-stamp pending
+  item too, rather than mistaking metadata delivery for complete content delivery.
+- `binaries/tasks/{repoKey}` and `status/repoState/{repoKey}/binaries/` project
+  `{failedTasks: <count>}` from the repository's failed-fetch records. Their DTO is
+  closed source; this field and the shape are [I], marked `x-unverified` for #216.
+  Task controls and `binaries/tasks` are administrator-only; `repoState` requires
+  current Read on the repository. Missing repositories answer 404; existing
+  non-federated repositories and invalid filters/paging answer 400 after authority.
 
 **Endpoints only a separate federation service would serve.** artifactweave has no RTFS: it
 presents itself as an instance whose federation service is connected and whose migration

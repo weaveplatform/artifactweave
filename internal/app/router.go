@@ -462,6 +462,9 @@ func federatedAPIs(cfg RouterConfig) (federationhttp.FederatedAPI, federationpee
 	if o, err := cfg.Federation.Operations(); err == nil {
 		ops.Operations = o
 	}
+	if b, err := cfg.Federation.Binaries(); err == nil {
+		ops.Binaries = b
+	}
 	if r, err := cfg.Federation.Receiver(); err == nil {
 		receiver.Receiver = r
 	}

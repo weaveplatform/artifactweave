@@ -93,6 +93,15 @@ func (w workQueue) Enqueue(
 	return err
 }
 
+func (w workQueue) Expedite(ctx context.Context, kind, key string, now time.Time) error {
+	return w.s.ExecOne(ctx, "expedite work "+kind, "UPDATE work_items SET "+
+		"not_before = CASE WHEN state IN ('pending','leased') THEN ? ELSE not_before END, "+
+		"attempts = CASE WHEN state IN ('pending','leased') THEN 0 ELSE attempts END, "+
+		"last_error = CASE WHEN state IN ('pending','leased') THEN '' ELSE last_error END, "+
+		"updated_at = CASE WHEN state IN ('pending','leased') THEN ? ELSE updated_at END "+
+		"WHERE kind = ? AND key = ?", now.UnixMicro(), now.UnixMicro(), kind, key)
+}
+
 // dueClause selects the items Lease may take at a time bound twice.
 const dueClause = "((state = 'pending' AND not_before <= ?) OR (state = 'leased' AND lease_until <= ?))"
 
@@ -313,6 +322,15 @@ func (w workQueue) Fail(
 	f work.WorkFailure,
 ) error {
 	return w.s.Tx(ctx, func(ctx context.Context) error {
+		// Expedite resets attempts without taking a running item's lease.
+		// The old generation's failure cannot back off that fresh request.
+		err := w.held(ctx, "fail expedited work "+kind, kind, key, gen,
+			"dirty_since IS NOT NULL AND attempts = 0",
+			"UPDATE work_items SET enqueued_at = dirty_since, last_error = '', "+unlease,
+			f.Now.UnixMicro(), f.Now.UnixMicro())
+		if !errors.Is(err, kernel.ErrConflict) {
+			return err
+		}
 		if f.Park {
 			// Work asked for during the run is new: it is retried rather
 			// than parked with the run that failed.

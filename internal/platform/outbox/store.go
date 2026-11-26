@@ -66,10 +66,21 @@ type OutboxStore interface {
 	// its other fields, and returns the record as stored. Failures counts
 	// the calls; the value in f is ignored.
 	RecordFailedFetch(ctx context.Context, f FailedBlobFetch) (FailedBlobFetch, error)
+	// RetryFailedFetch records another failed attempt only if the task still
+	// exists. An operator deletion while network I/O was in flight must not
+	// recreate it. kernel.ErrNotFound when it was deleted.
+	RetryFailedFetch(ctx context.Context, stream, sha256, reason string) error
+	// ResetFailedFetch starts operator replay at zero attempts without
+	// changing the task's creation time. kernel.ErrNotFound if it is gone.
+	ResetFailedFetch(ctx context.Context, stream, sha256 string) error
 	// FailedFetches returns a stream's failed fetches ("" for every stream)
 	// ordered by (stream, sha256).
 	FailedFetches(ctx context.Context, stream string) ([]FailedBlobFetch, error)
 	// ClearFailedFetch removes one after a successful retry;
 	// kernel.ErrNotFound when there is none.
 	ClearFailedFetch(ctx context.Context, stream, sha256 string) error
+	// ClearFailedFetches drops every failed task of one nonempty stream,
+	// when its repository lifetime ends. None there is not an error;
+	// kernel.ErrInvalid for an empty stream, so no call clears all streams.
+	ClearFailedFetches(ctx context.Context, stream string) error
 }

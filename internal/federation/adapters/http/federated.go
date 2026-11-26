@@ -60,6 +60,7 @@ const (
 // Operations each answers 501, as its stub did.
 type FederatedAPI struct {
 	Operations FederatedOperations
+	Binaries   FailedBinaries
 }
 
 func (a FederatedAPI) ops() (FederatedOperations, error) {

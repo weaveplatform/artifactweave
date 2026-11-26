@@ -552,9 +552,9 @@ func (e *Engine) diff(
 		switch {
 		case !match:
 			ops = append(ops, op{key: s.Key, entry: s})
-		case l.Stamp() == s.Stamp() && l.Deleted == s.Deleted:
+		case l.Stamp() == s.Stamp() && l.Deleted == s.Deleted && !l.Pending:
 			// The same change: nothing to do, in either mode.
-		case forced || s.Stamp().After(l.Stamp()):
+		case forced || s.Stamp().After(l.Stamp()) || l.Pending && l.Stamp() == s.Stamp():
 			ops = append(ops, op{key: s.Key, entry: s})
 		}
 	}

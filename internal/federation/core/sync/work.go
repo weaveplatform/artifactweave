@@ -68,6 +68,18 @@ func (e *Engine) enqueue(ctx context.Context, kind string, i item) error {
 	return nil
 }
 
+// QueueFetch marks a failed binary for replay at once, clearing retry backoff
+// and reviving parked work. The caller's transaction contains its authority
+// check and attempt reset; no content fetch runs in this call.
+func (e *Engine) QueueFetch(ctx context.Context, stream, sha256 string) error {
+	i := item{Stream: stream, SHA256: sha256}
+	payload, _ := json.Marshal(i) //nolint:errchkjson // strings only
+	if err := e.Queue.EnqueueNow(ctx, FetchKind, i.key(), payload); err != nil {
+		return fmt.Errorf("queue failed binary replay: %w", err)
+	}
+	return nil
+}
+
 func decode(it work.WorkItem) (item, error) {
 	var i item
 	if err := json.Unmarshal(it.Payload, &i); err != nil || i.Stream == "" {

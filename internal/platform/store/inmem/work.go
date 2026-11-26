@@ -59,6 +59,21 @@ func (w workQueue) Enqueue(
 	})
 }
 
+func (w workQueue) Expedite(ctx context.Context, kind, key string, now time.Time) error {
+	return w.s.Do(ctx, func() error {
+		k := workKey{kind, key}
+		it, ok := w.items().Get(k)
+		if !ok {
+			return memtx.NotFound("work item", kind+" "+key)
+		}
+		if it.State == work.WorkPending || it.State == work.WorkLeased {
+			it.NotBefore, it.Attempts, it.LastError, it.Updated = now, 0, "", now
+			w.items().Put(k, it)
+		}
+		return nil
+	})
+}
+
 // due reports whether it can be leased at now, and from when it was due.
 func due(it work.WorkItem, now time.Time) (time.Time, bool) {
 	switch it.State {
@@ -229,6 +244,13 @@ func (w workQueue) Fail(
 	f work.WorkFailure,
 ) error {
 	return w.run(ctx, kind, key, gen, func(it *work.WorkItem) bool {
+		// Operator replay reset attempts while retaining this lease. Its
+		// fresh work must not inherit this old run's retry delay or parking.
+		if !it.DirtySince.IsZero() && it.Attempts == 0 {
+			it.Enqueued, it.LastError = it.DirtySince, ""
+			unlease(it, f.Now, f.Now)
+			return true
+		}
 		it.LastError = f.Error
 		if f.Park && it.DirtySince.IsZero() {
 			it.State, it.NotBefore, it.LeasedBy, it.LeaseUntil = work.WorkParked, f.Now, "", time.Time{}

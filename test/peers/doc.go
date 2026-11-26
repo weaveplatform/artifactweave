@@ -41,7 +41,9 @@
 //     liveness (liveness_test.go); and full sync
 //     (federated_fullsync_test.go): members partitioned past the retention
 //     window repaired by full and forced full sync, ?mirror, recovery and
-//     reconnect, propagateCreatedTime and removeMember; the other P13
+//     reconnect, propagateCreatedTime and removeMember; failed binaries
+//     (failed_binaries_test.go): source outage, replay, SHA-1 deletion,
+//     superseded content and full-sync repair after task cancellation; the other P13
 //     tickets add theirs.
 //
 // # References

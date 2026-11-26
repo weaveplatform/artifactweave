@@ -15,6 +15,7 @@ import (
 
 // runWork covers the persistent work queue (decision 0033).
 func runWork(t *testing.T, newStore func(*testing.T) Store) {
+	t.Run("WorkExpedite", func(t *testing.T) { testWorkExpedite(t, newStore(t)) })
 	t.Run("WorkValidation", func(t *testing.T) { testWorkValidation(t, newStore(t)) })
 	t.Run("WorkLifecycle", func(t *testing.T) { testWorkLifecycle(t, newStore(t)) })
 	t.Run("WorkCoalescing", func(t *testing.T) { testWorkCoalescing(t, newStore(t)) })
@@ -455,3 +456,68 @@ func testWorkConcurrency(t *testing.T, s Store) {
 		t.Fatalf("after the bulk run: %+v", st)
 	}
 }
+
+func testWorkExpedite(t *testing.T, s Store) {
+	ctx := t.Context()
+	q := s.WorkQueue()
+	const kind, key = "replay", "content"
+	storekit.WantErr(t, q.Expedite(ctx, kind, key, storekit.At(1)), kernel.ErrNotFound)
+	storekit.Must(t, q.Enqueue(ctx, kind, key, nil, storekit.At(1)))
+	first, took, err := q.LeaseKey(ctx, kind, key, lease("one", 2, 1))
+	storekit.Must(t, err)
+	if !took {
+		t.Fatal("initial item not leased")
+	}
+	storekit.Must(t, q.Fail(ctx, kind, key, first.Generation, work.WorkFailure{Error: "down", RetryAt: storekit.At(99), Now: storekit.At(3)}))
+	storekit.Must(t, q.Enqueue(ctx, kind, key, nil, storekit.At(4)))
+	before := storekit.Get[work.WorkItem](t)(q.Get(ctx, kind, key))
+	if !before.NotBefore.Equal(storekit.Want(storekit.At(99))) {
+		t.Fatalf("ordinary enqueue lost backoff: %+v, want %v", before, storekit.At(99))
+	}
+	rollback := errReplayRollback
+	err = s.Tx(ctx, func(ctx context.Context) error {
+		if err := q.Expedite(ctx, kind, key, storekit.At(4)); err != nil {
+			return fmt.Errorf("expedite replay fixture: %w", err)
+		}
+		return rollback
+	})
+	storekit.WantErr(t, err, rollback)
+	storekit.Same(t, "rolled-back expedite", before, storekit.Get[work.WorkItem](t)(q.Get(ctx, kind, key)))
+	storekit.Must(t, q.Expedite(ctx, kind, key, storekit.At(4)))
+	it := storekit.Get[work.WorkItem](t)(q.Get(ctx, kind, key))
+	if it.Attempts != 0 || !it.NotBefore.Equal(storekit.Want(storekit.At(4))) {
+		t.Fatalf("not expedited %+v", it)
+	}
+	active, took, err := q.LeaseKey(ctx, kind, key, lease("two", 4, 1))
+	storekit.Must(t, err)
+	if !took {
+		t.Fatal("expedited item not due")
+	}
+	storekit.Must(t, q.Enqueue(ctx, kind, key, nil, storekit.At(5)))
+	storekit.Must(t, q.Expedite(ctx, kind, key, storekit.At(5)))
+	current := storekit.Get[work.WorkItem](t)(q.Get(ctx, kind, key))
+	if current.State != work.WorkLeased || current.Generation != active.Generation || !current.LeaseUntil.Equal(active.LeaseUntil) || current.Attempts != 0 {
+		t.Fatalf("replay changed lease %+v", current)
+	}
+	// The failed old generation cannot park or back off the new replay.
+	storekit.Must(t, q.Fail(ctx, kind, key, active.Generation, work.WorkFailure{Error: "old attempt", Park: true, RetryAt: storekit.At(99), Now: storekit.At(6)}))
+	current = storekit.Get[work.WorkItem](t)(q.Get(ctx, kind, key))
+	if current.State != work.WorkPending || current.Attempts != 0 || !current.NotBefore.Equal(storekit.Want(storekit.At(6))) {
+		t.Fatalf("old run delayed replay %+v", current)
+	}
+	retry, took, err := q.LeaseKey(ctx, kind, key, lease("three", 6, 1))
+	storekit.Must(t, err)
+	if !took {
+		t.Fatal("new replay not due")
+	}
+	storekit.Must(t, q.Fail(ctx, kind, key, retry.Generation, work.WorkFailure{Error: "down", Park: true, Now: storekit.At(7)}))
+	storekit.Must(t, q.Enqueue(ctx, kind, key, nil, storekit.At(8)))
+	storekit.Must(t, q.Expedite(ctx, kind, key, storekit.At(8)))
+	current = storekit.Get[work.WorkItem](t)(q.Get(ctx, kind, key))
+	if current.State != work.WorkPending || current.Attempts != 0 {
+		t.Fatalf("parked replay not revived %+v", current)
+	}
+	storekit.WantErr(t, q.Complete(ctx, kind, key, active.Generation, storekit.At(8)), kernel.ErrConflict)
+}
+
+var errReplayRollback = errors.New("rollback replay")

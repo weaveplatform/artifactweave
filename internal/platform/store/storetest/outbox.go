@@ -437,6 +437,9 @@ func testFailedFetches(t *testing.T, s Store) {
 	second := first
 	second.Failures, second.LastError = 2, "404"
 	storekit.Same(t, "second RecordFailedFetch", second, got)
+	storekit.Must(t, ob.ResetFailedFetch(ctx, f.Stream, f.SHA256))
+	storekit.Must(t, ob.RetryFailedFetch(ctx, f.Stream, f.SHA256, "retry timeout"))
+	second.Failures, second.LastError = 1, "retry timeout"
 
 	a := outbox.FailedBlobFetch{
 		Stream:      "repo:a",
@@ -460,12 +463,32 @@ func testFailedFetches(t *testing.T, s Store) {
 
 	storekit.Must(t, ob.ClearFailedFetch(ctx, "repo:b", f.SHA256))
 	storekit.WantErr(t, ob.ClearFailedFetch(ctx, "repo:b", f.SHA256), kernel.ErrNotFound)
+	storekit.WantErr(t, ob.RetryFailedFetch(ctx, "repo:b", f.SHA256, "too late"), kernel.ErrNotFound)
+	storekit.WantErr(t, ob.ResetFailedFetch(ctx, "repo:b", f.SHA256), kernel.ErrNotFound)
 	storekit.Same(t, "FailedFetches after clear", []outbox.FailedBlobFetch{b2},
 		storekit.Get[[]outbox.FailedBlobFetch](t)(ob.FailedFetches(ctx, "repo:b")))
+	storekit.WantErr(t, ob.ClearFailedFetches(ctx, ""), kernel.ErrInvalid)
+	rollback := errFailedStreamRollback
+	err := s.Tx(ctx, func(ctx context.Context) error {
+		if err := ob.ClearFailedFetches(ctx, "repo:b"); err != nil {
+			return fmt.Errorf("clear failed stream: %w", err)
+		}
+		return rollback
+	})
+	storekit.WantErr(t, err, rollback)
+	storekit.Same(t, "bulk clear rollback", []outbox.FailedBlobFetch{b2}, storekit.Get[[]outbox.FailedBlobFetch](t)(ob.FailedFetches(ctx, "repo:b")))
+	storekit.Must(t, ob.ClearFailedFetches(ctx, "repo:b"))
+	storekit.Must(t, ob.ClearFailedFetches(ctx, "repo:b"))
+	storekit.Same(t, "bulk clear preserves other stream", []outbox.FailedBlobFetch{a}, storekit.Get[[]outbox.FailedBlobFetch](t)(ob.FailedFetches(ctx, "")))
 	//nolint:wrapcheck // each case checks only that the call fails
 	failsCancelled(t, map[string]func(context.Context) error{
-		"RecordFailedFetch": func(ctx context.Context) error { _, err := ob.RecordFailedFetch(ctx, a); return err },
-		"FailedFetches":     func(ctx context.Context) error { _, err := ob.FailedFetches(ctx, ""); return err },
-		"ClearFailedFetch":  func(ctx context.Context) error { return ob.ClearFailedFetch(ctx, a.Stream, a.SHA256) },
+		"RecordFailedFetch":  func(ctx context.Context) error { _, err := ob.RecordFailedFetch(ctx, a); return err },
+		"FailedFetches":      func(ctx context.Context) error { _, err := ob.FailedFetches(ctx, ""); return err },
+		"ClearFailedFetch":   func(ctx context.Context) error { return ob.ClearFailedFetch(ctx, a.Stream, a.SHA256) },
+		"RetryFailedFetch":   func(ctx context.Context) error { return ob.RetryFailedFetch(ctx, a.Stream, a.SHA256, "retry") },
+		"ClearFailedFetches": func(ctx context.Context) error { return ob.ClearFailedFetches(ctx, a.Stream) },
+		"ResetFailedFetch":   func(ctx context.Context) error { return ob.ResetFailedFetch(ctx, a.Stream, a.SHA256) },
 	})
 }
+
+var errFailedStreamRollback = errors.New("reset rolled back")
