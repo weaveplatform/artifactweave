@@ -151,6 +151,8 @@ def launch(work, port, coverage):
         "api": {"budget_timeout": "5s"},
         "log": {"format": "json", "level": "info"},
     }
+    if os.environ.get("TERRAFORM_FIXTURE_ORIGINS"):
+        config["remote"] = {"allowed_private_origins": json.loads(os.environ["TERRAFORM_FIXTURE_ORIGINS"])}
     path = work / "artifactweave.json"
     with path.open("x") as out:
         json.dump(config, out)

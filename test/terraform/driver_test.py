@@ -270,7 +270,7 @@ class DriverTest(unittest.TestCase):
                     "attempted_while_provider_active": (self.work / "front-attempt-while-provider-active").exists(),
                     "provider_completed": (self.work / "provider-completed").exists(),
                 }, indent=2) + "\n")
-            self.assertTrue((self.work / "front-attempt-while-provider-active").exists())
+            self.assertTrue((self.work / "front-attempt-while-provider-active").exists(), result.stdout + result.stderr)
             self.assertTrue((self.work / "provider-completed").exists())
             self.assertTrue((self.work / "front-bind-refused").exists())
             self.assert_no_effects(result, backend)
@@ -455,6 +455,134 @@ class P12LedgerTest(unittest.TestCase):
         result = self.checker("--inventory", str(root))
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("artifactory_repository_layout", result.stderr)
+
+
+class FederatedLifecycleTest(unittest.TestCase):
+    def shell(self, script):
+        result = subprocess.run(["/bin/bash", "-euc", 'source "$1/test/terraform/federated-driver.sh"\n' + script,
+                                 "federated-lifecycle", str(ROOT)], text=True, capture_output=True, timeout=10)
+        return result
+
+    def test_no_peer_or_not_yet_started_forwarder_is_safe_on_bash_three(self):
+        result = self.shell('require_federated_servers; peer_servers=("$$"); require_federated_servers')
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_dead_peer_or_quarantined_forwarder_fails_closed(self):
+        result = self.shell('peer_servers=("2147483647"); require_federated_servers')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("fixture child exited", result.stderr)
+        with tempfile.TemporaryDirectory() as directory:
+            Path(directory, "forwarder.failed").touch()
+            result = self.shell('peer_servers=("$$"); peer_dirs=("' + directory + '"); require_federated_servers')
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("frontend quarantined", result.stderr)
+
+    def test_peer_exit_and_coverage_collection_failures_are_retained(self):
+        # The child has completed before cleanup; a missing kill target must not
+        # erase Wait's original failure. Collection is attempted even on failure.
+        for status, merge in ((7, 0), (0, 9), (0, 0)):
+            with self.subTest(child=status, collection=merge):
+                result = self.shell(f"""
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+mkdir "$work/peer" "$work/cover"
+: > "$work/peer/server.log"
+(exit {status}) &
+peer_servers=("$!")
+peer_dirs=("$work/peer")
+peer_coverage=("$work/cover")
+go() {{ echo collection-attempted; return {merge}; }}
+sleep .05
+federated_cleanup
+""")
+                self.assertEqual(result.returncode == 0, status == 0 and merge == 0, result.stderr)
+                self.assertIn("collection-attempted", result.stdout)
+
+
+class P13LedgerTest(unittest.TestCase):
+    def setUp(self):
+        import importlib.util
+        from unittest.mock import patch
+        spec = importlib.util.spec_from_file_location("p13", ROOT / "test/terraform/check-p13.py")
+        self.p13 = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.p13)
+        temp = tempfile.TemporaryDirectory(prefix="provider-p13-test-")
+        self.addCleanup(temp.cleanup)
+        self.work = Path(temp.name)
+        self.entries = [{"url": f"http://127.0.0.1:{18081 + n}", "token": f"private-member-token-{n}"} for n in range(3)]
+        (self.work / "members.json").write_text(json.dumps(self.entries))
+        (self.work / "server.log").write_text("")
+        env = dict(P13_MEMBERS_FILE=str(self.work / "members.json"), P13_LEDGER=str(self.work / "ledger.jsonl"),
+                   P13_UNPAIRED_RESULT=str(self.work / "unpaired.json"), P13_SERVER_LOG=str(self.work / "server.log"),
+                   TERRAFORM_APPLICATION_COMMIT="owned-driver-regression", TERRAFORM_CLI_VERSION="1.17.1")
+        context = patch.dict(os.environ, env)
+        context.start()
+        self.addCleanup(context.stop)
+        (self.work / "unpaired.json").write_text(json.dumps({"plan": "accepted", "apply_status": 400,
+                                                            "state_written": False, "config_sync_called": False}))
+        (self.work / "mirror").mkdir()
+
+    def complete(self, steps=None):
+        for step in self.p13.STEPS if steps is None else steps:
+            self.p13.record(step)
+        self.p13.complete(ROOT, self.work / "mirror", self.work, self.work / "cover", [self.p13.SCENARIO])
+
+    def test_every_resource_requires_all_steps_and_writes_sanitized_evidence(self):
+        self.complete()
+        serialized = (self.work / "cover/p13-provider-evidence.json").read_text()
+        evidence = json.loads(serialized)
+        self.assertEqual(len(evidence["resources"]), 35)
+        self.assertEqual(len(evidence["exclusions"]), 3)
+        for resource in evidence["resources"].values():
+            self.assertEqual(resource, {"steps": self.p13.STEPS, "member_readbacks": 3, "config_sync_statuses": [200, 200]})
+        for entry in self.entries:
+            self.assertNotIn(entry["token"], serialized)
+        self.assertEqual(set(evidence["scenario"]), {"main.tf", "variables.tf", "outputs.tf", "versions.tf", ".terraform.lock.hcl"})
+
+    def test_missing_or_duplicate_steps_cannot_write_success(self):
+        for steps in ([x for x in self.p13.STEPS if x != "read-2"], self.p13.STEPS + ["destroy"]):
+            with self.subTest(steps=steps):
+                (self.work / "ledger.jsonl").unlink(missing_ok=True)
+                with self.assertRaisesRegex(AssertionError, "incomplete or duplicated"):
+                    self.complete(steps)
+                self.assertFalse((self.work / "cover/p13-provider-evidence.json").exists())
+
+    def test_member_credential_in_peer_log_prevents_public_evidence(self):
+        peer = self.work / "federation-peer-1"
+        peer.mkdir()
+        (peer / "server.log").write_text(self.entries[1]["token"])
+        with self.assertRaisesRegex(AssertionError, "member credential"):
+            self.complete()
+        self.assertFalse((self.work / "cover/p13-provider-evidence.json").exists())
+
+    def test_provider_config_sync_warning_or_skipped_call_fails(self):
+        rows = [{"method": "POST", "path": "/artifactory/api/federation/configSync/" + self.p13.key(name), "status": 200}
+                for name in self.p13.NAMES]
+        def write():
+            (self.work / "server.log").write_text("".join(json.dumps(row) + "\n" for row in rows))
+        write()
+        self.p13.sync_calls(1)
+        rows[-1]["status"] = 500
+        write()
+        with self.assertRaisesRegex(AssertionError, "successful provider calls"):
+            self.p13.sync_calls(1)
+        rows.pop()
+        write()
+        with self.assertRaisesRegex(AssertionError, "successful provider calls"):
+            self.p13.sync_calls(1)
+
+    def test_federated_inventory_requires_every_pinned_resource(self):
+        self.p13.inventory(ROOT)
+        root = self.work / "root"
+        target = root / self.p13.SCENARIO
+        shutil.copytree(ROOT / self.p13.SCENARIO, target)
+        (root / "test/terraform").mkdir(parents=True)
+        shutil.copyfile(ROOT / "Makefile", root / "Makefile")
+        shutil.copyfile(ROOT / "test/terraform/run.sh", root / "test/terraform/run.sh")
+        main = target / "main.tf"
+        main.write_text(main.read_text().replace('resource "artifactory_federated_alpine_repository"', 'resource "artifactory_dropped"'))
+        with self.assertRaises(AssertionError):
+            self.p13.inventory(root)
 
 
 if __name__ == "__main__":

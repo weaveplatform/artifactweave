@@ -180,3 +180,14 @@ reads each virtual's member order back through the repositories API. The provide
 usage report (`POST /artifactory/api/system/usage`) for each of its 102 resources' operations;
 those are ordinary requests ([decision 0043](../../docs/research/decisions/0043-api-reliability.md#classes-moved-since)),
 so the run keeps the default request rates.
+
+The `federated-repositories` reference qualifies 35 pinned provider resources on three
+owned instances. `federated-driver.sh` starts two additional children with the same connection
+ownership forwarders, pairs all members, and keeps each child's coverage separate until it
+has exited. Cleanup merges those counters and propagates child or collection failures.
+`check-p13.py` requires both revisions' apply, empty refreshed plan and three-member readback,
+all provider `configSync` responses to be 200, remote deletion and the native unpaired-member
+400 control. Its complete ledger writes sanitized `p13-provider-evidence.json` beside the
+coverage; credentials and state remain in the private workspace. `P13LedgerTest` rejects
+missing or duplicate steps, failed or omitted `configSync` calls, runtime credential leaks,
+and a missing resource declaration.

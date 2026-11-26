@@ -1470,7 +1470,7 @@ All deployment roots require Terraform **1.17 or later**; CI pins **1.17.1**.
 identity, OIDC, CDN repositories, remote repositories, virtual repositories, webhooks, single
 replication, projects and package-cleanup references in `deploy/artifactweave/terraform/`,
 the `configuration` and `reverse-proxy` references, the `general-security` reference, the
-`ldap-groups` reference and the `trashcan` reference in that same tree. `configuration`,
+`ldap-groups`, `trashcan` and `federated-repositories` references in that same tree. `configuration`,
 `reverse-proxy` and `ldap-groups` qualify the seven P12 resources (#1837):
 `artifactory_proxy`, `artifactory_property_set`, `artifactory_backup`,
 `artifactory_mail_server`, `artifactory_repository_layout`, `platform_reverse_proxy` and
@@ -1645,6 +1645,15 @@ signature committed in `deploy/ci/testdata/jfrog-providers`.
      when on kept in the trash can until `POST /api/system/storage/gc` purges it at 0 days.
      Remove the resource from state, import it and require an empty plan. Destroy it and
      require the documented reset to on with 14 days (#1829).
+   - **federated-repositories:** create all 35 implemented federated provider resources
+     over three owned, mutually paired instances. Apply a second description revision,
+     refresh and require empty plans after each revision, and read every resource on all
+     three members. Require every provider `configSync` to return 200. The unpaired-member
+     control must plan but fail apply with the native 400, without repository state or a
+     `configSync` call. Destroy with remote cleanup and verify absence on all members.
+     `check-p13.py` requires every step and writes sanitized provenance and the three
+     exclusions to `cover/terraform/p13-provider-evidence.json`. Each instance's runtime
+     coverage is collected after it exits; collection and child errors fail the lane.
 4. Require `terraform plan -detailed-exitcode` to exit 0.
 5. Destroy.
 
