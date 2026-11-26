@@ -417,7 +417,7 @@ func TestUnitStreamMembership(t *testing.T) {
 	if _, err := f.k.Paused(ctx, "repo:fed", "b"); !errors.Is(err, kernel.ErrStore) {
 		t.Fatalf("paused with a failing store = %v", err)
 	}
-	if got := (federated.Stream{}).UseCases(streamsync.Receive); !slices.Equal(got, []model.UseCase{model.UseFederatedRepo}) {
+	if got := (federated.Stream{}).UseCases(streamsync.Receive); !slices.Equal(got, []model.UseCase{model.UseFederatedRepo, model.UseFederatedRepoRead}) {
 		t.Fatalf("use cases = %v", got)
 	}
 	if (federated.Stream{}).Name() != "repo" {

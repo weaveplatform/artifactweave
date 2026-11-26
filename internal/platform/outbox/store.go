@@ -76,6 +76,11 @@ type OutboxStore interface {
 	// FailedFetches returns a stream's failed fetches ("" for every stream)
 	// ordered by (stream, sha256).
 	FailedFetches(ctx context.Context, stream string) ([]FailedBlobFetch, error)
+	// FailedFetchPage returns at most limit failed fetches after offset rows,
+	// ordered by (stream, sha256), and whether another row exists. The stream
+	// filter precedes paging; an empty stream selects every stream.
+	// kernel.ErrInvalid for limit below 1 or a negative offset.
+	FailedFetchPage(ctx context.Context, stream string, limit, offset int) ([]FailedBlobFetch, bool, error)
 	// ClearFailedFetch removes one after a successful retry;
 	// kernel.ErrNotFound when there is none.
 	ClearFailedFetch(ctx context.Context, stream, sha256 string) error

@@ -162,5 +162,10 @@ func (r *Registry) Kinds() []Kind {
 
 // holds reports whether p holds one of the use cases k requires for d.
 func holds(p model.Peer, k Kind, d Direction) bool {
+	if directional, ok := k.(interface {
+		AllowsPeer(model.Peer, Direction) bool
+	}); ok && !directional.AllowsPeer(p, d) {
+		return false
+	}
 	return slices.ContainsFunc(k.UseCases(d), p.Has)
 }

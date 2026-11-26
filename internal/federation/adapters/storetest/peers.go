@@ -76,19 +76,20 @@ func peerKey(i int) (ed25519.PublicKey, ed25519.PrivateKey) {
 func peer(i int, uses ...model.UseCase) model.Peer {
 	pub, _ := peerKey(i)
 	return model.Peer{
-		InstanceID:      peerID(i),
-		BaseURL:         fmt.Sprintf("https://edge-%d.example.com", i),
-		PublicKey:       pub,
-		ProtocolVersion: instance.ProtocolVersion,
-		UseCases:        uses,
-		Status:          model.PeerOnline,
-		LastSeen:        storekit.At(i),
-		ClockSkew:       time.Duration(i-2) * 1500 * time.Millisecond,
-		DisplayName:     fmt.Sprintf("Edge %d", i),
-		CityName:        "Cardiff",
-		CountryCode:     "GB",
-		EdgeRole:        i%2 == 0,
-		Delivery:        []model.Delivery{model.DeliveryPush, model.DeliveryPull, model.DeliveryPulled}[i%3],
+		InstanceID:             peerID(i),
+		BaseURL:                fmt.Sprintf("https://edge-%d.example.com", i),
+		PublicKey:              pub,
+		ProtocolVersion:        instance.ProtocolVersion,
+		UseCases:               uses,
+		Status:                 model.PeerOnline,
+		LastSeen:               storekit.At(i),
+		ClockSkew:              time.Duration(i-2) * 1500 * time.Millisecond,
+		DisplayName:            fmt.Sprintf("Edge %d", i),
+		CityName:               "Cardiff",
+		CountryCode:            "GB",
+		EdgeRole:               i%2 == 0,
+		ReceivesFederationOnly: i%2 == 0,
+		Delivery:               []model.Delivery{model.DeliveryPush, model.DeliveryPull, model.DeliveryPulled}[i%3],
 	}
 }
 

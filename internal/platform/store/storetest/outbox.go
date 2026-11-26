@@ -460,6 +460,28 @@ func testFailedFetches(t *testing.T, s Store) {
 		storekit.Get[[]outbox.FailedBlobFetch](t)(ob.FailedFetches(ctx, "")))
 	storekit.Same(t, "FailedFetches of a stream", []outbox.FailedBlobFetch{b2, second},
 		storekit.Get[[]outbox.FailedBlobFetch](t)(ob.FailedFetches(ctx, "repo:b")))
+	for _, tc := range []struct {
+		stream        string
+		limit, offset int
+		want          []outbox.FailedBlobFetch
+		more          bool
+	}{
+		{"", 1, 0, []outbox.FailedBlobFetch{a}, true},
+		{"repo:b", 1, 0, []outbox.FailedBlobFetch{b2}, true},
+		{"repo:b", 1, 1, []outbox.FailedBlobFetch{second}, false},
+		{"", 99, 1, []outbox.FailedBlobFetch{b2, second}, false},
+		{"repo:b", 1, int(^uint(0) >> 1), nil, false},
+		{"repo:b", int(^uint(0) >> 1), 0, []outbox.FailedBlobFetch{b2, second}, false},
+	} {
+		got, more, err := ob.FailedFetchPage(ctx, tc.stream, tc.limit, tc.offset)
+		storekit.Must(t, err)
+		storekit.Same(t, "failed fetch page", tc.want, got)
+		storekit.Same(t, "failed fetch page continuation", tc.more, more)
+	}
+	for _, tc := range []struct{ limit, offset int }{{0, 0}, {-1, 0}, {1, -1}} {
+		_, _, err := ob.FailedFetchPage(ctx, "repo:b", tc.limit, tc.offset)
+		storekit.WantErr(t, err, kernel.ErrInvalid)
+	}
 
 	storekit.Must(t, ob.ClearFailedFetch(ctx, "repo:b", f.SHA256))
 	storekit.WantErr(t, ob.ClearFailedFetch(ctx, "repo:b", f.SHA256), kernel.ErrNotFound)
@@ -484,11 +506,18 @@ func testFailedFetches(t *testing.T, s Store) {
 	failsCancelled(t, map[string]func(context.Context) error{
 		"RecordFailedFetch":  func(ctx context.Context) error { _, err := ob.RecordFailedFetch(ctx, a); return err },
 		"FailedFetches":      func(ctx context.Context) error { _, err := ob.FailedFetches(ctx, ""); return err },
+		"FailedFetchPage":    func(ctx context.Context) error { _, _, err := ob.FailedFetchPage(ctx, "", 1, 0); return err },
 		"ClearFailedFetch":   func(ctx context.Context) error { return ob.ClearFailedFetch(ctx, a.Stream, a.SHA256) },
 		"RetryFailedFetch":   func(ctx context.Context) error { return ob.RetryFailedFetch(ctx, a.Stream, a.SHA256, "retry") },
 		"ClearFailedFetches": func(ctx context.Context) error { return ob.ClearFailedFetches(ctx, a.Stream) },
 		"ResetFailedFetch":   func(ctx context.Context) error { return ob.ResetFailedFetch(ctx, a.Stream, a.SHA256) },
 	})
+}
+
+// RunFailedFetches exercises failed-fetch persistence and paging on a backend.
+func RunFailedFetches(t *testing.T, s Store) {
+	t.Helper()
+	testFailedFetches(t, s)
 }
 
 var errFailedStreamRollback = errors.New("reset rolled back")

@@ -1,6 +1,6 @@
 // Package federationhttp serves single-target replication configuration,
 // enablement/global controls, durable execution and scoped status, and the
-// service_trust pairing endpoints.
+// service_trust pairing endpoints and federated repository operations.
 //
 // # Role
 //
@@ -38,6 +38,11 @@
 // deletion and task counts. The three controls and binaries/tasks are
 // administrator-only; status/repoState/{repoKey}/binaries/ requires current
 // repository Read. Inferred count/path fields are marked x-unverified.
+// FederatedAPI serves guarded membership/configuration operations, full sync,
+// and connectionStates. The connection response uses the generated named
+// FederationConnection DTO; receiver mode is independent of health. All
+// connection reads require a current administrator and collect at most the
+// nine remote members allowed by the ten-member federation limit.
 //
 // # References
 //
@@ -68,4 +73,5 @@
 // are implemented. One-shot overrides and advanced, event-driven
 // and checksum replication retain their separate generated/deferred owners.
 // The service_trust endpoints are implemented P13 (PEER-02, #1926).
+// Receiving-only member enforcement and connectionStates are FED-03 (#1933).
 package federationhttp

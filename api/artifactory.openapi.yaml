@@ -6539,48 +6539,7 @@ paths:
                   memberConnections:
                     description: Optional within this object. One entry per member.
                     items:
-                      description: One member connection.
-                      properties:
-                        disabled:
-                          description: Optional within this object. True when sync to this member is turned off.
-                          type: boolean
-                        lagInMs:
-                          description: Optional within this object. Age of the oldest undelivered event, in milliseconds.
-                          format: int64
-                          type: integer
-                        localPlatformUrl:
-                          description: Optional within this object. Base URL of this instance.
-                          type: string
-                        localRepoKey:
-                          description: Optional within this object. Repository key on this instance.
-                          type: string
-                        queuedEvents:
-                          description: Optional within this object. Events waiting for delivery.
-                          format: int64
-                          type: integer
-                        remotePlatformUrl:
-                          description: Optional within this object. Base URL of the member instance.
-                          type: string
-                        remoteRepoKey:
-                          description: Optional within this object. Repository key on the member.
-                          type: string
-                        status:
-                          description: 'Optional within this object. Dashboard state of the connection from the local member to the remote one. HEALTHY: events flow promptly. DELAYED: HEALTHY with lag above the threshold. ERROR: any underlying error state (generic, inactive target, out of sync). PENDING_FS: waiting for a full sync. FULL_SYNC_RUNNING: a full sync is preparing or running. DISABLED: the member is disabled. UNSUPPORTED: the remote member cannot report status. READONLY: the member is receiving-only. N/A: the state cannot be determined because a side is unreachable.'
-                          enum:
-                            - HEALTHY
-                            - DELAYED
-                            - ERROR
-                            - PENDING_FS
-                            - FULL_SYNC_RUNNING
-                            - DISABLED
-                            - UNSUPPORTED
-                            - READONLY
-                            - N/A
-                          type: string
-                        supported:
-                          description: Optional within this object. False when the remote member cannot report federation status; the connection then shows N/A or UNSUPPORTED. It is false when the peer speaks a protocol major version this instance does not (decision 0021).
-                          type: boolean
-                      type: object
+                      $ref: '#/components/schemas/FederationConnection'
                     type: array
                 type: object
           description: Connection state per member.
@@ -6602,6 +6561,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs.
+        '404':
+          description: The repository does not exist. This follows the federation error policy; the closed 7.x service's missing-repository answer is unverified.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          x-unverified: true
         '405':
           content:
             application/json:
@@ -25720,6 +25686,53 @@ components:
       x-go-type: repo.Config
       x-go-type-import:
         path: github.com/weaveplatform/artifactweave/internal/artifacts/api/repo
+    FederationConnection:
+      description: One member connection.
+      properties:
+        disabled:
+          description: Optional within this object. True when sync to this member is turned off.
+          type: boolean
+        lagInMs:
+          description: Optional within this object. Age of the oldest undelivered event, in milliseconds.
+          format: int64
+          type: integer
+        localPlatformUrl:
+          description: Optional within this object. Base URL of this instance.
+          type: string
+        localRepoKey:
+          description: Optional within this object. Repository key on this instance.
+          type: string
+        mode:
+          description: Optional within this object. Target member mode. Receiving_Only identifies a receiver independently of its connection health. The JSON field name is inferred from the documented mode.
+          type: string
+          x-unverified: true
+        queuedEvents:
+          description: Optional within this object. Events waiting for delivery.
+          format: int64
+          type: integer
+        remotePlatformUrl:
+          description: Optional within this object. Base URL of the member instance.
+          type: string
+        remoteRepoKey:
+          description: Optional within this object. Repository key on the member.
+          type: string
+        status:
+          description: 'Optional within this object. Dashboard state of the connection from the local member to the remote one. HEALTHY: events flow promptly. DELAYED: HEALTHY with lag above the threshold. ERROR: any underlying error state (generic, inactive target, out of sync). PENDING_FS: waiting for a full sync. FULL_SYNC_RUNNING: a full sync is preparing or running. DISABLED: the member is disabled. UNSUPPORTED: the remote member cannot report status. READONLY: the member is receiving-only. N/A: the state cannot be determined because a side is unreachable.'
+          enum:
+            - HEALTHY
+            - DELAYED
+            - ERROR
+            - PENDING_FS
+            - FULL_SYNC_RUNNING
+            - DISABLED
+            - UNSUPPORTED
+            - READONLY
+            - N/A
+          type: string
+        supported:
+          description: Optional within this object. False when the remote member cannot report federation status; the connection then shows N/A or UNSUPPORTED. It is false when the peer speaks a protocol major version this instance does not (decision 0021).
+          type: boolean
+      type: object
     FileInfo:
       description: Metadata of one file item as returned by the storage API without a mode query parameter. Timestamps are RFC 3339 with millisecond precision and a zone offset.
       properties:

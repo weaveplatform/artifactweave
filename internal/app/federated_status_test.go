@@ -15,8 +15,13 @@ func federatedStatusRows() []statusCase {
 	const remove, prio = "POST " + base + "removeMember", "PUT " + base + "prioritization/{repoKey}"
 	const propagate = "PUT " + base + "propagateCreatedTime"
 	return []statusCase{
+		{"GET " + base + "status/connectionStates/{repoKey}", base + "status/connectionStates/missing", "user", "", 403},
+		{"GET " + base + "status/connectionStates/{repoKey}", base + "status/connectionStates/missing", "", "", 401},
+		{"GET " + base + "status/connectionStates/{repoKey}", base + "status/connectionStates/missing", "admin", "", 404},
 		{"PUT " + repos + "{repoKey}", repos + "fed-status", "admin", `{"rclass":"federated","packageType":"generic"}`, 200},
 		{"PUT " + repos + "{repoKey}", repos + "fed-local-status", "admin", `{"rclass":"local","packageType":"generic"}`, 200},
+		{"GET " + base + "status/connectionStates/{repoKey}", base + "status/connectionStates/fed-local-status", "admin", "", 400},
+		{"GET " + base + "status/connectionStates/{repoKey}", base + "status/connectionStates/fed-status", "admin", "", 200},
 		{sync, base + "configSync/fed-status", "user", "", 403},
 		{sync, base + "configSync/fed-status", "", "", 401},
 		{sync, base + "configSync/missing", "admin", "", 404},

@@ -327,6 +327,34 @@ func (o outboxStore) ClearFailedFetch(ctx context.Context, stream, sha256 string
 		"DELETE FROM failed_blob_fetches WHERE stream = ? AND sha256 = ?", stream, sha256)
 }
 
+func (o outboxStore) FailedFetchPage(ctx context.Context, stream string, limit, offset int) ([]outbox.FailedBlobFetch, bool, error) {
+	if limit < 1 || offset < 0 {
+		return nil, false, fmt.Errorf("invalid failed fetch page: %w", kernel.ErrInvalid)
+	}
+	where, args := "", make([]any, 0, 3)
+	if stream != "" {
+		where, args = " WHERE stream = ?", append(args, stream)
+	}
+	window := limit
+	if window < int(^uint(0)>>1) {
+		window++
+	}
+	args = append(args, window, offset)
+	var out []outbox.FailedBlobFetch
+	err := o.s.Rows(ctx, "page failed fetches",
+		"SELECT "+failedFetchCols+" FROM failed_blob_fetches"+where+" ORDER BY stream, sha256 LIMIT ? OFFSET ?", args,
+		func(r *sql.Rows) error {
+			f, err := scanFailedFetch(r)
+			out = append(out, f)
+			return err
+		})
+	more := len(out) > limit
+	if more {
+		out = out[:limit]
+	}
+	return out, more, err
+}
+
 func (o outboxStore) ClearFailedFetches(ctx context.Context, stream string) error {
 	if stream == "" {
 		return fmt.Errorf("failed fetch stream is required: %w", kernel.ErrInvalid)

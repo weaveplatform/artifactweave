@@ -45,6 +45,17 @@ func (e *Engine) FullSync(ctx context.Context, peerID, stream string, forced boo
 // starts its run, or returns the run already going, made forced when
 // forced is, and queues the run's work, in one transaction.
 func (e *Engine) startResync(ctx context.Context, peerID, stream string, forced bool) (model.FullSyncRun, error) {
+	if k, ok := e.Kinds.For(stream); ok {
+		if policy, ok := k.(interface {
+			AuthoritativeSnapshot(context.Context, string) (bool, error)
+		}); ok {
+			authoritative, err := policy.AuthoritativeSnapshot(ctx, stream)
+			if err != nil {
+				return model.FullSyncRun{}, fmt.Errorf("full-sync authority for %s: %w", stream, err)
+			}
+			forced = forced || authoritative
+		}
+	}
 	self, err := e.self(ctx)
 	if err != nil {
 		return model.FullSyncRun{}, err

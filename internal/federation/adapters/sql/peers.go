@@ -22,7 +22,7 @@ func (s *Store) Peers() port.PeerStore { return peerStore{s} }
 type peerStore struct{ s *Store }
 
 const peerCols = "instance_id, base_url, public_key, protocol_version, status, last_seen_at, " +
-	"display_name, city_name, country_code, edge_role, delivery, clock_skew_ms"
+	"display_name, city_name, country_code, edge_role, delivery, clock_skew_ms, receives_federation_only"
 
 func scanPeer(r dialect.PeersScanner) (model.Peer, error) {
 	var (
@@ -32,7 +32,7 @@ func scanPeer(r dialect.PeersScanner) (model.Peer, error) {
 		skew int64
 	)
 	err := r.Scan(&p.InstanceID, &p.BaseURL, &pub, &p.ProtocolVersion, &p.Status, &seen,
-		&p.DisplayName, &p.CityName, &p.CountryCode, &p.EdgeRole, &p.Delivery, &skew)
+		&p.DisplayName, &p.CityName, &p.CountryCode, &p.EdgeRole, &p.Delivery, &skew, &p.ReceivesFederationOnly)
 	p.ClockSkew = time.Duration(skew) * time.Millisecond
 	if len(pub) > 0 {
 		p.PublicKey = pub
@@ -59,6 +59,7 @@ func (p peerStore) Put(ctx context.Context, peer model.Peer) error {
 			peer.EdgeRole,
 			string(delivery(peer.Delivery)),
 			peer.ClockSkew.Milliseconds(),
+			peer.ReceivesFederationOnly,
 		); err != nil {
 			return err
 		}

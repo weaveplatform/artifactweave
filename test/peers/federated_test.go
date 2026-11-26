@@ -107,17 +107,11 @@ func testFederatedMembers(t *testing.T, driver peers.Driver) {
 	pair(t, a, d)
 	pair(t, b, d)
 
-	// A member that is not a paired peer, and a receiver member, are
-	// refused before anything is stored.
+	// A member that is not a paired peer is refused before anything is stored.
 	unpaired := `{"rclass":"federated","packageType":"generic","members":[{"url":"http://127.0.0.1:9/artifactory/fed"}]}`
 	if status, body := a.Do(t, http.MethodPut, "/artifactory/api/repositories/fed", unpaired); status != http.StatusBadRequest ||
 		!strings.Contains(body, "Federated member 'http://127.0.0.1:9/artifactory/fed' is not a paired peer: pair the instances for federated-repo/* first") {
 		t.Fatalf("unpaired member: %d %s", status, body)
-	}
-	receiver := `{"rclass":"federated","packageType":"generic","members":[{"url":"` + member(b, "fed") + `","mode":"receiver"}]}`
-	if status, body := a.Do(t, http.MethodPut, "/artifactory/api/repositories/fed", receiver); status != http.StatusBadRequest ||
-		!strings.Contains(body, "is not supported yet; use bidirectional") {
-		t.Fatalf("receiver member: %d %s", status, body)
 	}
 	if _, found := readRepo(t, a, "fed"); found {
 		t.Fatal("a refused federated repository was stored")

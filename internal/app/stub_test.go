@@ -46,6 +46,7 @@ var generatedRoutes = map[string]bool{
 	"GET /artifactory/api/federation/binaries/tasks/{repoKey}":             true,
 	"GET /artifactory/api/federation/status/repoState/{repoKey}/binaries/": true,
 
+	"GET /artifactory/api/federation/status/connectionStates/{repoKey}":                 true,
 	"POST /artifactory/api/federation/configSync/{repoKey}":                             true,
 	"POST /artifactory/api/federation/migrate/{repoKey}":                                true,
 	"POST /artifactory/api/federation/convertToLocal":                                   true,

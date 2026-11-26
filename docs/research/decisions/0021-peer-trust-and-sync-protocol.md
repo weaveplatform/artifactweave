@@ -136,6 +136,23 @@ P37 the separate cold-instance contract
 trust lasts until either side unpairs, and a peer whose signatures stop verifying shows as
 `UNAUTHORIZED`.
 
+**Receiving-only pairing direction (FED-03).**
+
+The peer record persists `receives_federation_only`: true on the instance that
+redeemed `federated-repo/r`, false on its issuer. The issuer sends and refuses the
+redeemer's events with 403; the redeemer receives and never sends, including event
+pulls, snapshots and configuration sync. A `federated-repo/*` grant overrides that
+restriction while present; removing it restores the persisted `/r` direction.
+The same direction is checked again inside each stream apply transaction.
+
+Migration 0017 defaults older records to the issuer's restricted interpretation.
+The pre-FED-03 server accepted `/r` pairing but refused receiver membership, so
+no receiver delivery existed to preserve. After upgrading a preexisting `/r`
+pair, cancel and establish it again from the intended sender to persist both
+roles; bidirectional pairings need no action. The migration does not guess the
+role from repository configuration or relax receiving authorization.
+
+
 **Transport.** Peer traffic is HTTPS on the normal listener under the
 `/artifactweave/peer/v1/` prefix, which is artifactweave's own API, specified in its own
 OpenAPI document and versioned independently of the JFrog surfaces. Every request and

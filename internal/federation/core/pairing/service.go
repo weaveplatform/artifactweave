@@ -324,6 +324,7 @@ func (s Service) redeem(
 		return err
 	}
 	issuer.ProtocolVersion, _ = Major(ans.ProtocolVersion)
+	issuer.ReceivesFederationOnly = tok.UseCase == model.UseFederatedRepoRead
 	return s.Store.Tx(ctx, func(ctx context.Context) error { //nolint:wrapcheck // fn wraps its own errors
 		return s.grant(ctx, issuer, tok.UseCase, now)
 	})
@@ -353,6 +354,9 @@ func (s Service) checkAnswer(tok Parsed, ans Answer, major int) error {
 func (s Service) grant(ctx context.Context, p model.Peer, use model.UseCase, now time.Time) error {
 	if prev, err := s.Store.Peers().Get(ctx, p.InstanceID); err == nil {
 		p.UseCases = prev.UseCases
+		if use != model.UseFederatedRepoRead {
+			p.ReceivesFederationOnly = prev.ReceivesFederationOnly
+		}
 		// Pairing another use case changes none of what the administrator
 		// set on the record, the way its entries travel included.
 		p.DisplayName, p.CityName, p.CountryCode, p.EdgeRole, p.Delivery =

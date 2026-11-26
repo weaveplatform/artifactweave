@@ -83,6 +83,15 @@ artifactweave's repositories API therefore adds `mode` in P13 (FED-01), keeps `p
 `disableProxy` as today, and leaves `maxNumberOfThreads` and `modificationDate` to the XML
 descriptor. `gridTopologyId` belongs to P14.
 
+Receiver mode qualification uses the repositories API and YAML descriptor
+application, which preserve `members[].mode` in the repository configuration
+store. GET XML configuration intentionally retains empty repository sections,
+as 7.161.26's `CentralConfigServiceImpl.getFilteredDescriptor` and
+`cleanupConfigDescriptorRepositories` do (CFG-01, #1893; decision 0009).
+XML import/replacement remains P36. FED-03 does not add repository entries to
+that export or claim an XML repository round trip.
+
+
 ## 3. Member URL rules
 
 From `base/common/src/main/java/org/artifactory/util/FederatedMemberUtils.java` [S]:
@@ -214,8 +223,11 @@ From [Configure Receiving-Only Mode](https://docs.jfrog.com/artifactory/docs/con
 - So a local write on a receiver is accepted with its usual answer and is never sent; no
   status or message refuses it [D]. artifactweave does the same
   ([0022](decisions/0022-federated-repositories.md#decision)).
-- `GET /api/federation/status/connectionStates/{repoKey}` reports the receiver's mode as
-  `Receiving_Only`.
+- `GET /api/federation/status/connectionStates/{repoKey}` distinguishes target member
+  mode `Receiving_Only` from connection status `HEALTHY` (the documented verification
+  table, rechecked 2026-11-26). The API schema publishes `status` but no mode field;
+  artifactweave uses an additional `mode` string [I], marked `x-unverified` and logged
+  on #216. Its status remains a health value, not `Receiving_Only`.
 - Trust: a `federated-repo/r` pairing gives the redeeming (target) instance a receiving-only
   master token, so its administrator cannot build federations that send back to the
   issuer. A `federated-repo/*` pairing also works, with the receiver mode set per repository.
@@ -290,7 +302,7 @@ Paths are under `/artifactory/api/`. Line numbers are the `@Path` lines in
 | `GET v2/federation/status/repo/{repoKey}` and `.../{federatedKey}` | `FederatedStatusResourceV2.java:34`, `:41` | yes | P13 FED-05 | |
 | `GET federation/status/mirrorsLag`, `.../unavailableMirrors` | `FederatedStatusResource.java:91`, `:108` | yes | P13 FED-05 | Legacy monitoring, served |
 | `GET federation/status/stateList`, `.../stateSummary` | `:155`, `:183` | yes | P13 FED-05 | |
-| `GET federation/status/connectionStates/{repoKey}` | `:216` | yes | P13 FED-05 | A receiver member's mode reads `Receiving_Only` |
+| `GET federation/status/connectionStates/{repoKey}` | `:216` | yes | P13 FED-03 (connectionStates); FED-05 (other status) | Receiver `mode` reads `Receiving_Only` [I] field name; health remains `HEALTHY` when healthy |
 | `GET federation/rtfs` | `FederatedRepoResource.java:682` | no | P13 FED-05 | 200 `text/plain` `true` |
 | `GET federation/migration/status` | `:820` | no | P13 FED-05 | 200 `text/plain` `MIGRATION_COMPLETED` |
 | `PUT federation/rtfs`, `PUT federation/migration`, `PUT federation/migration/status/verbose` | `:800`, `:836`, `:1011` | no | Deviation (FED-05) | 400 "Access denied: This endpoint is restricted to migration tool calls only.", to every caller |
@@ -495,6 +507,13 @@ Posted on [#216](https://github.com/weaveplatform/artifactweave/issues/216) for 
     artifactweave answers `Proxy '<key>' does not exist`.
 11. Whether 7.x refuses `migrate` for a repository with push replication. artifactweave
     does, as decision 0022 forbids a repository being both federated and a push target.
+12. `connectionStates.memberConnections[].mode` is inferred; the receiving-only
+    documentation publishes `Receiving_Only` as the target mode separately from
+    connection health but its API schema has no mode property. Registered on
+    [#216](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-7198643299).
+13. A missing repository in `connectionStates` returns 404 under artifactweave's
+    existing federation error policy; the closed 7.x service's answer is unverified.
+    Its response is marked `x-unverified` and recorded in the same #216 comparison.
 
 14. When a failed binary first appears in the list: the public list documentation mentions
     a default maximum of ten attempts without defining visibility timing. artifactweave
@@ -514,7 +533,8 @@ Posted on [#216](https://github.com/weaveplatform/artifactweave/issues/216) for 
 one current pending path; superseded failures omit it. The content task is keyed by
 repository and SHA-256, while replay/delete accept the documented SHA-1 filter.
 List defaults to page 1 and limit 1000, accepts positive limits and emits a next-page
-Link. Invalid paging and digests are 400; an unknown repository is 404.
+Link. The store filters and pages failed rows before pending-path metadata is read
+for the selected page. Invalid paging and digests are 400; an unknown repository is 404.
 
 [I] The two closed-source task-count DTOs use `{failedTasks: <count>}`, marked
 `x-unverified` in the spec, for comparison on #216. These are failed content fetches,

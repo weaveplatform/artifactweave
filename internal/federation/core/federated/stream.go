@@ -99,10 +99,9 @@ func (s Stream) log() *slog.Logger {
 // Name is the stream kind's prefix.
 func (Stream) Name() string { return string(model.StreamRepository) }
 
-// UseCases is two-way federated repository trust in both directions;
-// receiving-only trust is FED-03's.
+// UseCases accepts federation trust; AllowsPeer enforces its direction.
 func (Stream) UseCases(streamsync.Direction) []model.UseCase {
-	return []model.UseCase{model.UseFederatedRepo}
+	return []model.UseCase{model.UseFederatedRepo, model.UseFederatedRepoRead}
 }
 
 // key is the repository a stream of this kind names.
@@ -232,6 +231,19 @@ func (s Stream) ItemChanged(ctx context.Context, c artifactsapi.ItemChange) erro
 		return fmt.Errorf("members of %s: %w", c.Repository, err)
 	}
 	if len(ms) == 0 {
+		return nil
+	}
+	receiving, err := s.receivingOnly(ctx, c.Repository)
+	if err != nil {
+		return err
+	}
+	if receiving {
+		// Local divergence must not retain the inbound stamp: even a forced
+		// snapshot skips an identical stamp. Forget it so the next sender
+		// snapshot restores changed or locally deleted content as well.
+		if err := s.Store.Stamps().Remove(ctx, c.Repository, c.Path, c.Deleted && c.Folder); err != nil {
+			return fmt.Errorf("forget receiver's local change of %s:%s: %w", c.Repository, c.Path, err)
+		}
 		return nil
 	}
 	prev, err := s.Store.Stamps().Stamp(ctx, c.Repository, c.Path)

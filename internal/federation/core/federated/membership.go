@@ -165,6 +165,14 @@ func (m Membership) resolve(ctx context.Context, c *repo.Config) ([]model.Federa
 			return nil, refuse("Federated member '%s' is not a valid member URL", mem.URL)
 		}
 		peer, ok := pairedPeer(peers, base, mem.Mode)
+		if !ok && selfReceiver(*c, self) {
+			for _, p := range peers {
+				if repo.NormalizeMemberBase(p.BaseURL) == base && p.Has(model.UseFederatedRepoRead) && p.ReceivesFederationOnly {
+					peer, ok = p, true
+					break
+				}
+			}
+		}
 		if !ok {
 			return nil, refuse("Federated member '%s' is not a paired peer: pair the instances for %s first",
 				mem.URL, useCasesFor(mem.Mode))
@@ -256,8 +264,21 @@ func (m Membership) Reconcile(ctx context.Context, c repo.Config, sync bool) err
 			return err
 		}
 	}
-	if !sync {
+	self, err := m.SelfBase(ctx)
+	if err != nil {
+		return err
+	}
+	if !sync || selfReceiver(c, self) {
 		return nil
+	}
+	for _, member := range members {
+		if member.Mode == repo.ModeReceiver && !slices.ContainsFunc(before, func(b model.FederationMember) bool {
+			return b.PeerInstanceID == member.PeerInstanceID && b.Mode == repo.ModeReceiver && b.RemoteRepoKey == member.RemoteRepoKey
+		}) {
+			if err := m.QueueFullSync(ctx, c.Key, member.PeerInstanceID, false); err != nil {
+				return err
+			}
+		}
 	}
 	return m.Enqueue(ctx, c.Key, members)
 }

@@ -126,9 +126,21 @@ func TestAccFederatedRepositoryMembers(t *testing.T) {
 	w.call("admin", http.MethodPut, put+"fed",
 		`{"rclass":"federated","packageType":"generic","members":[{"url":"https://r.example/artifactory/fed"}]}`, 400,
 		`is not a paired peer: pair the instances for federated-repo/* first`)
-	w.call("admin", http.MethodPut, put+"fed",
-		`{"rclass":"federated","packageType":"generic","members":[{"url":"https://b.example/artifactory/fed","mode":"receiver"}]}`, 400,
-		`is not supported yet; use bidirectional`)
+	w.call("admin", http.MethodPut, put+"receiver",
+		`{"rclass":"federated","packageType":"generic","members":[{"url":"https://b.example/artifactory/fed","mode":"receiver"}]}`, 200, "")
+	var receiver struct{ Members []repo.Member }
+	if err := json.Unmarshal([]byte(w.call("admin", http.MethodGet, put+"receiver", "", 200, "")), &receiver); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(receiver.Members, func(m repo.Member) bool {
+		return m.URL == "https://b.example/artifactory/fed" && m.Mode == repo.ModeReceiver
+	}) {
+		t.Fatalf("receiver mode not retained by API: %+v", receiver.Members)
+	}
+	receiverMembers, err := w.db.Federation().Members(t.Context(), "receiver")
+	if err != nil || len(receiverMembers) != 1 || receiverMembers[0].Mode != repo.ModeReceiver {
+		t.Fatalf("receiver membership: %+v, %v", receiverMembers, err)
+	}
 	w.call("admin", http.MethodPut, put+"fed",
 		`{"rclass":"federated","packageType":"generic","members":[{"url":"not a url"}]}`, 400, `members.url`)
 	eleven := make([]string, 11)

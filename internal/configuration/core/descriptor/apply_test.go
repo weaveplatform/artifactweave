@@ -80,10 +80,11 @@ federatedRepositories:
     members:
       - url: https://peer.example/artifactory/apm-fed
         enabled: true
+        mode: receiver
 `)
 	got, err := db.Repos().Get(context.Background(), "apm-fed")
 	if err != nil || got.PackageType != repo.AgentPackages || got.Class != repo.Federated ||
-		len(got.Members) != 1 || got.Members[0].URL != "https://peer.example/artifactory/apm-fed" ||
+		len(got.Members) != 1 || got.Members[0].Mode != repo.ModeReceiver || got.Members[0].URL != "https://peer.example/artifactory/apm-fed" ||
 		got.Members[0].Enabled == nil || !got.Members[0].Enabled.Bool() {
 		t.Fatalf("federated descriptor %+v: %v", got, err)
 	}

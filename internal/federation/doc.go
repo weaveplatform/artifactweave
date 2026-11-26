@@ -1,6 +1,6 @@
 // Package federation owns guarded single-target replication configuration,
-// the bounded single-push transfer driver and pairing between instances.
-// Outbox delivery, federation and topology retain their later owners.
+// bounded replication drivers, peer trust and federated repository streams.
+// Access federation and topology retain their later owners.
 //
 // # Role
 //
@@ -40,7 +40,9 @@
 // operations, and RegisterWork then runs its dispatchers, pulls, blob
 // retries, sweep and pruning, and the pruning of expired tombstones
 // (TombstonePruneKind). Membership changes wake the repository's stream,
-// so a member added or enabled again receives at once.
+// so a member added or enabled again receives at once. Receiving-only members
+// suppress local stream production, enforce trust direction and receive an
+// authoritative full sync; Operations also reads bounded connection states.
 //
 // Module.Binaries supplies failed-binary list/replay/delete and task counts
 // over the outbox and current pending item stamps (FED-06). The HTTP adapter
