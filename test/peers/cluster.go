@@ -510,6 +510,24 @@ func (in *Instance) SetPeerKey(t testing.TB, instanceID string, key ed25519.Publ
 	}
 }
 
+// SetPeerDelivery configures the stored delivery topology without changing
+// the production default. Pair a pull with pulled on the other instance.
+func (in *Instance) SetPeerDelivery(t testing.TB, instanceID string, delivery model.Delivery) {
+	t.Helper()
+	if !model.KnownDelivery(delivery) {
+		t.Fatalf("peers: unknown delivery %q", delivery)
+	}
+	st := in.openStore(t)
+	p, err := st.Peers().Get(t.Context(), instanceID)
+	if err != nil {
+		t.Fatalf("peers: read %s's record of %s: %v", in.Name, instanceID, err)
+	}
+	p.Delivery = delivery
+	if err := st.Peers().Put(t.Context(), p); err != nil {
+		t.Fatalf("peers: write %s's delivery to %s: %v", in.Name, instanceID, err)
+	}
+}
+
 // openStore returns the instance's metadata store, opened once with the
 // configuration it runs with, its master key included, without migrating
 // it.

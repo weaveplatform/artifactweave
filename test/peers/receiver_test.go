@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/federation/core/model"
 	corepeer "github.com/weaveplatform/artifactweave/internal/federation/core/peer"
 	"github.com/weaveplatform/artifactweave/test/peers"
 )
@@ -81,18 +82,25 @@ func testFederatedReceiver(t *testing.T, driver peers.Driver) {
 	awaitFile(t, all, "fed/a.txt", "from a")
 	awaitFile(t, all, "fed/b.txt", "from b")
 	do(t, b, http.MethodPut, "/artifactory/api/storage/fed/a.txt?properties=source=sender", "", http.StatusNoContent)
-	eventually(t, r, "sender properties", func() (bool, string) {
-		got := properties(t, r, "fed/a.txt")
-		return slices.Equal(got["source"], []string{"sender"}), strings.Join(got["source"], ",")
-	})
+	for _, in := range all {
+		awaitReceiverProperty(t, in, "fed/a.txt", "sender")
+	}
 	do(t, a, http.MethodDelete, "/artifactory/fed/b.txt", "", http.StatusNoContent)
 	awaitFile(t, all, "fed/b.txt", "")
 	// A receiver accepts deploy/property/delete with their usual answers.
 	do(t, r, http.MethodPut, "/artifactory/fed/local.txt", "only here", http.StatusCreated)
 	do(t, r, http.MethodPut, "/artifactory/fed/a.txt", "local divergence", http.StatusCreated)
 	do(t, r, http.MethodPut, "/artifactory/api/storage/fed/a.txt?properties=source=local", "", http.StatusNoContent)
+	if got := receiverProperties(t, r, "fed/a.txt")["source"]; !slices.Equal(got, []string{"local"}) {
+		t.Fatalf("receiver did not store its local property: %v", got)
+	}
 	awaitFile(t, []*peers.Instance{r}, "fed/a.txt", "local divergence")
 	absent(t, []*peers.Instance{a, b}, "fed/local.txt")
+	for _, in := range []*peers.Instance{a, b} {
+		if got := receiverProperties(t, in, "fed/a.txt")["source"]; !slices.Equal(got, []string{"sender"}) {
+			t.Fatalf("%s received the receiver's local property: %v", in.Name, got)
+		}
+	}
 	awaitFile(t, []*peers.Instance{a, b}, "fed/a.txt", "from a")
 	do(t, r, http.MethodDelete, "/artifactory/fed/before.txt", "", http.StatusNoContent)
 	awaitFile(t, []*peers.Instance{a}, "fed/before.txt", "predates federation")
@@ -133,6 +141,7 @@ func testFederatedReceiver(t *testing.T, driver peers.Driver) {
 	}
 	do(t, a, http.MethodPost, "/artifactory/api/federation/fullSync/fed?mirror="+r.URL, "", http.StatusOK)
 	awaitFile(t, []*peers.Instance{r}, "fed/a.txt", "from a")
+	awaitReceiverProperty(t, r, "fed/a.txt", "sender")
 	awaitFile(t, []*peers.Instance{r}, "fed/local.txt", "")
 	awaitFile(t, []*peers.Instance{r}, "fed/before.txt", "predates federation")
 	// Mode persists in the repository JSON, while default members keep the
@@ -153,4 +162,96 @@ func testFederatedReceiver(t *testing.T, driver peers.Driver) {
 			t.Log(string(output))
 		}
 	}
+}
+
+// receiverProperties requires a successful property read even when checking
+// that a local receiver value did not propagate to another member.
+func receiverProperties(t *testing.T, in *peers.Instance, path string) map[string][]string {
+	t.Helper()
+	got, present := readReceiverProperties(t, in, path)
+	if !present {
+		t.Fatalf("no properties of %s on %s", path, in.Name)
+	}
+	return got
+}
+
+func readReceiverProperties(t *testing.T, in *peers.Instance, path string) (map[string][]string, bool) {
+	t.Helper()
+	status, body := in.Do(t, http.MethodGet, "/artifactory/api/storage/"+path+"?properties", "")
+	// Property replication may lag content. Only the documented no-properties
+	// response is pending; an authentication or admission error is a failure.
+	if status == http.StatusNotFound {
+		var got struct {
+			Errors []struct {
+				Message string `json:"message"`
+				Status  int    `json:"status"`
+			} `json:"errors"`
+		}
+		if err := json.Unmarshal([]byte(body), &got); err != nil || len(got.Errors) != 1 ||
+			got.Errors[0].Status != http.StatusNotFound || got.Errors[0].Message != "No properties could be found." {
+			t.Fatalf("unexpected properties response for %s on %s: %d %s", path, in.Name, status, body)
+		}
+		return nil, false
+	}
+	if status != http.StatusOK {
+		t.Fatalf("properties of %s on %s: %d %s", path, in.Name, status, body)
+	}
+	var got struct {
+		Properties map[string][]string `json:"properties"`
+	}
+	if err := json.Unmarshal([]byte(body), &got); err != nil || got.Properties == nil {
+		t.Fatalf("properties of %s on %s: %v: %s", path, in.Name, err, body)
+	}
+	return got.Properties, true
+}
+
+func awaitReceiverProperty(t *testing.T, in *peers.Instance, path, want string) {
+	t.Helper()
+	eventually(t, in, "source property "+want, func() (bool, string) {
+		properties, present := readReceiverProperties(t, in, path)
+		got := properties["source"]
+		return present && slices.Equal(got, []string{want}), strings.Join(got, ",")
+	})
+}
+
+func TestAccFederatedReceiverPullSQLite(t *testing.T) {
+	t.Parallel()
+	testFederatedReceiverPull(t, peers.SQLite)
+}
+
+func TestAccFederatedReceiverPullPostgres(t *testing.T) {
+	t.Parallel()
+	testFederatedReceiverPull(t, peers.Postgres)
+}
+
+// The sender cannot initiate any connection to the receiver after the cut.
+// New bytes and properties therefore require signed /r pulls and blob fetches.
+func testFederatedReceiverPull(t *testing.T, driver peers.Driver) {
+	c := peers.Start(t, peers.Options{Instances: 2, Driver: driver})
+	a, r := c.Instances[0], c.Instances[1]
+	pairReceiver(t, a, r)
+	body := `{"rclass":"federated","packageType":"generic","members":[{"url":"` +
+		member(a, "fed") + `"},{"url":"` + member(r, "fed") + `","mode":"receiver"}]}`
+	do(t, a, http.MethodPut, "/artifactory/api/repositories/fed", body, http.StatusOK)
+	await(t, r, "fed", "receiver membership", func(cfg federatedRepo) bool { return len(cfg.Members) == 2 })
+	do(t, a, http.MethodPut, "/artifactory/fed/before.txt", "before cut", http.StatusCreated)
+	awaitFile(t, []*peers.Instance{r}, "fed/before.txt", "before cut")
+	a.SetPeerDelivery(t, r.Identity(t).InstanceID, model.DeliveryPulled)
+	r.SetPeerDelivery(t, a.Identity(t).InstanceID, model.DeliveryPull)
+	c.Cut(0, 1)
+	if _, _, err := c.DoFrom(0, 1, http.MethodGet, "/artifactory/api/system/ping", ""); err == nil {
+		t.Fatal("sender can still reach receiver across the cut")
+	}
+	do(t, a, http.MethodPut, "/artifactory/fed/pull.txt", "created after cut", http.StatusCreated)
+	awaitFile(t, []*peers.Instance{r}, "fed/pull.txt", "created after cut")
+	do(t, a, http.MethodPut, "/artifactory/api/storage/fed/pull.txt?properties=source=pull", "", http.StatusNoContent)
+	awaitReceiverProperty(t, r, "fed/pull.txt", "pull")
+	do(t, a, http.MethodDelete, "/artifactory/fed/pull.txt", "", http.StatusNoContent)
+	eventually(t, r, "pulled deletion", func() (bool, string) {
+		status, body := r.Do(t, http.MethodGet, "/artifactory/fed/pull.txt", "")
+		if status != http.StatusOK && status != http.StatusNotFound {
+			t.Fatalf("pulled deletion read: %d %s", status, body)
+		}
+		return status == http.StatusNotFound, body
+	})
 }

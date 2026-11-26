@@ -423,10 +423,23 @@ across a partition answers the network failure and pairs nothing, and the same
 token pairs once healed; an unpair across a partition fails unless forced.
 `TestAccFederatedMembersSQLite` and `TestAccFederatedMembersPostgres` pair three
 instances and federate one repository across them (FED-01, [#1930](https://github.com/weaveplatform/artifactweave/issues/1930)):
-an unpaired or receiver member is refused, a create on one instance reaches the
+an unpaired member is refused, a create on one instance reaches the
 other two as their own copies listing every member, an update reaches a member
 cut off from the sender once the cut is restored, a member's own change reaches
 the others, and configSync answers as 7.x does.
+`TestAccFederatedReceiverSQLite` and `TestAccFederatedReceiverPostgres` qualify
+FED-03 ([#1933](https://github.com/weaveplatform/artifactweave/issues/1933)) with
+two bidirectional members and one receiving-only member: initial full sync,
+deploys, properties and deletes; local receiver writes and properties stay
+local and a sender full sync restores its authoritative content and properties;
+receiver membership/full-sync changes and a signed `/r` redeemer push are refused;
+repository mode persists and connection mode remains separate from health.
+`TestAccFederatedReceiverPullSQLite` and `TestAccFederatedReceiverPullPostgres`
+then qualify `/r` delivery with sender-to-receiver traffic cut after the initial
+baseline. Content created after the cut, its property update and its deletion
+reach the receiver through pull; the reverse connection remains available for
+signed reads and blob fetches. These scenarios use the production delivery
+defaults except for the two explicitly configured peer delivery records.
 `TestAccPeerLivenessSQLite` and `TestAccPeerLivenessPostgres` pair two instances
 that read each other's signed `GET /artifactweave/peer/v1/status` every second
 ([#1949](https://github.com/weaveplatform/artifactweave/issues/1949)): each
