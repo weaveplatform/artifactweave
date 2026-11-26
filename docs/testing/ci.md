@@ -451,6 +451,17 @@ deviations.
 `TestAccPeersFailurePrintsEachServerLog` runs a deliberately failing scenario in
 a process of its own and requires its output to carry each instance's log.
 
+Shared file assertions accept HTTP 200 as presence and HTTP 404 as absence.
+Other HTTP statuses and transport errors fail the scenario immediately; they
+cannot prove a delete converged or a partitioned/receiver member received
+nothing. Existing 404 polling for an expected file remains unchanged.
+`TestAccPeerFileAssertionsSQLite`
+([#1976](https://github.com/weaveplatform/artifactweave/issues/1976)) deploys
+generic and Maven files to a real instance, then invokes `file`, `awaitFile`
+and `absent` through controlled 401/403/500/503 responses and a closed
+transport. It checks the reported failures, 200 content/presence and true 404
+controls, and restores the instance address to verify both files remain.
+
 The package acceptance lane leaves `test/peers` out (`tools/citestselection`
 scans it as it does `test/acceptance` and `test/platform`), so each cluster
 starts once per run. The harness itself is excluded from the per-package
