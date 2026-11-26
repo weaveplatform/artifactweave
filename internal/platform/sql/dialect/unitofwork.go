@@ -87,9 +87,7 @@ func runTx(ctx context.Context, db *sql.DB, d Dialect, fn func(context.Context) 
 		// driver rejects any but the default.
 		opts = nil
 	}
-	probe := newTransactionProbe(ctx, db, d.Name)
 	tx, err := db.BeginTx(ctx, opts)
-	probe.began(err)
 	if err != nil {
 		return fmt.Errorf("%w: begin: %w", ErrTransaction, errors.Join(err, ctx.Err()))
 	}
@@ -98,10 +96,8 @@ func runTx(ctx context.Context, db *sql.DB, d Dialect, fn func(context.Context) 
 	defer func() {
 		if !committed {
 			_ = tx.Rollback()
-			probe.closed("rollback")
 			return
 		}
-		probe.closed("commit")
 		for _, f := range u.commit {
 			f()
 		}
@@ -109,7 +105,6 @@ func runTx(ctx context.Context, db *sql.DB, d Dialect, fn func(context.Context) 
 	defer u.before.Close()
 	ctx = u.before.Bind(context.WithValue(ctx, unitKey{}, u))
 	err = fn(ctx)
-	probe.phase("business")
 	u.mu.Lock()
 	err = errors.Join(err, u.err)
 	u.mu.Unlock()
@@ -117,7 +112,6 @@ func runTx(ctx context.Context, db *sql.DB, d Dialect, fn func(context.Context) 
 		return err
 	}
 	err = u.before.Run(ctx)
-	probe.phase("finalizers")
 	// A finalizer can join Tx and drop its error, just like business work.
 	u.mu.Lock()
 	err = errors.Join(err, u.err)
@@ -125,7 +119,6 @@ func runTx(ctx context.Context, db *sql.DB, d Dialect, fn func(context.Context) 
 	if err != nil {
 		return err
 	}
-	probe.phase("commit")
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("%w: commit: %w", ErrTransaction, errors.Join(err, ctx.Err()))
 	}
