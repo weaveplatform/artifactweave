@@ -4,7 +4,7 @@ Checked against: Artifactory 7.161.32 and the 7.161.26 source ([research 40](../
 
 Status: Accepted
 
-Implementation status (2026-11-26): **in progress, P13**. Members and
+Implementation status (2026-11-27): **in progress, P13**. Members and
 configuration sync are implemented (FED-01, [#1930](https://github.com/weaveplatform/artifactweave/issues/1930)):
 member checks against paired peers, `federatedRepoUrlBase`, configSync over the
 peer API, `migrate`, `convertToLocal`, `replaceUrl` and `updateMemberUrl`. Change
@@ -14,10 +14,12 @@ producer in the item service's transaction and its applier under the conflict ru
 Full sync and the member operations are implemented (FED-04,
 [#1932](https://github.com/weaveplatform/artifactweave/issues/1932)): the repository's
 snapshot and reconciler, `fullSync`, `forceFullSync`, `recovery`, `reconnect`,
-`removeMember`, `prioritization` and `propagateCreatedTime`. The
-rest of the decision below describes intended behavior that later P13 tasks
-implement; their generated API stubs and storage models do not implement it yet.
+`removeMember`, `prioritization` and `propagateCreatedTime`.
 Receiver members and receiving-only trust are implemented by FED-03 (#1933).
+FED-05 (#1934) implements monitoring and the classified RTFS answers; FED-06 (#1935)
+implements failed-binary list, replay and delete. Configured-member cleanup remains
+pending FED-07 (#1798), including its consistency decision. The integrated P13 exit
+and independent epic acceptance remain pending QUA-03 (#1937).
 P37 owns vendor federation/RTFS interoperability and migration contracts. [0042](0042-capability-scope-and-supersession.md)
 replaces permanent scope cuts; [research 10](../10-scope-and-tiers.md) records current
 availability.
@@ -362,6 +364,15 @@ Alternatives considered:
 - Handler tests for the member URL rules, the paired-peer and ten-member refusals, `mode`,
   the `terraformbackend` refusal on create and `migrate`, and every answer in research 40 §7.
 - Status endpoint tests driven by synthetic cursors.
+- `TestAccFederatedNativeSQLite/Postgres` publishes Maven/npm content and resolves it
+  with fresh clients on all three members; JFrog CLI changes properties and deletes
+  content on each origin. It proves pruning with signed 410 answers, normal/forced
+  full-sync repair, publication after repair and receiving-only isolation. Pinned Linux
+  execution is required; explicit host-client mode is supplementary evidence.
+- `TestAccFederatedAPIFormatsSQLite/Postgres` configures the six types without a
+  provider resource and publishes valid native-format content. Every member must serve
+  exact bytes and regenerated native metadata, with generated links resolving locally.
+  These HTTP protocol cases are distinct from CLI compatibility and phase acceptance.
 
 ## References
 

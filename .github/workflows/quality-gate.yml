@@ -394,14 +394,63 @@ jobs:
       - name: Download Go modules
         uses: ./.github/actions/go-mod-download
 
+      - name: Maven build tools (pinned)
+        uses: ./.github/actions/maven-tools
+
+      - name: JFrog CLI (pinned)
+        uses: ./.github/actions/jfrog-cli
+
+      - name: Peer native client images (pinned)
+        run: |
+          docker build -t artifactweave-accept-node \
+            -f test/acceptance/clients/node.Dockerfile test/acceptance/clients
+          docker build -t artifactweave-accept-maven \
+            -f test/acceptance/clients/maven.Dockerfile test/acceptance/clients
+
       - name: Multi-instance scenarios (race, shuffle, coverage)
         env:
+          ARTIFACTWEAVE_REQUIRE_DOCKER: '1'
+          ARTIFACTWEAVE_NODE_IMAGE: artifactweave-accept-node
+          ARTIFACTWEAVE_MAVEN_IMAGE: artifactweave-accept-maven
           ARTIFACTWEAVE_TEST_PROCESS_LOG_DIR: ${{ runner.temp }}/peer-logs
         run: |
+          set -o pipefail
           mkdir -p cover/accept-peers
-          go test -race -shuffle=on -count=1 -timeout=20m -v \
+          go test -race -shuffle=on -json -count=1 -timeout=20m -v \
             -cover -covermode=atomic -coverpkg=github.com/weaveplatform/artifactweave/... \
-            ./test/peers/... -args -test.gocoverdir="$PWD/cover/accept-peers"
+            ./test/peers/... -args -test.gocoverdir="$PWD/cover/accept-peers" \
+            | tee "$RUNNER_TEMP/peer-results.jsonl"
+
+      - name: Require peer qualification results
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          required = {
+              "TestAccFederatedNativeSQLite", "TestAccFederatedNativePostgres",
+              "TestAccFederatedAPIFormatsSQLite", "TestAccFederatedAPIFormatsPostgres",
+              "TestAccPeerProtocolQualificationSQLite", "TestAccPeerProtocolQualificationPostgres",
+              "TestAccPeerStreamSQLite", "TestAccPeerStreamPostgres",
+          }
+          outcomes = {}
+          for line in (Path(os.environ["RUNNER_TEMP"]) / "peer-results.jsonl").read_text().splitlines():
+              event = json.loads(line)
+              if event.get("Test") in required and event.get("Action") in {"pass", "fail", "skip"}:
+                  outcomes[event["Test"]] = event["Action"]
+          missing = {name: outcomes.get(name, "missing") for name in required if outcomes.get(name) != "pass"}
+          if missing:
+              raise SystemExit("Required peer qualification did not pass: " + str(missing))
+          print("Required native client, format, protocol and stream cases passed on SQLite and PostgreSQL")
+          PY
+
+      - name: Upload peer qualification results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: peer-qualification-results
+          path: ${{ runner.temp }}/peer-results.jsonl
+          if-no-files-found: error
+          retention-days: 7
 
       # A failing scenario prints each instance's log in the job output;
       # these are the complete files.

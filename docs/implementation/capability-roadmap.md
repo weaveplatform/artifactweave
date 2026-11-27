@@ -67,6 +67,16 @@ inventory across products, APIs and clients.
 | Incoming API budgets, temporary principal restriction/recovery, optional durable build-append retries and bounded Access identity pages | P18, [#890](https://github.com/weaveplatform/artifactweave/issues/890); [operation ledger and execution review](../research/api-reliability/README.md), fault/load/paging evidence and full quality gate. P19/#216 owns live wire confirmation; P20 retains the wider product/client inventory |
 | First delivery sequence: hardening and live comparison | P18/P19 followed by P19a observation-dependent implementation; does not imply completion of the newly scheduled P20–P41 capabilities |
 
+P13 delivery reviewed on 2026-11-27 is **partially implemented** at merged main
+`05eae4473cae77c3fe0d086f96ffb67a42126270`: peer trust, streams and snapshots;
+members and configuration; receiver direction; full sync; monitoring/RTFS answers;
+failed-binary controls; and the 35-resource provider qualification are delivered.
+Configured-member cleanup remains [#1798](https://github.com/weaveplatform/artifactweave/issues/1798).
+The [P13 record](plan.md#p13-peer-trust-and-federated-repositories) separates those
+child deliveries from [#1937](https://github.com/weaveplatform/artifactweave/issues/1937)'s
+pending integrated acceptance and merged-main evidence. This does not deliver P14
+Access/topology, P19 live comparison, P37 vendor interoperability or P40 bridge workflows.
+
 ## P20 onward: capability ownership
 
 The [phase tasks and exits](plan.md#p20-capability-inventory-and-contract-coverage)

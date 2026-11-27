@@ -42,7 +42,7 @@ Updated as phases land. "Done" means the exit criteria hold, the gate (95% merge
 | P10 Virtual repositories | Implementation delivered; qualification in progress | **M3**; [qualification and epic closeout](../testing/phase10-signoff.md), final completion record in [EPIC-QUA #1528](https://github.com/weaveplatform/artifactweave/issues/1528) |
 | P11 Projects, events, cleanup and single replication | Done (2026-11-23) | Project APIs/authorization/sharing/quotas, typed events and durable consumers, 24 webhook subscription resources, package cleanup, single push/pull execution/status (#1763) and native/provider qualification (#1764) are merged. #1765 qualified merged main `425ce4de9a68`: the no-input [full workflow 45191301585](https://github.com/weaveplatform/artifactweave/actions/runs/45191301585) passed at 95.2% total coverage and literal `make gate` passed at 95.1%. Epic #1742 closure is the maintainer's; P19a owns observation-dependent completion |
 | P12 Descriptor export, system configuration, LDAP | Done (2026-11-23) | XML export, base URL/reverse proxy/nginx, temporary loggers, baseline security and global hiding, GC/trash can, global quota, backups/mail/system message, LDAP connections/bind/group synchronization, NTLM and redirected proxy credentials and the seven provider resources are merged (#1825 to #1837, #1848, #1902, #1903). #1838 qualified merged main `b910ea869b65`: the no-input [full workflow 45277781762](https://github.com/weaveplatform/artifactweave/actions/runs/45277781762) passed at 95.2% total coverage and literal `make gate` passed at 95.1%, two load timeouts rerun once. #1905 (#1912) then made the XML `security` element follow 7.161.26's `SecurityType`, so the deprecated `artifactory_ldap_group_setting` no longer reads back, as on 7.x from 7.57.1; `artifactory_ldap_group_setting_v2` remains qualified. Epic closure is the maintainer's; #1908, #1873 and #1901 are open follow-ups; P36 owns XML POST and backup execution |
-| P13 Peer trust and federated repositories | Not started | |
+| P13 Peer trust and federated repositories | In progress | [Delivery and independent acceptance](#p13-peer-trust-and-federated-repositories); cleanup and phase qualification remain open |
 | P14 Platform federation and topology | Not started | |
 | P15 Release bundles v1 and Distribution | Not started | |
 | P16 Cold storage archive and retention | Not started | |
@@ -1330,6 +1330,29 @@ Decisions: [0021](../research/decisions/0021-peer-trust-and-sync-protocol.md),
 [40](../research/40-federated-repositories-7x.md).
 
 **Tracking.** [P13 implementation backlog and product baseline #1920](https://github.com/weaveplatform/artifactweave/issues/1920)
+
+**Delivery and acceptance (2026-11-27).** Merged main
+`05eae4473cae77c3fe0d086f96ffb67a42126270` contains PEER-01–05,
+FED-01–06 and QUA-01–02. The [peer](https://github.com/weaveplatform/artifactweave/issues/1921),
+[repository](https://github.com/weaveplatform/artifactweave/issues/1922) and
+[qualification](https://github.com/weaveplatform/artifactweave/issues/1923) epics record
+their child merges separately from integrated acceptance. FED-07
+([#1798](https://github.com/weaveplatform/artifactweave/issues/1798)) remains unpublished
+while its consistency guarantee is unresolved. P13 is not accepted.
+
+[QUA-03 #1937](https://github.com/weaveplatform/artifactweave/issues/1937) adds explicit
+SQLite/PostgreSQL process scenarios in `test/peers`: native Maven/npm publication and
+fresh resolution with JFrog CLI property/delete operations; the six formats without a
+provider resource; pairwise trust and live protocol refusals; and an ordered test stream
+through process restart, pull, actual pruning and snapshot recovery. A snapshot repairs
+state at its sequence without inventing application-history entries for pruned events.
+Host-client results supplement the required pinned Linux client execution. Final
+merged-main CI, the clean literal gate and independent epic acceptance remain pending
+QUA-03 and the merged cleanup implementation.
+
+P14 owns Access federation and topology; P19 owns live comparison of inferred answers;
+P37 owns vendor interoperability and cold-instance contracts; P40 owns Mission Control
+and bridge integration. These receiving phases are unchanged by P13's local peer proof.
 
 **Tasks**
 

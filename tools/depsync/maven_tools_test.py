@@ -104,6 +104,9 @@ class MavenToolsTest(unittest.TestCase):
         root = self.root / 'repo'
         (root / 'test/acceptance/features').mkdir(parents=True)
         (root / 'test/acceptance/testdata/maven/lib').mkdir(parents=True)
+        (root / 'test/peers').mkdir(parents=True)
+        (root / 'test/peers/native_clients_test.go').write_text(
+            '"org.apache.maven.plugins:maven-deploy-plugin:3.1.3:deploy-file"\n')
         (root / 'test/acceptance/features/x.feature').write_text(
             'When I run mvn "org.apache.maven.plugins:maven-help-plugin:3.5.1:evaluate"\n')
         (root / 'test/acceptance/testdata/maven/lib/pom.xml').write_text(
@@ -112,6 +115,7 @@ class MavenToolsTest(unittest.TestCase):
             '</plugin></plugins></build></project>')
         self.assertEqual(
             {('org.apache.maven.plugins', 'maven-help-plugin', '3.5.1'),
+             ('org.apache.maven.plugins', 'maven-deploy-plugin', '3.1.3'),
              ('org.apache.maven.plugins', 'maven-jar-plugin', '3.4.2')},
             TOOLS.required_plugins(root))
         (root / 'test/acceptance/testdata/maven/lib/pom.xml').write_text(

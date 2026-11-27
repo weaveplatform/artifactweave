@@ -48,8 +48,9 @@ type streamInstance struct {
 // each as the other's peer for federated-repo/*, as pairing would, with the
 // deliveries given. Both subscribe to the test stream.
 //
-// It runs here rather than in test/peers, which cannot host paired
-// instances yet; the scenario moves there with #1946.
+// These component scenarios retain direct fault hooks. The process-based
+// TestAccPeerStreamSQLite/Postgres scenarios separately qualify pairing,
+// restart, pull and real pruning through snapshot recovery in test/peers.
 func newStreamWorld(t *testing.T, driver, dsnA, dsnB string, aRecordsB, bRecordsA model.Delivery) (a, b *streamInstance) {
 	t.Helper()
 	listeners := make([]net.Listener, 2)

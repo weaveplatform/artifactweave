@@ -4,8 +4,8 @@ Checked against: Artifactory 7.161.32 and the 7.161.26 source ([research 40](../
 
 Status: Accepted
 
-Implementation status (2026-11-24): **partly implemented P13**. The decision below describes
-intended behavior. The peer API's wire contract is specified
+Implementation status (2026-11-27): **peer protocol implemented; P13 qualification in progress**.
+The peer API's wire contract is specified
 ([PEER-01](https://github.com/weaveplatform/artifactweave/issues/1925), **Wire contract**
 below): `api/src/peer/` generates its server and client. The signed transport is
 implemented ([PEER-03](https://github.com/weaveplatform/artifactweave/issues/1927),
@@ -28,6 +28,10 @@ and reads every paired peer's status periodically (**Wire contract** below), and
 ([#1932](https://github.com/weaveplatform/artifactweave/issues/1932)) adds `POST
 streams/{stream}/resync`, through which a member's `fullSync` asks another to resynchronise
 from it, so every peer operation is served.
+The complete P13 exit remains open in
+[QUA-03 #1937](https://github.com/weaveplatform/artifactweave/issues/1937), including
+configured-member cleanup's unresolved guarantee in #1798. Child delivery does not
+establish integrated epic acceptance or the final merged-main gates.
 P37 owns cross-vendor synchronization and separate cold-instance contracts; P40 owns
 Mission Control/bridge/estate integration. [0042](0042-capability-scope-and-supersession.md)
 replaces permanent scope cuts; [research 10](../10-scope-and-tiers.md) records current
@@ -405,6 +409,19 @@ Alternatives considered:
   idempotent apply, cursor advance, pruning.
 - Multi-instance acceptance scenarios in the `acceptance-peers` CI job: pair two and three
   instances, partition one, resume from cursor, force a full sync after pruning.
+- `TestAccPeerProtocolQualificationSQLite/Postgres` checks three actual processes:
+  exact pairings and bilateral cancellation, outgoing status probes in all six directions,
+  and live replay, skew, tampering and version refusals. Adversarial requests originate in
+  the harness; genuine probes originate in the processes. Refusal bodies and process logs
+  are checked for fixture secret material. Required signed response headers remain on the wire.
+- `TestAccPeerStreamSQLite/Postgres` uses the existing `streamtest` kind in three
+  processes with real signed adapters and production cryptographic costs. A private test
+  child adds fixture control without a production route or configuration switch. The
+  scenario covers actual stop/restart, partition, pull, duplicate rejection, scheduler
+  pruning, a signed 410 and completed snapshot recovery. Snapshot reconciliation preserves
+  state and the applied cursor; it does not manufacture the missing events' history.
+  Subsequent entries must append exactly once in order. Default and custom restarted
+  child coverage are checked in atomic, set and count modes.
 - Full sync (PEER-05): `core/sync`'s unit tests with the `streamtest` kind (push and pull
   receivers past the window, pages that keep their sequence while the sender writes, a
   restart mid-run, forced and normal modes, failed content, refusals), the snapshot store

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"maps"
 	"net/http"
 	"os"
@@ -22,6 +23,96 @@ import (
 
 // unitJobs are the quality gate's Go unit test jobs, one per runner OS.
 var unitJobs = []string{"unit-linux", "unit-macos", "unit-windows"}
+
+func TestUnitPeerQualificationRequiresClientsAndCompletedResults(t *testing.T) {
+	data, err := os.ReadFile("../../.github/workflows/quality-gate.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var workflow struct {
+		Jobs map[string]struct {
+			Steps []struct {
+				Name, Uses, Run string
+				Env             map[string]string
+			}
+		}
+	}
+	if err := yaml.Unmarshal(data, &workflow); err != nil {
+		t.Fatal(err)
+	}
+	var tools, jf, images bool
+	var verify string
+	for _, step := range workflow.Jobs["acceptance-peers"].Steps {
+		switch {
+		case step.Uses == "./.github/actions/maven-tools":
+			tools = true
+		case step.Uses == "./.github/actions/jfrog-cli":
+			jf = true
+		case step.Name == "Peer native client images (pinned)":
+			images = strings.Contains(step.Run, "-f test/acceptance/clients/node.Dockerfile test/acceptance/clients") &&
+				strings.Contains(step.Run, "-f test/acceptance/clients/maven.Dockerfile test/acceptance/clients")
+		case step.Name == "Multi-instance scenarios (race, shuffle, coverage)":
+			if !tools || !jf || !images || step.Env["ARTIFACTWEAVE_REQUIRE_DOCKER"] != "1" ||
+				step.Env["ARTIFACTWEAVE_NODE_IMAGE"] != "artifactweave-accept-node" ||
+				step.Env["ARTIFACTWEAVE_MAVEN_IMAGE"] != "artifactweave-accept-maven" ||
+				!strings.Contains(step.Run, "-json") || !strings.Contains(step.Run, "set -o pipefail") ||
+				!strings.Contains(step.Run, `tee "$RUNNER_TEMP/peer-results.jsonl"`) {
+				t.Fatal("peer scenarios must require the pinned clients and retain truthful process results")
+			}
+		case step.Name == "Require peer qualification results":
+			verify = step.Run
+		}
+	}
+	if verify == "" {
+		t.Fatal("peer lane lost its mandatory qualification result check")
+	}
+	if runtime.GOOS == "windows" {
+		t.Skip("the Actions result check uses Bash and python3")
+	}
+	required := []string{
+		"TestAccFederatedNativeSQLite", "TestAccFederatedNativePostgres",
+		"TestAccFederatedAPIFormatsSQLite", "TestAccFederatedAPIFormatsPostgres",
+		"TestAccPeerProtocolQualificationSQLite", "TestAccPeerProtocolQualificationPostgres",
+		"TestAccPeerStreamSQLite", "TestAccPeerStreamPostgres",
+	}
+	type resultCase struct {
+		name, testName, result string
+		wantSuccess            bool
+	}
+	cases := []resultCase{{name: "all required cases pass", wantSuccess: true}}
+	for _, name := range required {
+		for _, result := range []string{"missing", "skip", "fail"} {
+			cases = append(cases, resultCase{name: name + "/" + result, testName: name, result: result})
+		}
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			var outcomes strings.Builder
+			for _, name := range required {
+				result := "pass"
+				if name == tc.testName {
+					if tc.result == "missing" {
+						continue
+					}
+					result = tc.result
+				}
+				if err := json.NewEncoder(&outcomes).Encode(struct{ Test, Action string }{name, result}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := os.WriteFile(filepath.Join(dir, "peer-results.jsonl"), []byte(outcomes.String()), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			cmd := exec.CommandContext(t.Context(), "bash", "-ec", verify)
+			cmd.Env = append(os.Environ(), "RUNNER_TEMP="+dir)
+			output, err := cmd.CombinedOutput()
+			if (err == nil) != tc.wantSuccess {
+				t.Fatalf("required qualification results success=%t, want %t: %v\n%s", err == nil, tc.wantSuccess, err, output)
+			}
+		})
+	}
+}
 
 func TestUnitTerraformModuleNativeAcceptanceIsRequired(t *testing.T) {
 	const pkg, testName = "./test/server/artifacts/terraform", "TestAccTerraformModuleInit"

@@ -85,6 +85,9 @@ type Options struct {
 	// PeerProbeInterval is each instance's federation.peer_probe_interval,
 	// how often it reads its peers' status; zero keeps the default.
 	PeerProbeInterval time.Duration
+	// ChildTest selects a dedicated TestAcc child entry in this binary.
+	// Empty keeps InstanceTest and the production app.Run server.
+	ChildTest string
 }
 
 // Cluster is a set of artifactweave instances, each in its own OS process
@@ -150,6 +153,7 @@ func Start(t *testing.T, opts Options) *Cluster {
 			cluster:       c,
 			probe:         opts.PeerProbeInterval,
 			retention:     opts.Retention,
+			childTest:     opts.ChildTest,
 			work:          filepath.Join(work, name),
 			done:          make(chan struct{}),
 			// Both relays listen before any instance starts: the ingress
@@ -233,6 +237,26 @@ func (c *Cluster) Heal(a, b int) {
 func (c *Cluster) Stop(i int) {
 	c.t.Helper()
 	c.instance(i).stop()
+}
+
+// Restart starts a stopped instance from its unchanged configuration, retaining
+// its listener, ingress, data, database and identity. A failed prior exit is
+// reported before another process can replace its result.
+func (c *Cluster) Restart(i int) {
+	c.t.Helper()
+	in := c.instance(i)
+	select {
+	case <-in.done:
+	default:
+		c.t.Fatalf("peers: %s must be stopped before restart", in.Name)
+	}
+	if in.exit != nil {
+		c.t.Fatalf("peers: %s exited unsuccessfully before restart: %v", in.Name, in.exit)
+	}
+	in.closeStore()
+	if err := in.launch(); err != nil {
+		c.t.Fatal(err)
+	}
 }
 
 // DoFrom sends a request to instance to's base URL as to's administrator,
@@ -417,6 +441,7 @@ type Instance struct {
 	// peer_probe_interval and outbox_retention, left out when zero.
 	probe     time.Duration
 	retention time.Duration
+	childTest string
 	work      string
 	dsn       string
 	// config is the configuration file the instance process loads.
@@ -683,12 +708,16 @@ func (in *Instance) startOnce(origins []string) error {
 		return err
 	}
 	in.config = path
+	return in.launch()
+}
+
+func (in *Instance) launch() error {
 	log, err := in.openLog()
 	if err != nil {
 		return err
 	}
 	done := make(chan struct{})
-	stdin, kill, err := startProcess(log, path, done, &in.exit)
+	stdin, kill, err := startProcess(log, in.config, in.childTest, done, &in.exit)
 	if err != nil {
 		return fmt.Errorf("%s: %w", in.Name, err)
 	}

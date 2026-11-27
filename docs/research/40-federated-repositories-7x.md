@@ -509,6 +509,20 @@ exercises section 10 separately. The sanitized `p13-provider-evidence.json` reco
 35 resource outcomes and exclusions; it contains neither state nor member credentials.
 This is configuration qualification; content convergence remains the multi-instance exit.
 
+`TestAccFederatedAPIFormatsSQLite/Postgres` in `test/peers` supplies content scenarios
+for the six types without provider resources: Pub archive/finalize, Nix archive and
+narinfo, Machine Learning transaction/manifest, Bazel module/source archive, LuaRocks
+rockspec/source rock, and Agent Packages ZIP publication. All three members must serve
+exact content and native metadata. This is artifactweave HTTP protocol evidence, not
+a live JFrog comparison or actual CLI execution.
+
+`TestAccFederatedNativeSQLite/Postgres` separately uses Maven, npm and JFrog CLI for
+three-member publication, resolution, properties, deletion, partition repair and receiver
+isolation. Host-client results supplement required pinned Linux execution. The integrated
+exit, configured-member cleanup and final merged-main evidence remain open under
+[#1937](https://github.com/weaveplatform/artifactweave/issues/1937) and
+[#1798](https://github.com/weaveplatform/artifactweave/issues/1798).
+
 ## 10. An unpaired member in a Terraform run
 
 This answers the "Federated repository plans" question in [12](12-open-questions.md).

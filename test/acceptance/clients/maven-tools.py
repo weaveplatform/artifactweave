@@ -54,7 +54,8 @@ def required_plugins(root=ROOT):
             if not version:
                 raise ValueError("unpinned plugin in " + str(pom.relative_to(root)) + ": " + artifact)
             found.add((group, artifact, version))
-    sources = [*(root / "test/acceptance/features").glob("*.feature"), *(root / "test/acceptance").glob("*.go")]
+    sources = [*(root / "test/acceptance/features").glob("*.feature"),
+               *(root / "test/acceptance").glob("*.go"), *(root / "test/peers").glob("*.go")]
     for source in sorted(sources):
         found.update(COMMAND_PLUGIN.findall(source.read_text()))
     return found

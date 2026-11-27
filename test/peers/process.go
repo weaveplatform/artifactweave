@@ -31,6 +31,13 @@ const instanceConfigEnv = "ARTIFACTWEAVE_PEER_INSTANCE_CONFIG"
 // runtime, router and production costs, until Start closes its standard
 // input.
 func RunInstance(t *testing.T) {
+	RunInstanceWith(t, app.Run)
+}
+
+// RunInstanceWith gives a dedicated child fixture the same configuration,
+// production logging and EOF shutdown as RunInstance. The runner belongs to
+// the test binary; it adds no option or endpoint to the application.
+func RunInstanceWith(t *testing.T, run func(context.Context, config.Config, *slog.Logger) error) {
 	path := os.Getenv(instanceConfigEnv)
 	if path == "" {
 		return
@@ -49,7 +56,7 @@ func RunInstance(t *testing.T) {
 		stop()
 	}()
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	if err := app.Run(ctx, cfg, log); err != nil {
+	if err := run(ctx, cfg, log); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -86,13 +93,16 @@ func testCommand(ctx context.Context, test, coverDir string, env ...string) (*ex
 	return cmd, collect, nil
 }
 
-// startProcess starts InstanceTest over the configuration at path, with its
+// startProcess starts childTest (InstanceTest by default) over the configuration at path, with its
 // output in log, and returns its standard input, whose closing stops it, and
 // a function that kills it. done closes once it has exited and *exit holds
 // its result.
-func startProcess(log *os.File, path string, done chan struct{}, exit *error) (io.WriteCloser, func(), error) {
+func startProcess(log *os.File, path, childTest string, done chan struct{}, exit *error) (io.WriteCloser, func(), error) {
 	ctx, kill := context.WithCancel(context.Background())
-	cmd, collect, err := TestCommand(ctx, InstanceTest, instanceConfigEnv+"="+path)
+	if childTest == "" {
+		childTest = InstanceTest
+	}
+	cmd, collect, err := TestCommand(ctx, childTest, instanceConfigEnv+"="+path)
 	if err != nil {
 		kill()
 		_ = log.Close()

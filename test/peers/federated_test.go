@@ -2,6 +2,7 @@ package peers_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"slices"
 	"strings"
@@ -106,6 +107,7 @@ func testFederatedMembers(t *testing.T, driver peers.Driver) {
 	pair(t, a, b)
 	pair(t, a, d)
 	pair(t, b, d)
+	refuseInvalidFederatedMembership(t, c.Instances)
 
 	// A member that is not a paired peer is refused before anything is stored.
 	unpaired := `{"rclass":"federated","packageType":"generic","members":[{"url":"http://127.0.0.1:9/artifactory/fed"}]}`
@@ -161,4 +163,59 @@ func testFederatedMembers(t *testing.T, driver peers.Driver) {
 	if status, body := a.DoAs(t, "", "", http.MethodPost, "/artifactory/api/federation/configSync/fed", ""); status != http.StatusUnauthorized {
 		t.Fatalf("anonymous configSync: %d %s", status, body)
 	}
+}
+
+// These refusals must survive the real HTTP, SQL and process boundary and
+// leave repository configuration unchanged, not merely fail model validation.
+func refuseInvalidFederatedMembership(t *testing.T, all []*peers.Instance) {
+	t.Helper()
+	a := all[0]
+	const repositories = "/artifactory/api/repositories/"
+	eleven := make([]string, 11)
+	for i := range eleven {
+		eleven[i] = fmt.Sprintf(`{"url":%q}`, member(all[1], fmt.Sprintf("limit-%d", i)))
+	}
+	for _, tc := range []struct{ key, body, message string }{
+		{
+			"member-limit",
+			`{"rclass":"federated","packageType":"generic","members":[` + strings.Join(eleven, ",") + `]}`,
+			"allows at most 10 members, this instance's included",
+		},
+		{
+			"unknown-mode",
+			fmt.Sprintf(`{"rclass":"federated","packageType":"generic","members":[{"url":%q,"mode":"sideways"}]}`, member(all[1], "unknown-mode")),
+			"is not one of bidirectional, receiver",
+		},
+		{
+			"unsupported-type",
+			`{"rclass":"federated","packageType":"terraformbackend"}`,
+			"packageType",
+		},
+	} {
+		t.Run(tc.key, func(t *testing.T) {
+			status, body := a.Do(t, http.MethodPut, repositories+tc.key, tc.body)
+			if status != http.StatusBadRequest || !strings.Contains(body, tc.message) {
+				t.Fatalf("invalid membership: %d %s", status, body)
+			}
+			for _, in := range all {
+				do(t, in, http.MethodGet, repositories+tc.key, "", http.StatusNotFound)
+			}
+		})
+	}
+	t.Run("terraformbackend-migrate", func(t *testing.T) {
+		const key = "backend-local"
+		do(t, a, http.MethodPut, repositories+key,
+			`{"rclass":"local","packageType":"terraformbackend","description":"migration refusal sentinel"}`, http.StatusOK)
+		status, body := a.Do(t, http.MethodPost, "/artifactory/api/federation/migrate/"+key, "")
+		if status != http.StatusBadRequest || !strings.Contains(body, "terraformbackend") {
+			t.Fatalf("unsupported migration: %d %s", status, body)
+		}
+		config, found := readRepo(t, a, key)
+		if !found || config.Rclass != "local" || config.Description != "migration refusal sentinel" || len(config.Members) != 0 {
+			t.Fatalf("refused migration changed the local repository: %+v", config)
+		}
+		for _, in := range all[1:] {
+			do(t, in, http.MethodGet, repositories+key, "", http.StatusNotFound)
+		}
+	})
 }
