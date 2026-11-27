@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"reflect"
 	"testing"
+	"time"
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
@@ -35,6 +36,7 @@ func TestAccRuntimeAccessModule(t *testing.T) {
 	cfg.Listen = "127.0.0.1:0"
 	cfg.Token.AllowBasicAuth = true
 	cfg.Environments.GlobalLimit = 7
+	cfg.NPM.LoginTokenExpiry = 12 * time.Hour
 	ctx, cancel := context.WithCancel(context.Background())
 	ready := make(chan string, 1)
 	done := make(chan error, 1)
@@ -58,7 +60,7 @@ func TestAccRuntimeAccessModule(t *testing.T) {
 	if snapshot.PackageOptions.Store == nil {
 		t.Error("the Debian snapshot work was given no store for a virtual repository's walk")
 	}
-	want := accessapi.Settings{AllowBasicAuthTokens: true, GlobalEnvironmentLimit: 7}
+	want := accessapi.Settings{AllowBasicAuthTokens: true, GlobalEnvironmentLimit: 7, NativeLoginTokenExpiry: 12 * time.Hour}
 	if api.Settings != want {
 		t.Errorf("Access.Settings = %+v, want %+v from the configuration", api.Settings, want)
 	}

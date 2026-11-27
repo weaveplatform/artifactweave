@@ -1690,13 +1690,12 @@ func xetFixture(t *testing.T, name string) []byte {
 	return repopath.Read(t, "internal/artifacts/ecosystem/huggingface/xet/testdata/"+name)
 }
 
-func newXetWorld(t *testing.T) *itemWorld {
+func newXetWorld(t *testing.T, tune ...func(*RouterConfig)) *itemWorld {
 	t.Helper()
-	w := newItemWorld(
-		t,
-		false,
+	opts := []func(*RouterConfig){
 		func(c *RouterConfig) { c.HuggingFaceXetEnabled = true; c.Keys = support.TerraformBackendKeys(t) },
-	)
+	}
+	w := newItemWorld(t, false, append(opts, tune...)...)
 	for _, c := range []repo.Config{{Key: "hf", Class: repo.Local, PackageType: repo.HuggingFaceML}, {Key: "hf-f", Class: repo.Federated, PackageType: repo.HuggingFaceML}, {Key: "hf-v", Class: repo.Virtual, PackageType: repo.HuggingFaceML, Repositories: []string{"hf"}, DefaultDeploymentRepo: "hf"}} {
 		if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
 			t.Fatal(err)

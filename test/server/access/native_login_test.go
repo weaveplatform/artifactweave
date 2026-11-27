@@ -20,6 +20,7 @@ import (
 	appsql "github.com/weaveplatform/artifactweave/internal/app/adapters/sql"
 	"github.com/weaveplatform/artifactweave/internal/app/config"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/internal/platform/crypt"
 	"github.com/weaveplatform/artifactweave/internal/platform/instance"
@@ -239,6 +240,20 @@ func TestAccNativeLoginSQL(t *testing.T) {
 					t.Fatal("session fixation")
 				}
 				b.approve()
+				// Even an approved, valid poll must not be consumed by HEAD.
+				// Authenticated HEAD reaches npm's wildcard refusal, not Poll.
+				for _, check := range []struct {
+					headers map[string]string
+					status  int
+				}{{nil, 401}, {basic("browser-user", "pw"), 404}} {
+					if head := b.request(http.MethodHead, b.poll, "", check.headers); head.Code != check.status {
+						t.Fatal("approved HEAD refusal", head.Code, check.status)
+					}
+				}
+				stored, _, err := db.Tokens().List(t.Context(), accesstest.TokenFilter{}, kernel.Page{Limit: 100})
+				if err != nil || len(stored) != 0 {
+					t.Fatal("HEAD minted a token", len(stored), err)
+				}
 				var wg sync.WaitGroup
 				results := make(chan *httptest.ResponseRecorder, 8)
 				for range 8 {
@@ -264,6 +279,10 @@ func TestAccNativeLoginSQL(t *testing.T) {
 				}
 				if wins != 1 {
 					t.Fatal("redemption winners", wins)
+				}
+				stored, _, err = db.Tokens().List(t.Context(), accesstest.TokenFilter{}, kernel.Page{Limit: 100})
+				if err != nil || len(stored) != 1 {
+					t.Fatal("GET must mint exactly once after HEAD", len(stored), err)
 				}
 				rec := b.request(http.MethodGet, "/artifactory/api/npm/npm-login/-/whoami", "", map[string]string{"Authorization": "Bearer " + raw})
 				if rec.Code != 200 || !strings.Contains(rec.Body.String(), "browser-user") {
