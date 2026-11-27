@@ -303,5 +303,9 @@ Crowd, HTTP-SSO, MFA, SCIM, shared HA sessions or the P39 console.
   session consistency/failover remains P35 work unless this implementation explicitly
   undertakes and qualifies it; a bounded single-node claim must say so.
 
-Only this note was added. No client/server builds, native login runs, Docker changes,
-cache changes, production changes or live vendor login captures were made.
+The original November 19 audit added only research and PKCE primitives. The #262
+implementation now follows [decision 0019](decisions/0019-human-authentication-tiers.md#native-approval-contract-262). Required client proof lives in
+`test/acceptance/features/native_login.feature`; security/current-policy and
+rollback proof lives in `test/server/access/native_login*_test.go` and the session
+unit tests. These runs do not add a live vendor capture or qualify the other P21
+identity providers, MFA challenges or HA sessions.

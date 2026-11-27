@@ -46,6 +46,7 @@ var statusParts = []statusPart{
 	serviceTrustStatusPart,
 	peerStreamsStatusPart,
 	peerStatusStatusPart,
+	nativeLoginStatusPart,
 }
 
 // matrixPart is a format's share of the route × principal matrix.
@@ -70,6 +71,7 @@ var matrixParts = []matrixPart{
 	serviceTrustMatrixPart,
 	peerStreamsMatrixPart,
 	peerStatusMatrixPart,
+	nativeLoginMatrixPart,
 }
 
 // partRoutes is the routes each status part lists under pick.

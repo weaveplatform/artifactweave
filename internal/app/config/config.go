@@ -574,8 +574,6 @@ func set(cfg *Config, key, value string) error {
 	switch key {
 	case "listen":
 		cfg.Listen = value
-	case "native_login.origin":
-		cfg.NativeLogin.Origin = value
 	case "base_url":
 		cfg.BaseURL = value
 	case "data_dir":
@@ -658,11 +656,12 @@ func boolKeys(cfg *Config) map[string]*bool {
 // line here.
 func sections(cfg *Config) map[string]func(sub, key, value string) error {
 	return map[string]func(sub, key, value string) error{
-		"api.":    func(sub, key, value string) error { return setAPI(&cfg.API, sub, key, value) },
-		"maven.":  func(sub, key, value string) error { return setMaven(&cfg.Maven, sub, key, value) },
-		"nuget.":  func(sub, key, value string) error { return setNuGet(&cfg.NuGet, sub, key, value) },
-		"remote.": func(sub, key, value string) error { return setRemote(&cfg.Remote, sub, key, value) },
-		"xz.":     func(sub, key, value string) error { return setXZ(&cfg.XZ, sub, key, value) },
+		"native_login.": func(sub, key, value string) error { return setNativeLogin(&cfg.NativeLogin, sub, key, value) },
+		"api.":          func(sub, key, value string) error { return setAPI(&cfg.API, sub, key, value) },
+		"maven.":        func(sub, key, value string) error { return setMaven(&cfg.Maven, sub, key, value) },
+		"nuget.":        func(sub, key, value string) error { return setNuGet(&cfg.NuGet, sub, key, value) },
+		"remote.":       func(sub, key, value string) error { return setRemote(&cfg.Remote, sub, key, value) },
+		"xz.":           func(sub, key, value string) error { return setXZ(&cfg.XZ, sub, key, value) },
 		"virtual.": func(sub, key, value string) error {
 			return setVirtual(&cfg.Virtual, sub, key, value)
 		},

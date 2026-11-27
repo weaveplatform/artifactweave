@@ -7652,6 +7652,25 @@
     ]
   },
   {
+    "route": "GET /artifactory/api/npm/{repoKey}/-/v1/done",
+    "state": "implemented when native_login.enabled; absent by default",
+    "handler": "internal/app/router.go: internal/access/adapters/http/login.Handler.poll-fm",
+    "review_family": "native-client-approval",
+    "effects": "single-winner capability consumption and guarded P4 revocable finite token issuance; no refresh token or token replay storage; HEAD never redeems",
+    "retry": "pending npm202 honors Retry-After; do not repeat a delivered, denied, expired or consumed capability; issuance failure or response loss requires a new login, never a second mint",
+    "admission": "explicit trusted canonical origin; bounded process-local capabilities; browser session and CSRF plus exact Origin for form mutations; current internal user/UI eligibility and npm repository incarnation/class/owner/visibility rechecked under shared administration guard",
+    "pagination_execution": "not a collection; at most1024 outstanding approvals, lazy expiry, no transaction across password authentication/directory I/O",
+    "evidence": [
+      "internal/access/core/session/service.go",
+      "internal/access/adapters/http/login/http.go",
+      "internal/access/module.go",
+      "internal/app/status_native_login_test.go",
+      "test/server/access/native_login_test.go",
+      "test/acceptance/features/native_login.feature",
+      "docs/research/decisions/0019-human-authentication-tiers.md"
+    ]
+  },
+  {
     "route": "GET /artifactory/api/npm/{repoKey}/-/v1/search",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
     "handler": "internal/app/router.go: internal/artifacts/ecosystem/npm/http.handler.search-fm",
@@ -13115,6 +13134,44 @@
       "internal/access/adapters/sql/projects.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "GET /ui/native-login",
+    "state": "implemented when native_login.enabled; absent by default",
+    "handler": "internal/app/router.go: internal/access/adapters/http/login.Handler.page-fm",
+    "review_family": "native-client-approval",
+    "effects": "browser/session approval state only; no credential issued before authenticated consent; restart cancels outstanding state",
+    "retry": "no Idempotency-Key; reconcile approval status; a new start allocates a distinct approval",
+    "admission": "explicit trusted canonical origin; bounded process-local capabilities; browser session and CSRF plus exact Origin for form mutations; current internal user/UI eligibility and npm repository incarnation/class/owner/visibility rechecked under shared administration guard",
+    "pagination_execution": "not a collection; at most1024 outstanding approvals, lazy expiry, no transaction across password authentication/directory I/O",
+    "evidence": [
+      "internal/access/core/session/service.go",
+      "internal/access/adapters/http/login/http.go",
+      "internal/access/module.go",
+      "internal/app/status_native_login_test.go",
+      "test/server/access/native_login_test.go",
+      "test/acceptance/features/native_login.feature",
+      "docs/research/decisions/0019-human-authentication-tiers.md"
+    ]
+  },
+  {
+    "route": "GET /ui/terraform/oauth2/authorize",
+    "state": "implemented when native_login.enabled; absent by default",
+    "handler": "internal/app/router.go: internal/access/adapters/http/login.Handler.authorize-fm",
+    "review_family": "native-client-approval",
+    "effects": "browser/session approval state only; no credential issued before authenticated consent; restart cancels outstanding state",
+    "retry": "no Idempotency-Key; reconcile approval status; a new start allocates a distinct approval",
+    "admission": "explicit trusted canonical origin; bounded process-local capabilities; browser session and CSRF plus exact Origin for form mutations; current internal user/UI eligibility and npm repository incarnation/class/owner/visibility rechecked under shared administration guard",
+    "pagination_execution": "not a collection; at most1024 outstanding approvals, lazy expiry, no transaction across password authentication/directory I/O",
+    "evidence": [
+      "internal/access/core/session/service.go",
+      "internal/access/adapters/http/login/http.go",
+      "internal/access/module.go",
+      "internal/app/status_native_login_test.go",
+      "test/server/access/native_login_test.go",
+      "test/acceptance/features/native_login.feature",
+      "docs/research/decisions/0019-human-authentication-tiers.md"
     ]
   },
   {
@@ -19382,6 +19439,25 @@
     ]
   },
   {
+    "route": "POST /artifactory/api/npm/{repoKey}/-/v1/login",
+    "state": "implemented when native_login.enabled; absent by default",
+    "handler": "internal/app/router.go: internal/access/adapters/http/login.Handler.start-fm",
+    "review_family": "native-client-approval",
+    "effects": "browser/session approval state only; no credential issued before authenticated consent; restart cancels outstanding state",
+    "retry": "no Idempotency-Key; reconcile approval status; a new start allocates a distinct approval",
+    "admission": "explicit trusted canonical origin; bounded process-local capabilities; browser session and CSRF plus exact Origin for form mutations; current internal user/UI eligibility and npm repository incarnation/class/owner/visibility rechecked under shared administration guard",
+    "pagination_execution": "not a collection; at most1024 outstanding approvals, lazy expiry, no transaction across password authentication/directory I/O",
+    "evidence": [
+      "internal/access/core/session/service.go",
+      "internal/access/adapters/http/login/http.go",
+      "internal/access/module.go",
+      "internal/app/status_native_login_test.go",
+      "test/server/access/native_login_test.go",
+      "test/acceptance/features/native_login.feature",
+      "docs/research/decisions/0019-human-authentication-tiers.md"
+    ]
+  },
+  {
     "route": "POST /artifactory/api/npm/{repoKey}/reindex",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "calculateNpmRepositoryMetadata",
@@ -19450,6 +19526,25 @@
       "internal/artifacts/adapters/sql/content_items.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "POST /artifactory/api/oauth2/token",
+    "state": "implemented when native_login.enabled; absent by default",
+    "handler": "internal/app/router.go: internal/access/adapters/http/login.Handler.exchange-fm",
+    "review_family": "native-client-approval",
+    "effects": "single-winner capability consumption and guarded P4 revocable finite token issuance; no refresh token or token replay storage; HEAD never redeems",
+    "retry": "pending npm202 honors Retry-After; do not repeat a delivered, denied, expired or consumed capability; issuance failure or response loss requires a new login, never a second mint",
+    "admission": "explicit trusted canonical origin; bounded process-local capabilities; browser session and CSRF plus exact Origin for form mutations; current internal user/UI eligibility and npm repository incarnation/class/owner/visibility rechecked under shared administration guard",
+    "pagination_execution": "not a collection; at most1024 outstanding approvals, lazy expiry, no transaction across password authentication/directory I/O",
+    "evidence": [
+      "internal/access/core/session/service.go",
+      "internal/access/adapters/http/login/http.go",
+      "internal/access/module.go",
+      "internal/app/status_native_login_test.go",
+      "test/server/access/native_login_test.go",
+      "test/acceptance/features/native_login.feature",
+      "docs/research/decisions/0019-human-authentication-tiers.md"
     ]
   },
   {
@@ -22353,6 +22448,25 @@
     "evidence": [
       "internal/platform/gen/pfed/unimplemented.gen.go",
       "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+    ]
+  },
+  {
+    "route": "POST /ui/native-login",
+    "state": "implemented when native_login.enabled; absent by default",
+    "handler": "internal/app/router.go: internal/access/adapters/http/login.Handler.form-fm",
+    "review_family": "native-client-approval",
+    "effects": "browser/session approval state only; no credential issued before authenticated consent; restart cancels outstanding state",
+    "retry": "no Idempotency-Key; reconcile approval status; a new start allocates a distinct approval",
+    "admission": "explicit trusted canonical origin; bounded process-local capabilities; browser session and CSRF plus exact Origin for form mutations; current internal user/UI eligibility and npm repository incarnation/class/owner/visibility rechecked under shared administration guard",
+    "pagination_execution": "not a collection; at most1024 outstanding approvals, lazy expiry, no transaction across password authentication/directory I/O",
+    "evidence": [
+      "internal/access/core/session/service.go",
+      "internal/access/adapters/http/login/http.go",
+      "internal/access/module.go",
+      "internal/app/status_native_login_test.go",
+      "test/server/access/native_login_test.go",
+      "test/acceptance/features/native_login.feature",
+      "docs/research/decisions/0019-human-authentication-tiers.md"
     ]
   },
   {

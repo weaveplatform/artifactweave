@@ -22,9 +22,9 @@ const (
 	maxApprovals     = 1024
 )
 
-// Repository checks npm repository identity and access in the caller's guarded
-// transaction. A zero principal validates only existence/type for bootstrap.
-// Its binding includes the immutable repository incarnation and current owner.
+// Repository describes an npm repository in the caller's guarded transaction.
+// Its binding includes the immutable incarnation and current owner; the service
+// separately checks current user visibility before consent and issuance.
 type Repository func(context.Context, string) (accessapi.NativeRepository, error)
 
 // Deps supplies local identity publication. Guard serializes current security
@@ -141,6 +141,7 @@ func (s *Service) current(browser string) (*approval, error) {
 	}
 	return a, nil
 }
+
 func page(a *approval) accessapi.NativePage {
 	return accessapi.NativePage{Session: a.cookie, CSRF: a.csrf, User: a.principal.Name, Client: a.request.Kind, Repository: a.request.Repository, Approved: a.approved}
 }
@@ -280,6 +281,7 @@ func (s *Service) Consent(ctx context.Context, browser, cookie, csrf string, all
 	}
 	return "", nil
 }
+
 func callback(a *approval, key, value string) string {
 	return a.request.RedirectURI + "?" + url.Values{key: {value}, "state": {a.request.State}}.Encode()
 }
@@ -307,9 +309,12 @@ func (s *Service) Poll(ctx context.Context, poll, repository string) (accessapi.
 // Exchange consumes a code only with its original client, callback and verifier.
 func (s *Service) Exchange(ctx context.Context, r accessapi.NativeExchange) (accessapi.IssuedToken, error) {
 	return s.redeem(ctx, func(a *approval) bool {
-		return a.request.Kind == "terraform" && same(a.code, r.Code) && a.request.ClientID == r.ClientID && a.request.RedirectURI == r.RedirectURI && VerifyPKCE(a.request.Challenge, r.Verifier) && s.d.Now().Before(a.codeExpires)
+		return a.request.Kind == "terraform" && same(a.code, r.Code) && a.request.ClientID == r.ClientID && a.request.RedirectURI == r.RedirectURI &&
+			VerifyPKCE(a.request.Challenge, r.Verifier) &&
+			s.d.Now().Before(a.codeExpires)
 	}, true)
 }
+
 func (s *Service) redeem(ctx context.Context, match func(*approval) bool, code bool) (accessapi.IssuedToken, error) {
 	s.mu.Lock()
 	var selected *approval
@@ -348,8 +353,14 @@ func (s *Service) redeem(ctx context.Context, match func(*approval) bool, code b
 		if !s.d.Now().Before(selected.expires) {
 			return accessapi.ErrNativeLogin
 		}
-		out, err = s.d.Tokens.Issue(ctx, accessapi.TokenRequest{Username: p.Name, ExpiresIn: &s.d.TokenExpiry, ForceRevocable: true, Description: "native " + selected.request.Kind + " login"})
-		return err
+		out, err = s.d.Tokens.Issue(
+			ctx,
+			accessapi.TokenRequest{Username: p.Name, ExpiresIn: &s.d.TokenExpiry, ForceRevocable: true, Description: "native " + selected.request.Kind + " login"},
+		)
+		if err != nil {
+			return fmt.Errorf("issue native P4 token: %w", err)
+		}
+		return nil
 	})
 	if err != nil {
 		return accessapi.IssuedToken{}, fmt.Errorf("native login token publication: %w", err)

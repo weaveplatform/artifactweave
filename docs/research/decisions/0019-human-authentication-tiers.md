@@ -48,7 +48,9 @@ unfinished work, not an exclusion; their Terraform resource names remain invento
 Local password approval is a small server-rendered HTML surface shared by npm web
 login and Terraform `login.v1`; it requires no JavaScript or general console.
 `native_login.enabled` defaults to false. Enabling it requires the explicit
-`native_login.origin`: an HTTPS origin without userinfo, path, query or fragment.
+`native_login.origin`: a browser-canonical HTTPS origin: lower-case ASCII DNS/punycode or canonical IP,
+with no userinfo, path, query, fragment, default port or zero-padded port.
+This matches [RFC6454 origin serialization](https://www.rfc-editor.org/rfc/rfc6454.html#section-6.2); ambiguous numeric IPv4 forms, expanded IPv6 and zone identifiers are refused.
 HTTP is allowed only on loopback for local development. Request Host, forwarded
 headers and the Artifactory base-URL override never choose approval or token URLs.
 The configured origin must be the origin the browser actually uses, including its

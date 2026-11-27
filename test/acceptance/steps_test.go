@@ -383,7 +383,11 @@ func (w *world) start() error {
 	)
 	w.server.Env = append(w.server.Env, w.env...)
 	if w.nativeLogin != nil {
-		w.server.Env = append(w.server.Env, fmt.Sprintf("ARTIFACTWEAVE_NATIVE_LOGIN_ENABLED=%t", w.nativeLogin.enabled), "ARTIFACTWEAVE_NATIVE_LOGIN_ORIGIN="+w.nativeLogin.front.URL)
+		w.server.Env = append(
+			w.server.Env,
+			fmt.Sprintf("ARTIFACTWEAVE_NATIVE_LOGIN_ENABLED=%t", w.nativeLogin.enabled),
+			"ARTIFACTWEAVE_NATIVE_LOGIN_ORIGIN="+w.nativeLogin.front.URL,
+		)
 	}
 	if coverDir != "" {
 		w.server.Env = append(w.server.Env, "GOCOVERDIR="+coverDir)

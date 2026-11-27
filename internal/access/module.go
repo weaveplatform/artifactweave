@@ -58,10 +58,8 @@ type Deps struct {
 	// Settings are the access options that API() publishes to the other
 	// modules.
 	Settings accessapi.Settings
-	// Now is the clock of the services the module builds itself; nil means
-	// time.Now. New builds none: Authenticator and Tokens keep the clocks
-	// app built them with, and every other binding takes the times it
-	// compares from its caller, so New does not read it.
+	// Now supplies the native approval clock; nil means time.Now. Injected
+	// Authenticator and Tokens retain their own clocks. New performs no clock I/O.
 	Now func() time.Time
 	// Log receives the logs of the services the module builds itself; nil
 	// means slog.Default(). New builds none, and the bindings log nothing:
@@ -70,7 +68,8 @@ type Deps struct {
 }
 
 // Module is the access module as app holds it. It is safe for concurrent
-// use: its bindings hold no state of their own beyond what Deps gave them.
+// use: native approvals own bounded mutex-protected state; the other bindings
+// retain only their dependencies.
 type Module struct {
 	api accessapi.API
 }

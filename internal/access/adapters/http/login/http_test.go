@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 )
 
@@ -24,6 +25,7 @@ func (f *fakeLogin) Open(string, string) (accessapi.NativePage, error) { return 
 func (f *fakeLogin) Login(context.Context, string, string, string, string, string) (accessapi.NativePage, error) {
 	return f.page, f.err
 }
+
 func (f *fakeLogin) Consent(context.Context, string, string, string, bool) (string, error) {
 	return f.redirect, f.err
 }
@@ -31,9 +33,11 @@ func (f *fakeLogin) Logout(string, string, string) error { return f.err }
 func (f *fakeLogin) Poll(context.Context, string, string) (accessapi.IssuedToken, error) {
 	return accessapi.IssuedToken{AccessToken: "token"}, f.err
 }
+
 func (f *fakeLogin) Exchange(context.Context, accessapi.NativeExchange) (accessapi.IssuedToken, error) {
 	return accessapi.IssuedToken{AccessToken: "token", ExpiresIn: 3600}, f.err
 }
+
 func request(t *testing.T, h Handler, method, path, body, origin string) *httptest.ResponseRecorder {
 	t.Helper()
 	router := chi.NewRouter()
@@ -45,6 +49,7 @@ func request(t *testing.T, h Handler, method, path, body, origin string) *httpte
 	router.ServeHTTP(w, r)
 	return w
 }
+
 func TestUnitNativeLoginHTTP(t *testing.T) {
 	f := &fakeLogin{page: accessapi.NativePage{Session: "cookie", CSRF: "csrf", User: "<script>alert(1)</script>", Client: "npm", Repository: "<img>"}}
 	h := Handler{Service: f, Origin: "https://login.example"}
@@ -55,6 +60,9 @@ func TestUnitNativeLoginHTTP(t *testing.T) {
 		{"POST", "/artifactory/api/npm/npm/-/v1/login", "{}", 200},
 		{"POST", "/artifactory/api/npm/npm/-/v1/login", "not-json", 400},
 		{"POST", "/artifactory/api/npm/npm/-/v1/login", "null", 400},
+		{"POST", "/artifactory/api/npm/npm/-/v1/login", `{} {}`, 400},
+		{"POST", "/artifactory/api/npm/npm/-/v1/login", `{"create":true}`, 400},
+		{"POST", "/artifactory/api/npm/npm/-/v1/login", `{"payload":"` + strings.Repeat("x", 8192) + `"}`, 400},
 		{"GET", "/artifactory/api/npm/npm/-/v1/done?sessionId=poll", "", 200},
 		{"GET", pagePath + "?request=b", "", 200},
 		{"POST", pagePath + "?request=b", "action=login&csrf=csrf", 200},
@@ -134,5 +142,35 @@ func TestUnitNativeLoginPublicBoundary(t *testing.T) {
 		if w := request(t, off, "GET", pagePath, "", ""); w.Code != 404 {
 			t.Fatal(w.Code)
 		}
+	}
+}
+
+func TestUnitNativeLoginCanonicalOriginBoundary(t *testing.T) {
+	h := Handler{Service: &fakeLogin{}, Origin: "https://login.example"}
+	for _, origin := range []string{"https://login.example:443", "https://LOGIN.example", "http://login.example", "null", ""} {
+		if w := request(t, h, "POST", pagePath, "action=login", origin); w.Code != 400 {
+			t.Fatal("nonexact Origin accepted", origin, w.Code)
+		}
+	}
+	if w := request(t, h, "POST", pagePath, "action=login", h.Origin); w.Code != 200 {
+		t.Fatal("canonical Origin refused", w.Code)
+	}
+	for _, bad := range []string{"https://login.example:443", "https://bücher.example", "https://127.1", "https://[2001:0db8::1]"} {
+		h.Origin = bad
+		if h.Enabled() {
+			t.Fatal("noncanonical configuration enabled", bad)
+		}
+	}
+	h.Origin = "https://login.example"
+	router := chi.NewRouter()
+	h.Mount(router)
+	r := httptest.NewRequest("POST", "/artifactory/api/npm/npm/-/v1/login", strings.NewReader(`{}`))
+	r.Host = "attacker.example"
+	r.Header.Set("X-Forwarded-Host", "attacker.example")
+	r.Header.Set("X-JFrog-Override-Base-Url", "https://attacker.example")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	if w.Code != 200 || strings.Contains(w.Body.String(), "attacker.example") {
+		t.Fatal("request-selected credential origin", w.Code, w.Body)
 	}
 }

@@ -16,8 +16,10 @@ import (
 
 var errTest = errors.New("controlled store failure")
 
-type transactionKey struct{}
-type testStore struct{ err error }
+type (
+	transactionKey struct{}
+	testStore      struct{ err error }
+)
 
 func (st *testStore) Tx(ctx context.Context, fn func(context.Context) error) error {
 	if st.err != nil {
@@ -46,6 +48,7 @@ func (a *testAuth) Basic(_ context.Context, name, password string) (kernel.Princ
 	}
 	return kernel.Principal{Name: name, Password: true, Identity: kernel.IdentityStored}, nil
 }
+
 func (a *testAuth) Current(ctx context.Context, p kernel.Principal) (kernel.Principal, error) {
 	if ctx.Value(transactionKey{}) != true {
 		panic("identity outside transaction")
@@ -106,15 +109,35 @@ type fixture struct {
 
 func setup(t *testing.T) *fixture {
 	t.Helper()
-	f := &fixture{now: time.Now(), auth: &testAuth{}, tokens: &testTokens{}, store: &testStore{}, authorizer: &testAuthorizer{visible: true}, binding: accessapi.NativeRepository{Key: "npm", Class: "local", Incarnation: "one", Project: "alpha"}}
-	f.s = New(Deps{Store: f.store, Auth: f.auth, Tokens: f.tokens, Authorizer: f.authorizer, TokenExpiry: time.Hour, Now: func() time.Time { return f.now }, Guard: func(ctx context.Context) error {
-		if ctx.Value(transactionKey{}) != true {
-			t.Error("guard outside transaction")
-		}
-		return f.guardErr
-	}, Eligible: func(context.Context, kernel.Principal) error { return f.eligibleErr }, Repository: func(context.Context, string) (accessapi.NativeRepository, error) { return f.binding, f.repoErr }})
+	f := &fixture{
+		now:        time.Now(),
+		auth:       &testAuth{},
+		tokens:     &testTokens{},
+		store:      &testStore{},
+		authorizer: &testAuthorizer{visible: true},
+		binding:    accessapi.NativeRepository{Key: "npm", Class: "local", Incarnation: "one", Project: "alpha"},
+	}
+	f.s = New(
+		Deps{
+			Store:       f.store,
+			Auth:        f.auth,
+			Tokens:      f.tokens,
+			Authorizer:  f.authorizer,
+			TokenExpiry: time.Hour,
+			Now:         func() time.Time { return f.now },
+			Guard: func(ctx context.Context) error {
+				if ctx.Value(transactionKey{}) != true {
+					t.Error("guard outside transaction")
+				}
+				return f.guardErr
+			},
+			Eligible:   func(context.Context, kernel.Principal) error { return f.eligibleErr },
+			Repository: func(context.Context, string) (accessapi.NativeRepository, error) { return f.binding, f.repoErr },
+		},
+	)
 	return f
 }
+
 func start(t *testing.T, f *fixture, r accessapi.NativeRequest) accessapi.NativeStart {
 	t.Helper()
 	v, e := f.s.Start(t.Context(), r)
@@ -123,6 +146,7 @@ func start(t *testing.T, f *fixture, r accessapi.NativeRequest) accessapi.Native
 	}
 	return v
 }
+
 func login(t *testing.T, f *fixture, b string) accessapi.NativePage {
 	t.Helper()
 	p, e := f.s.Open(b, "")
@@ -138,6 +162,7 @@ func login(t *testing.T, f *fixture, b string) accessapi.NativePage {
 	}
 	return v
 }
+
 func approve(t *testing.T, f *fixture, b string) string {
 	t.Helper()
 	p := login(t, f, b)
@@ -147,11 +172,20 @@ func approve(t *testing.T, f *fixture, b string) string {
 	}
 	return v
 }
+
 func npmRequest() accessapi.NativeRequest {
 	return accessapi.NativeRequest{Kind: "npm", Repository: "npm"}
 }
+
 func terraformRequest() accessapi.NativeRequest {
-	return accessapi.NativeRequest{Kind: "terraform", ClientID: "terraform-cli", RedirectURI: "http://localhost:10000/login", State: "original state", Challenge: "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM", ChallengeMethod: "S256"}
+	return accessapi.NativeRequest{
+		Kind:            "terraform",
+		ClientID:        "terraform-cli",
+		RedirectURI:     "http://localhost:10000/login",
+		State:           "original state",
+		Challenge:       "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+		ChallengeMethod: "S256",
+	}
 }
 
 const verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
@@ -254,7 +288,10 @@ func TestUnitNativeLoginExpiryAndCapacity(t *testing.T) {
 	u, _ := url.Parse(redirect)
 	code := u.Query().Get("code")
 	f.now = f.now.Add(2 * time.Second)
-	if _, e := f.s.Exchange(t.Context(), accessapi.NativeExchange{Code: code, ClientID: "terraform-cli", RedirectURI: "http://localhost:10000/login", Verifier: verifier}); e != nil {
+	if _, e := f.s.Exchange(
+		t.Context(),
+		accessapi.NativeExchange{Code: code, ClientID: "terraform-cli", RedirectURI: "http://localhost:10000/login", Verifier: verifier},
+	); e != nil {
 		t.Fatal("code inherited pending expiry", e)
 	}
 	f = setup(t)
@@ -262,6 +299,9 @@ func TestUnitNativeLoginExpiryAndCapacity(t *testing.T) {
 	f.now = f.now.Add(approvalLifetime)
 	if _, e := f.s.Open(st.Browser, ""); !errors.Is(e, accessapi.ErrNativeLogin) {
 		t.Fatal(e)
+	}
+	if _, e := f.s.Poll(t.Context(), st.Poll, "npm"); !errors.Is(e, accessapi.ErrNativeLogin) {
+		t.Fatal("expired pending poll", e)
 	}
 	for range maxApprovals {
 		start(t, f, npmRequest())
@@ -271,6 +311,67 @@ func TestUnitNativeLoginExpiryAndCapacity(t *testing.T) {
 	}
 	f.now = f.now.Add(approvalLifetime)
 	start(t, f, npmRequest())
+}
+
+func TestUnitNativeLoginBootstrapFailureAndMintExpiry(t *testing.T) {
+	for _, failure := range []string{"guard", "store", "repository", "missing"} {
+		t.Run(failure, func(t *testing.T) {
+			f := setup(t)
+			switch failure {
+			case "guard":
+				f.guardErr = errTest
+			case "store":
+				f.store.err = errTest
+			case "repository":
+				f.repoErr = errTest
+			case "missing":
+				f.s.d.Repository = nil
+			}
+			if _, err := f.s.Start(t.Context(), npmRequest()); err == nil {
+				t.Fatal("unavailable bootstrap accepted")
+			}
+			if len(f.s.entries) != 0 {
+				t.Fatal("failed bootstrap retained state")
+			}
+		})
+	}
+	for _, kind := range []string{"npm", "terraform"} {
+		t.Run("mint_expiry_"+kind, func(t *testing.T) {
+			f := setup(t)
+			r := npmRequest()
+			if kind == "terraform" {
+				r = terraformRequest()
+			}
+			st := start(t, f, r)
+			redirect := approve(t, f, st.Browser)
+			f.s.d.Eligible = func(context.Context, kernel.Principal) error { f.now = f.now.Add(codeLifetime); return nil }
+			var err error
+			if kind == "npm" {
+				_, err = f.s.Poll(t.Context(), st.Poll, "npm")
+			} else {
+				u, _ := url.Parse(redirect)
+				_, err = f.s.Exchange(t.Context(), accessapi.NativeExchange{Code: u.Query().Get("code"), ClientID: r.ClientID, RedirectURI: r.RedirectURI, Verifier: verifier})
+			}
+			if !errors.Is(err, accessapi.ErrNativeLogin) || f.tokens.count.Load() != 0 {
+				t.Fatal("mint crossed final deadline", err, f.tokens.count.Load())
+			}
+		})
+	}
+}
+
+func TestUnitNativeLoginRejectsNonPasswordIdentity(t *testing.T) {
+	for _, p := range []kernel.Principal{{Name: "alice", Anonymous: true, Password: true}, {Name: "alice", Identity: kernel.IdentityStored}, {Name: "alice", Password: true, Identity: kernel.IdentityTransient}} {
+		f := setup(t)
+		st := start(t, f, npmRequest())
+		page, err := f.s.Open(st.Browser, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		f.s.d.Authenticate = func(context.Context, string, string) (kernel.Principal, error) { return p, nil }
+		if _, err := f.s.Login(t.Context(), st.Browser, page.Session, page.CSRF, "alice", "password"); !errors.Is(err, accessapi.ErrNativeLogin) {
+			t.Fatal("nonpassword identity admitted", p.Identity, err)
+		}
+	}
 }
 
 func TestUnitNativeLoginCurrentPolicy(t *testing.T) {
@@ -408,6 +509,7 @@ func (s expiryCommitStore) Tx(ctx context.Context, fn func(context.Context) erro
 	s.advance()
 	return err
 }
+
 func (s expiryCommitStore) AfterCommit(ctx context.Context, fn func()) { s.runner.AfterCommit(ctx, fn) }
 
 func TestUnitNativeLoginPollDuringBrowserWork(t *testing.T) {

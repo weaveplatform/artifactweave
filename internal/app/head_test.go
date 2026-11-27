@@ -252,7 +252,7 @@ func TestAccHeadOnTheWire(t *testing.T) {
 // route with a HEAD of its own, so a route that moves or goes stale fails
 // here rather than answering 405 unseen.
 func TestUnitHeadDecidedForEveryGet(t *testing.T) {
-	router := NewRouter(RouterConfig{}).(*chi.Mux)
+	router := NewRouter(nativeRouteInventoryConfig()).(*chi.Mux)
 	routes := servedRoutes(t, router)
 	served := headServed()
 	generated := map[string]bool{}

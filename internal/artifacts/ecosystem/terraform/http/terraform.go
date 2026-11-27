@@ -140,7 +140,13 @@ func IsTerraformReindex(path string) bool {
 
 func discovery(origin string, services map[string]any) map[string]any {
 	if accessapi.ValidNativeOrigin(origin) {
-		services["login.v1"] = map[string]any{"client": "terraform-cli", "grant_types": []string{"authz_code"}, "authz": origin + "/ui/terraform/oauth2/authorize", "token": origin + "/artifactory/api/oauth2/token", "ports": []int{10000, 10010}}
+		services["login.v1"] = map[string]any{
+			"client":      "terraform-cli",
+			"grant_types": []string{"authz_code"},
+			"authz":       origin + "/ui/terraform/oauth2/authorize",
+			"token":       origin + "/artifactory/api/oauth2/token",
+			"ports":       []int{10000, 10010},
+		}
 	}
 	return services
 }

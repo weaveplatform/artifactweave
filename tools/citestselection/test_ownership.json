@@ -84,7 +84,8 @@
     "test/server/configuration": "shared",
     "test/server/federation": "shared",
     "test/server/notifications": "shared",
-    "test/server/retention": "shared"
+    "test/server/retention": "shared",
+    "internal/access/adapters/http/login": "shared"
   },
   "shared_files": {
     "internal/access/adapters/http": [
@@ -141,6 +142,7 @@
       "matrix_reindex_test.go",
       "matrix_test.go",
       "modules_test.go",
+      "native_login_ledger_test.go",
       "npm_fixture_test.go",
       "oidc_status_test.go",
       "peer_api_test.go",
@@ -166,6 +168,7 @@
       "status_cran_archive_test.go",
       "status_huggingface_xet_test.go",
       "status_machinelearning_test.go",
+      "status_native_login_test.go",
       "status_nix_test.go",
       "status_peerstatus_test.go",
       "status_peerstreams_test.go",
@@ -293,6 +296,8 @@
       "ldap_login_test.go",
       "ldap_test.go",
       "lock_events_test.go",
+      "native_login_fault_test.go",
+      "native_login_test.go",
       "oidc_test.go",
       "permissions_fault_test.go",
       "permissions_test.go",

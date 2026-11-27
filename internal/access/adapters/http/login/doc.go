@@ -1,5 +1,4 @@
-// Package login will serve browser login and the native-client approval
-// endpoints.
+// Package login serves the optional browser/native-client approval endpoints.
 //
 // # Role
 //
@@ -7,15 +6,13 @@
 //
 // # Inputs
 //
-// None yet. Planned: browser login requests and the approval requests of
-// native clients, such as npm web login and Terraform login.v1 (plan P21,
-// task 1).
+// Exact-origin form submissions, session-bound CSRF, npm start/poll requests,
+// Terraform authorization/code exchange and the access/api NativeLogin port.
 //
 // # Outputs
 //
-// None yet. Planned (target layout, line 295): responses over
-// access/core/session: sessions, consent, approvals and the scoped
-// credentials that an approved client receives.
+// Escaped server-rendered HTML without JavaScript, protected cookies,
+// no-store JSON and a code-only localhost redirect. No general console.
 //
 // # References
 //
@@ -36,5 +33,6 @@
 //
 // # Status
 //
-// Placeholder: implemented by P21.
+// Implemented for #262: optional server-rendered npm/Terraform approval.
+// External identity providers and the full console remain separate work.
 package login

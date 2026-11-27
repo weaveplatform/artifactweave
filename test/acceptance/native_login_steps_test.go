@@ -66,6 +66,7 @@ func (w *world) registerNativeLogin(sc *godog.ScenarioContext) {
 func (w *world) startNativeLogin() error {
 	return w.startNativeLoginMode(true)
 }
+
 func (w *world) startNativeLoginMode(enabled bool) error {
 	executable, err := os.Open(binary)
 	if err != nil {
@@ -193,7 +194,12 @@ func (w *world) startNativeLoginMode(enabled bool) error {
 	if err := w.backendRequest("PATCH", "/access/api/v2/groups/readers/members", `{"remove":["native-user"]}`, 200); err != nil {
 		return err
 	}
-	if err := w.backendRequest("POST", "/access/api/v2/permissions", `{"name":"native-login-read","resources":{"artifact":{"actions":{"users":{"native-user":["READ"]}},"targets":{"native-login":{"include_patterns":["**"]}}}}}`, 201); err != nil {
+	if err := w.backendRequest(
+		"POST",
+		"/access/api/v2/permissions",
+		`{"name":"native-login-read","resources":{"artifact":{"actions":{"users":{"native-user":["READ"]}},"targets":{"native-login":{"include_patterns":["**"]}}}}}`,
+		201,
+	); err != nil {
 		return err
 	}
 	for _, path := range []string{"/artifactory/native-login/allowed.txt", "/artifactory/native-secret/secret.txt"} {
@@ -266,7 +272,24 @@ func (f *nativeLoginFixture) approve(ctx context.Context, loginURL string) error
 }
 
 func (w *world) nativeDocker(ctx context.Context, name string, extra, args []string) *exec.Cmd {
-	flags := []string{"run", "--rm", "--name", name, "--label", "io.weaveplatform.task=262", "--label", "io.weaveplatform.owner=native-browser-login", "--network", "host", "-v", w.dir + ":/work", "-w", "/work", "-e", "NODE_EXTRA_CA_CERTS=/work/native-ca.pem"}
+	flags := []string{
+		"run",
+		"--rm",
+		"--name",
+		name,
+		"--label",
+		"io.weaveplatform.task=262",
+		"--label",
+		"io.weaveplatform.owner=native-browser-login",
+		"--network",
+		"host",
+		"-v",
+		w.dir + ":/work",
+		"-w",
+		"/work",
+		"-e",
+		"NODE_EXTRA_CA_CERTS=/work/native-ca.pem",
+	}
 	flags = append(flags, extra...)
 	flags = append(flags, w.npmImage)
 	flags = append(flags, args...)
@@ -278,7 +301,18 @@ func (w *world) nativeNPMLogin(client string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 	name := fmt.Sprintf("artifactweave-262-npm-%d", time.Now().UnixNano())
-	extra := []string{"--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()), "--entrypoint", "npm", "-e", "npm_config_userconfig=/work/native.npmrc", "-e", "npm_config_cache=/work/native-npm-cache", "-e", "npm_config_update_notifier=false"}
+	extra := []string{
+		"--user",
+		fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()),
+		"--entrypoint",
+		"npm",
+		"-e",
+		"npm_config_userconfig=/work/native.npmrc",
+		"-e",
+		"npm_config_cache=/work/native-npm-cache",
+		"-e",
+		"npm_config_update_notifier=false",
+	}
 	registry := f.front.URL + "/artifactory/api/npm/native-login/"
 	version := w.nativeDocker(ctx, name+"-version", extra, []string{"version", "--json"})
 	versions, err := version.CombinedOutput()
@@ -371,7 +405,18 @@ func nativeTLSFront(h http.Handler) (*httptest.Server, error) {
 		return nil, err
 	}
 	now := time.Now()
-	description := &x509.Certificate{SerialNumber: big.NewInt(now.UnixNano()), Subject: pkix.Name{CommonName: "native approval fixture"}, DNSNames: []string{"host.docker.internal", "localhost"}, IPAddresses: []net.IP{net.ParseIP("127.0.0.1")}, NotBefore: now.Add(-time.Minute), NotAfter: now.Add(time.Hour), IsCA: true, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}}
+	description := &x509.Certificate{
+		SerialNumber:          big.NewInt(now.UnixNano()),
+		Subject:               pkix.Name{CommonName: "native approval fixture"},
+		DNSNames:              []string{"host.docker.internal", "localhost"},
+		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1")},
+		NotBefore:             now.Add(-time.Minute),
+		NotAfter:              now.Add(time.Hour),
+		IsCA:                  true,
+		BasicConstraintsValid: true,
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+	}
 	der, err := x509.CreateCertificate(rand.Reader, description, description, &key.PublicKey, key)
 	if err != nil {
 		return nil, err
@@ -398,8 +443,24 @@ func (w *world) nativeNPMDisabled(_ string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	name := fmt.Sprintf("artifactweave-262-off-%d", time.Now().UnixNano())
-	extra := []string{"--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()), "--entrypoint", "npm", "-e", "npm_config_userconfig=/work/native.npmrc", "-e", "npm_config_cache=/work/native-npm-cache", "-e", "npm_config_update_notifier=false"}
-	cmd := w.nativeDocker(ctx, name, extra, []string{"login", "--auth-type=web", "--browser=false", "--fetch-retries=0", "--fetch-timeout=10000", "--registry", f.front.URL + "/artifactory/api/npm/native-login/"})
+	extra := []string{
+		"--user",
+		fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()),
+		"--entrypoint",
+		"npm",
+		"-e",
+		"npm_config_userconfig=/work/native.npmrc",
+		"-e",
+		"npm_config_cache=/work/native-npm-cache",
+		"-e",
+		"npm_config_update_notifier=false",
+	}
+	cmd := w.nativeDocker(
+		ctx,
+		name,
+		extra,
+		[]string{"login", "--auth-type=web", "--browser=false", "--fetch-retries=0", "--fetch-timeout=10000", "--registry", f.front.URL + "/artifactory/api/npm/native-login/"},
+	)
 	_, err := cmd.CombinedOutput()
 	if ctx.Err() != nil {
 		_ = exec.Command("docker", "rm", "--force", name).Run()
@@ -497,7 +558,12 @@ func (w *world) nativeTerraformLogin() error {
 	if err := w.backendRequest("PUT", "/artifactory/api/repositories/native-state", `{"rclass":"local","packageType":"terraformbackend"}`, 200); err != nil {
 		return err
 	}
-	if err := w.backendRequest("POST", "/access/api/v2/permissions", `{"name":"native-state","resources":{"artifact":{"actions":{"users":{"native-user":["READ","WRITE","DELETE"]}},"targets":{"native-state":{"include_patterns":["**"]}}}}}`, 201); err != nil {
+	if err := w.backendRequest(
+		"POST",
+		"/access/api/v2/permissions",
+		`{"name":"native-state","resources":{"artifact":{"actions":{"users":{"native-user":["READ","WRITE","DELETE"]}},"targets":{"native-state":{"include_patterns":["**"]}}}}}`,
+		201,
+	); err != nil {
 		return err
 	}
 	host := strings.TrimPrefix(f.front.URL, "https://")
@@ -510,7 +576,27 @@ func (w *world) nativeTerraformLogin() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 	name := fmt.Sprintf("artifactweave-262-terraform-%d", time.Now().UnixNano())
-	extra := []string{"-i", "--entrypoint", "sh", "-v", bin + ":/clients/terraform:ro", "-e", "TF_CLI_CONFIG_FILE=/work/terraform-native.rc", "-e", "TF_DATA_DIR=/tmp/native-tf-data", "-e", "CHECKPOINT_DISABLE=1", "-e", "SSL_CERT_FILE=/work/native-ca.pem", "-e", "BROWSER=true", "-e", "AW_NATIVE_HOST=" + host, "-e", fmt.Sprintf("AW_NATIVE_OWNER=%d:%d", os.Getuid(), os.Getgid())}
+	extra := []string{
+		"-i",
+		"--entrypoint",
+		"sh",
+		"-v",
+		bin + ":/clients/terraform:ro",
+		"-e",
+		"TF_CLI_CONFIG_FILE=/work/terraform-native.rc",
+		"-e",
+		"TF_DATA_DIR=/tmp/native-tf-data",
+		"-e",
+		"CHECKPOINT_DISABLE=1",
+		"-e",
+		"SSL_CERT_FILE=/work/native-ca.pem",
+		"-e",
+		"BROWSER=true",
+		"-e",
+		"AW_NATIVE_HOST=" + host,
+		"-e",
+		fmt.Sprintf("AW_NATIVE_OWNER=%d:%d", os.Getuid(), os.Getgid()),
+	}
 	script := `set -eu
 mkdir -p /root/.terraform.d
 /clients/terraform version -json
@@ -597,7 +683,8 @@ TF_CLI_CONFIG_FILE=/root/.terraform.d/credentials.tfrc.json /clients/terraform i
 	case <-ctx.Done():
 		return ctx.Err()
 	}
-	if !strings.Contains(output.String(), `"terraform_version": "1.17.1"`) || !strings.Contains(output.String(), "Terraform has been successfully initialized!") || f.exchanges.Load() != 1 {
+	if !strings.Contains(output.String(), `"terraform_version": "1.17.1"`) || !strings.Contains(output.String(), "Terraform has been successfully initialized!") ||
+		f.exchanges.Load() != 1 {
 		return fmt.Errorf("pinned Terraform did not complete exactly one exchange and protected init: %s", output.String())
 	}
 	data, err := os.ReadFile(filepath.Join(w.dir, "native-credentials.json"))

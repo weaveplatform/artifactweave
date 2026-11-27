@@ -18,7 +18,8 @@ import (
 func nativeRepository(st interface {
 	Repos() artport.RepoStore
 	RemoteCache() artport.RemoteCacheStore
-}) session.Repository {
+},
+) session.Repository {
 	return func(ctx context.Context, key string) (accessapi.NativeRepository, error) {
 		cfg, err := st.Repos().Get(ctx, key)
 		if err != nil {
