@@ -183,7 +183,8 @@ func (w *world) clientReachable(client string) error {
 		os.Getenv("ARTIFACTWEAVE_CHEF_DESKTOP") == "1"
 	desktopNix := client == "Nix" && runtime.GOOS == "darwin" &&
 		os.Getenv("ARTIFACTWEAVE_NIX_DESKTOP") == "1"
-	desktop := desktopNix ||
+	desktopNativeLogin := w.nativeLogin != nil && strings.HasPrefix(client, "npm") && runtime.GOOS == "darwin" && os.Getenv("ARTIFACTWEAVE_NATIVE_LOGIN_DESKTOP") == "1"
+	desktop := desktopNativeLogin || desktopNix ||
 		desktopChef ||
 		desktopFrogML ||
 		desktopAnsible ||

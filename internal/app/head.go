@@ -120,6 +120,9 @@ var handwrittenHeads = map[string]headAnswer{
 // headUnserved are the GET routes with no HEAD route of their own pattern
 // that HeadAsGet leaves to what chi finds, each with what answers the HEAD.
 var headUnserved = map[string]string{
+	"/ui/native-login":                         "405 when enabled: no HEAD browser session mutation",
+	"/ui/terraform/oauth2/authorize":           "405 when enabled: no HEAD approval admission",
+	"/artifactory/api/npm/{repoKey}/-/v1/done": "404 when authenticated: npm wildcard refuses HEAD without invoking poll",
 	// The JFrog Router is a Go service built on Traefik (the router's
 	// traefik settings in RTFACT-25374, Traefik's access log in
 	// RTFACT-31079), not a Jersey application, and no source shows it

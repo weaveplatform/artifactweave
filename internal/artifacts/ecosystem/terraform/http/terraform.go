@@ -25,6 +25,8 @@ const prefix = "/artifactory/api/terraform/"
 // server binds them over the store the router kit serves. Now is a test
 // clock; nil uses the wall clock.
 type Options struct {
+	// LoginOrigin enables native approval discovery at this trusted origin.
+	LoginOrigin string
 	// Authenticator rechecks the credential that a remote module or
 	// provider download URL names. Nil, as on a server without
 	// authentication, refuses those URLs 403.
@@ -79,14 +81,14 @@ func Protocol(o Options) pkgroute.Protocol {
 					writeJSON(
 						w,
 						r,
-						map[string]string{
+						discovery(o.LoginOrigin, map[string]any{
 							"modules.v1":   base + "modules/",
 							"providers.v1": base + "providers/",
 							"state.v2":     baseurl.From(r.Context()) + prefix + "remote/v2",
 							"tfe.v2":       baseurl.From(r.Context()) + prefix + "remote/v2",
 							"tfe.v2.1":     baseurl.From(r.Context()) + prefix + "remote/v2",
 							"tfe.v2.2":     baseurl.From(r.Context()) + prefix + "remote/v2",
-						},
+						}),
 					)
 				},
 			},
@@ -134,4 +136,17 @@ func IsTerraformReindex(path string) bool {
 	rest, ok := strings.CutPrefix(path, "/artifactory/api/terraform/")
 	key, op, _ := strings.Cut(rest, "/")
 	return ok && key != "" && op == "reindex"
+}
+
+func discovery(origin string, services map[string]any) map[string]any {
+	if accessapi.ValidNativeOrigin(origin) {
+		services["login.v1"] = map[string]any{
+			"client":      "terraform-cli",
+			"grant_types": []string{"authz_code"},
+			"authz":       origin + "/ui/terraform/oauth2/authorize",
+			"token":       origin + "/artifactory/api/oauth2/token",
+			"ports":       []int{10000, 10010},
+		}
+	}
+	return services
 }

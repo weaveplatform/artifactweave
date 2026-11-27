@@ -153,6 +153,9 @@ npm:
     external_dependencies_versioning: false
     enforce_path: false
     max_publish_size: 1GiB
+native_login:
+    enabled: false
+    origin: ""
 token:
     allow_basic_auth: false
 deploy:

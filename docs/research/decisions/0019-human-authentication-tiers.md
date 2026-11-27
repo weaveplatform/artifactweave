@@ -43,6 +43,75 @@ groups and makes them each fresh login's memberships
 unfinished work, not an exclusion; their Terraform resource names remain inventoried in
 [10-scope-and-tiers](../10-scope-and-tiers.md).
 
+### Native approval contract (#262)
+
+Local password approval is a small server-rendered HTML surface shared by npm web
+login and Terraform `login.v1`; it requires no JavaScript or general console.
+`native_login.enabled` defaults to false. Enabling it requires the explicit
+`native_login.origin`: a browser-canonical HTTPS origin: lower-case ASCII DNS/punycode or canonical IP,
+with no userinfo, path, query, fragment, default port or zero-padded port.
+This matches [RFC6454 origin serialization](https://www.rfc-editor.org/rfc/rfc6454.html#section-6.2); ambiguous numeric IPv4 forms, expanded IPv6 and zone identifiers are refused.
+HTTP is allowed only on loopback for local development. Request Host, forwarded
+headers and the Artifactory base-URL override never choose approval or token URLs.
+The configured origin must be the origin the browser actually uses, including its
+external port. The forms require that exact Origin and a session-bound CSRF value.
+
+The process owns at most 1,024 outstanding approvals. Pending requests expire after
+two minutes; authenticated consent starts a separate one-minute token-delivery or
+authorization-code lifetime. Browser cookies are HttpOnly, SameSite=Strict, scoped
+to the approval path and Secure on HTTPS, with a five-minute maximum age; server
+state expires sooner with its approval. Password authentication rotates both the
+session and CSRF capabilities. Browser, polling and code capabilities are distinct.
+No password or issued access token is retained in approval state. Restart cancels
+all approvals and browser sessions; normal stored P4 access tokens survive it.
+This is a single-process contract, with no claim of shared HA sessions.
+
+Only internal accounts eligible for interactive access may use this flow.
+`disable_ui_access` is enforced independently of ordinary API access. An account
+recorded as MFA=ENABLED is refused because this flow supplies no MFA challenge;
+that conservative choice does not interpret the field as a global MFA policy.
+External realms remain separate P21 work. Existing password policy, lock,
+suspension and API restrictions still apply. A browser password login uses the
+existing UI context under REQUIRED password encryption; ordinary Basic requests
+retain their existing refusal. Identity and current repository access are checked
+again under the shared administration guard before consent and token issuance.
+An npm approval also binds repository incarnation, class and project ownership,
+so recreation or transfer cannot adopt an earlier approval. No transaction spans
+password authentication that might perform directory I/O.
+
+An approval or code has one redemption winner, including concurrent requests.
+The service consumes the capability before its guarded token transaction; an
+issuance failure or lost success response requires a new login and cannot mint a
+second token. Tokens use the current user's ordinary P4 scope, are revocable,
+have `npm.login_token_expiry` as their finite lifetime (also for the shared
+Terraform flow), and include no refresh token. Browser sign-out cancels its
+pending approval; revoking an already issued client token uses the existing token
+API or npm logout.
+
+Enabled npm start returns absolute `loginUrl` and `doneUrl`; pending polling
+returns JSON 202 with `Retry-After: 5`, then JSON 200 with `token` on redemption.
+Unknown, expired, denied and consumed capabilities receive the same 400 response;
+capacity refusal is 429. HEAD does not redeem a token. Disabled npm behavior
+remains the existing unauthenticated 401 / authenticated 405; explicit legacy
+login remains available. Enabled Terraform discovery adds an object `login.v1`
+beside all existing registry/backend entries. Its public client is
+`terraform-cli`, with `grant_types: [authz_code]`, S256 PKCE and callback ports
+10000–10010. Only exact `http://localhost:<port>/login` callbacks are accepted;
+the redirect carries a one-use code and the original state, never an access
+token. The form token exchange binds that same client, callback and verifier.
+Invalid exchange answers OAuth `invalid_grant`, with no refresh grant. Denial
+redirects `access_denied`; Terraform 1.17.1 keeps waiting without a code, so its
+operator must cancel the command. Disabled discovery omits `login.v1`, retaining
+the pasted-token fallback.
+
+The TTLs, setting, routes, failure statuses, bounded storage and response-loss
+semantics above are artifactweave choices, not captured 7.x facts. The pinned
+client contracts and vendor evidence are separated in the
+[native browser login contract audit](../native-browser-login-contract-audit.md).
+Security review covers the browser/session boundary, exact origin and redirect
+binding, replay/concurrency, expiry, current authority, HTML escaping and secret
+handling. It is required acceptance evidence for #262.
+
 ## Rationale
 
 Local identities and workload exchange establish the token and permission model first.
@@ -82,6 +151,7 @@ UI-based exclusion is replaced by [decision 0042](0042-capability-scope-and-supe
   phase claims compatibility.
 
 ## Verification
+
 
 - OIDC exchange acceptance with a fake issuer.
 - Current stub tests record the unimplemented endpoints; they are not completion evidence.

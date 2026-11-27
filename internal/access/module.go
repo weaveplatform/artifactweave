@@ -1,15 +1,20 @@
 package access
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
+	"github.com/weaveplatform/artifactweave/internal/access/core/model"
 	"github.com/weaveplatform/artifactweave/internal/access/core/port"
+	"github.com/weaveplatform/artifactweave/internal/access/core/session"
 	"github.com/weaveplatform/artifactweave/internal/access/core/token"
 	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 )
@@ -34,6 +39,8 @@ var errNoStore = errors.New("access: Deps.Store is required")
 // access core are built by app, over the same store, until the module builds
 // them itself.
 type Deps struct {
+	// NativeRepository binds npm approvals to current repository identity and access.
+	NativeRepository session.Repository
 	// Store holds the users, groups, permissions, tokens, keys, projects,
 	// settings and API restrictions that the bindings read and write. It is
 	// required.
@@ -51,10 +58,8 @@ type Deps struct {
 	// Settings are the access options that API() publishes to the other
 	// modules.
 	Settings accessapi.Settings
-	// Now is the clock of the services the module builds itself; nil means
-	// time.Now. New builds none: Authenticator and Tokens keep the clocks
-	// app built them with, and every other binding takes the times it
-	// compares from its caller, so New does not read it.
+	// Now supplies the native approval clock; nil means time.Now. Injected
+	// Authenticator and Tokens retain their own clocks. New performs no clock I/O.
 	Now func() time.Time
 	// Log receives the logs of the services the module builds itself; nil
 	// means slog.Default(). New builds none, and the bindings log nothing:
@@ -63,7 +68,8 @@ type Deps struct {
 }
 
 // Module is the access module as app holds it. It is safe for concurrent
-// use: its bindings hold no state of their own beyond what Deps gave them.
+// use: native approvals own bounded mutex-protected state; the other bindings
+// retain only their dependencies.
 type Module struct {
 	api accessapi.API
 }
@@ -97,6 +103,32 @@ func New(d Deps) (*Module, error) {
 	// would be a typed nil, which the callers' nil checks would let through.
 	if d.Authenticator != nil {
 		m.api.Authenticator = authenticator{a: d.Authenticator, st: d.Store}
+	}
+	if m.api.Authenticator != nil && m.api.Tokens != nil {
+		expiry := d.Settings.NativeLoginTokenExpiry
+		if expiry <= 0 {
+			expiry = 30 * 24 * time.Hour
+		}
+		m.api.NativeLogin = session.New(session.Deps{
+			Authenticate: func(ctx context.Context, name, password string) (kernel.Principal, error) {
+				return d.Authenticator.Basic(authn.WithUIRequest(ctx), name, password)
+			},
+			Store: d.Store, Auth: m.api.Authenticator, Authorizer: m.api.Authorizer, Tokens: m.api.Tokens,
+			Guard: m.api.Projects.Guard, Repository: d.NativeRepository, Now: d.Now,
+			Eligible: func(ctx context.Context, p kernel.Principal) error {
+				u, err := d.Store.Users().Get(ctx, model.FoldUsername(p.Name))
+				if err != nil {
+					return fmt.Errorf("browser account: %w", err)
+				}
+				// This flow implements local password approval, not an external
+				// identity or MFA challenge. Never turn recorded MFA into bypass.
+				if u.DisableUIAccess || u.MFA == model.MFAEnabled || u.Realm != "" && u.Realm != model.RealmInternal {
+					return accessapi.ErrNativeLogin
+				}
+				return nil
+			},
+			TokenExpiry: expiry,
+		})
 	}
 	return m, nil
 }

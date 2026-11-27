@@ -79,18 +79,16 @@ claim that npm 9 and later refuse such registries). JFrog documents web login ag
 7.52 (confirmed); the URLs Artifactory returns are not captured and do not matter, since
 npm treats them as opaque.
 
-artifactweave: P21 owns browser approval and native web login (#262). The current
-`POST .../-/v1/login` has no implementation: the existing path routing answers 405 to
-an authenticated request, while an unauthenticated request can be rejected with 401
-first (`internal/server/status_npm_auth_test.go`). Use the implemented legacy login;
-automatic web-to-legacy fallback is not proved by this route. Decision
-[0034](decisions/0034-npm.md#login-and-tokens) records the login contract. The design
-#262 starts from:
-`POST .../-/v1/login` opens a two-minute session and returns a `loginUrl` to a small
-approval page and `doneUrl = <base>/artifactory/api/npm/<repo>/-/v1/done?sessionId=<id>`;
-the done URL answers 202 with `Retry-After: 5` while pending, 200 `{token, username}` once
-approved (single use) and 401 after expiry. With the page disabled the start call answers
-404, as before #262.
+artifactweave implements optional shared npm/Terraform approval in #262. It is off
+by default: npm start retains the existing authenticated 405 / unauthenticated 401,
+and explicit legacy login remains available. Enabling `native_login.enabled`
+requires a trusted canonical `native_login.origin`; the server-rendered page has
+no JavaScript, uses session-bound CSRF and exact Origin checks, and issues an
+ordinary revocable P4 token. The two-minute pending request, separate one-minute
+approved delivery/code window, paths, failure statuses and process-local storage
+are artifactweave choices, not vendor captures. See [decision 0019](decisions/0019-human-authentication-tiers.md#native-approval-contract-262)
+and the [pinned-client audit](native-browser-login-contract-audit.md) for the
+complete contract, replay/expiry and current-authority requirements.
 
 Sources: <https://github.com/npm/npm-profile/blob/main/lib/index.js>,
 <https://marmelab.com/blog/2022/12/22/how-to-implement-web-login-in-a-private-npm-registry.html>,

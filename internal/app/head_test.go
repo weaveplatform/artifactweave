@@ -18,6 +18,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/internal/access/core/token"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	skillsfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/skills"
@@ -252,7 +253,7 @@ func TestAccHeadOnTheWire(t *testing.T) {
 // route with a HEAD of its own, so a route that moves or goes stale fails
 // here rather than answering 405 unseen.
 func TestUnitHeadDecidedForEveryGet(t *testing.T) {
-	router := NewRouter(RouterConfig{}).(*chi.Mux)
+	router := NewRouter(nativeRouteInventoryConfig()).(*chi.Mux)
 	routes := servedRoutes(t, router)
 	served := headServed()
 	generated := map[string]bool{}
@@ -311,7 +312,17 @@ type headCase struct {
 // returns the workspace's ID.
 func headWorld(t *testing.T) (*itemWorld, string) {
 	t.Helper()
-	w := newXetWorld(t)
+	w := newXetWorld(t, func(c *RouterConfig) {
+		nativeStatusTune(c)
+		// The item fixture normally has no token service. Bind the real service
+		// so the optional browser routes exist in this complete HEAD inventory.
+		seedFixtureIdentity(t, c.Store)
+		var err error
+		c.Tokens, err = token.New(t.Context(), c.Store, token.Options{KeyBits: 1024})
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
 	ctx := t.Context()
 	if err := w.db.Settings().Put(ctx, settings.SettingFolderDownload,
 		artmodel.FolderDownloadSettings{Enabled: true}); err != nil {
@@ -393,6 +404,9 @@ func TestAccHeadAnswersHandwrittenGets(t *testing.T) {
 	hash := strings.Repeat("a", 64)
 	lfs := []string{"Accept", "application/vnd.git-lfs+json"}
 	cases := []headCase{
+		{path: "/ui/native-login?request=unknown"},
+		{path: "/ui/terraform/oauth2/authorize"},
+		{path: "/artifactory/api/npm/npm-local/-/v1/done?sessionId=unknown"},
 		{path: "/access/api/v1/system/ping"},
 		{path: "/access/api/v1/system/readiness"},
 		{path: "/access/api/v1/system/liveness"},
@@ -510,7 +524,26 @@ func TestAccHeadAnswersHandwrittenGets(t *testing.T) {
 					head.Code != http.StatusMethodNotAllowed {
 					t.Errorf("%s: %d, want 405", label, head.Code)
 				}
-				if !strings.HasPrefix(reason, "405") && head.Code != get.Code {
+				if strings.HasPrefix(pattern, "/ui/") {
+					want := http.StatusMethodNotAllowed
+					if by.as == "" {
+						want = http.StatusUnauthorized
+					}
+					if head.Code != want {
+						t.Errorf("%s: %d, want %d", label, head.Code, want)
+					}
+				}
+				if strings.HasPrefix(reason, "404") {
+					// npm's wildcard receives HEAD without invoking the native
+					// poll. Authentication still precedes that protocol refusal.
+					want := http.StatusUnauthorized
+					if by.as != "" {
+						want = http.StatusNotFound
+					}
+					if head.Code != want {
+						t.Errorf("%s: %d, want %d", label, head.Code, want)
+					}
+				} else if !strings.HasPrefix(reason, "405") && head.Code != get.Code {
 					t.Errorf("%s: %d, GET %d", label, head.Code, get.Code)
 				}
 				continue

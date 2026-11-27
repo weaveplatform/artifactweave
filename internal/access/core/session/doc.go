@@ -1,5 +1,5 @@
-// Package session will hold browser sessions and native-client approval
-// flows: sessions, CSRF protection, approvals and PKCE.
+// Package session implements bounded browser approval, session-bound CSRF,
+// native-client PKCE and callback validation.
 //
 // # Role
 //
@@ -7,15 +7,15 @@
 //
 // # Inputs
 //
-// None yet. Planned: browser logins and the approval requests of native
-// clients, such as npm web login and Terraform login.v1 with PKCE (plan P21,
-// task 1).
+// Browser password/consent, npm polling capabilities and Terraform S256
+// challenges/verifiers with exact localhost callbacks. Identity, authority,
+// repository and token ports belong to the access module.
 //
 // # Outputs
 //
-// None yet. Planned (target layout, line 548): session.go, csrf.go,
-// approval.go and pkce.go: sessions with consent, expiry and logout, CSRF
-// protection, and scoped credentials for approved clients.
+// Expiring process-local sessions and approvals, current-authority checks
+// and single-winner P4 token delivery; no password or issued token retained
+// in approval state and no metadata transaction across authentication I/O.
 //
 // # References
 //
@@ -36,5 +36,6 @@
 //
 // # Status
 //
-// Placeholder: implemented by P21.
+// Implemented for #262. External identity providers, MFA challenges and
+// shared HA sessions retain their separate P21/P35 owners.
 package session
