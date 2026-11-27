@@ -95,15 +95,16 @@ type Inventory struct {
 
 // block is one cached page, parsed.
 type block struct {
-	family string
-	page   string
-	source string
-	doc    map[string]any
+	family    string
+	page      string
+	source    string
+	doc       map[string]any
+	canonical bool
 }
 
-// readBlocks lists the cache the same way Load does and resolves each page's
-// source URL through the manifest so the inventory can cite it.
-func readBlocks(cacheDir string) ([]block, []string, error) {
+// readLegacyBlocks reads standalone caches without a manifest. Those fixtures
+// retain parse diagnostics, but cannot qualify the required family guard.
+func readLegacyBlocks(cacheDir string) ([]block, []string, error) {
 	sources := manifestSources(cacheDir)
 	families, err := os.ReadDir(cacheDir)
 	if err != nil {
@@ -174,10 +175,19 @@ func BuildInventory(cacheDir string) (Inventory, error) {
 	if err != nil {
 		return Inventory{}, err
 	}
+	owners, err := canonicalOwners(blocks)
+	if err != nil {
+		return Inventory{}, err
+	}
 	inv := Inventory{GeneratedAt: time.Now().UTC(), Pages: len(blocks), Errors: problems}
 	inv.Schemas = inventorySchemas(blocks)
 	for _, b := range blocks {
-		inv.Operations = append(inv.Operations, inventoryOps(b)...)
+		for _, op := range inventoryOps(b) {
+			if owner, ok := owners[op.Key]; ok {
+				op.Family = owner.family
+			}
+			inv.Operations = append(inv.Operations, op)
+		}
 	}
 	sort.Slice(inv.Operations, func(i, j int) bool {
 		if inv.Operations[i].Family != inv.Operations[j].Family {

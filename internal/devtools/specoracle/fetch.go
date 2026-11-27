@@ -51,15 +51,17 @@ type FetchOptions struct {
 
 // ManifestEntry records one page of one index.
 type ManifestEntry struct {
-	Index   string `json:"index"`
-	Family  string `json:"family"`
-	Title   string `json:"title"`
-	URL     string `json:"url"`
-	File    string `json:"file,omitempty"`
-	Status  int    `json:"status,omitempty"`
-	SHA256  string `json:"sha256,omitempty"`
-	Skipped string `json:"skipped,omitempty"`
-	Error   string `json:"error,omitempty"`
+	Index  string `json:"index"`
+	Family string `json:"family"`
+	Title  string `json:"title"`
+	URL    string `json:"url"`
+	File   string `json:"file,omitempty"`
+	Status int    `json:"status,omitempty"`
+	SHA256 string `json:"sha256,omitempty"`
+	// Canonical marks a verified full definition that owns its operation families.
+	Canonical bool   `json:"canonical,omitempty"`
+	Skipped   string `json:"skipped,omitempty"`
+	Error     string `json:"error,omitempty"`
 }
 
 // Manifest is written as manifest.json and lists what the cache holds.
@@ -211,6 +213,12 @@ func (f *fetcher) fetchFamily(
 		rec.Source = ""
 		rec.Error = err.Error()
 		parent, section, found, ferr := f.parentLinks(ctx, index, known)
+		if source, ok := currentFamilySources[rec.Family]; ok {
+			if ferr != nil {
+				rec.Error += "; " + ferr.Error()
+			}
+			return f.fetchCurrentFamily(ctx, rec, source)
+		}
 		if ferr != nil {
 			rec.Error += "; " + ferr.Error()
 			return rec, nil
@@ -311,6 +319,10 @@ func (f *fetcher) fetchPage(
 // get performs a GET with retries on 429 and 5xx. The backoff doubles from the
 // configured delay so a rate-limited crawl slows down instead of hammering.
 func (f *fetcher) get(ctx context.Context, url string) ([]byte, int, error) {
+	return f.getAccept(ctx, url, "text/markdown, text/plain;q=0.9, */*;q=0.1")
+}
+
+func (f *fetcher) getAccept(ctx context.Context, url, accept string) ([]byte, int, error) {
 	var lastErr error
 	for attempt := range f.retries {
 		if attempt > 0 {
@@ -325,7 +337,7 @@ func (f *fetcher) get(ctx context.Context, url string) ([]byte, int, error) {
 			return nil, 0, fmt.Errorf("specoracle: build request %s: %w", url, err)
 		}
 		req.Header.Set("User-Agent", f.userAgent)
-		req.Header.Set("Accept", "text/markdown, text/plain;q=0.9, */*;q=0.1")
+		req.Header.Set("Accept", accept)
 		resp, err := f.client.Do(req)
 		if err != nil {
 			lastErr = err

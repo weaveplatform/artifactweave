@@ -43,6 +43,9 @@ var Indexes = []string{
 	// 7.177.2 SaaS) out of the index above into a family of its own on
 	// 2026-11-13; the page URL stayed. Without this index a fetch loses the
 	// operation, and the parity check stops comparing replaceGroup (#1434).
+	// Its current llms.txt is absent: fetch follows the live Groups hierarchy
+	// and endorsed full current definition (#1988). A historical URL is not
+	// perpetual family membership; existing server PUT contracts stay intact.
 	"https://docs.jfrog.com/administration/reference/jfrog-platform-groups-api/llms.txt",
 	"https://docs.jfrog.com/administration/reference/storage-and-archive/llms.txt",
 	"https://docs.jfrog.com/administration/reference/jfrog-artifactory-security-api/llms.txt",

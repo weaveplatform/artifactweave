@@ -438,6 +438,9 @@ type ActionMetadata struct {
 	// MandatoryFilter Optional within this object. When true the action requires the filterCriteria member named by filterType; when absent or false the action rejects a filter.
 	MandatoryFilter *bool `json:"mandatoryFilter,omitempty"`
 
+	// Module Optional within this object. Event module within its application; empty for an event without a separate module.
+	Module *string `json:"module,omitempty"`
+
 	// RequestSchema Optional within this object. JSON schema of the input as text, when available.
 	RequestSchema *string `json:"requestSchema,omitempty"`
 
@@ -476,6 +479,9 @@ type ErrorResponse struct {
 type Worker struct {
 	// Action Optional within this object. The event that runs the worker. BEFORE_ actions run synchronously inside the operation and can veto or alter it; AFTER_ actions run after it has committed; GENERIC_EVENT workers run only when called through the execute operation. The server accepts only the actions it can trigger, which GET /api/v2/actions lists; any other value is rejected with 400.
 	Action *string `json:"action,omitempty"`
+
+	// ChainKey Optional within this object. Identifier of the chain containing this worker, when it belongs to a chain.
+	ChainKey *string `json:"chainKey,omitempty"`
 
 	// Debug Optional within this object. When true every run is recorded in the execution history; when false, the default, only failed runs are.
 	Debug *bool `json:"debug,omitempty"`
@@ -5527,6 +5533,9 @@ func ParseDeleteWorkerResponse(rsp *http.Response) (*DeleteWorkerResponse, error
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case rsp.StatusCode == 409:
+		break // No content-type
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
 		var dest TooManyRequests

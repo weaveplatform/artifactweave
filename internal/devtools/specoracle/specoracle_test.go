@@ -348,15 +348,22 @@ func TestUnitLoadAndCompare(t *testing.T) {
 	dir := t.TempDir()
 	writeCache(t, dir, "artifactory-repositories-api", "createrepository.json", theirRepoBlock)
 	writeCache(t, dir, "artifactory-repositories-api", "broken.json", "{not json")
-	if err := os.WriteFile(filepath.Join(dir, ManifestFile), []byte("{}"), 0o600); err != nil {
+	// The malformed orphan is outside the declared current snapshot.
+	manifest, err := json.Marshal(Manifest{Entries: []ManifestEntry{{
+		Family: "artifactory-repositories-api", File: "artifactory-repositories-api/createrepository.json",
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ManifestFile), manifest, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	theirs, err := Load(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(theirs.Errors) != 1 || !strings.Contains(theirs.Errors[0], "broken.json") {
-		t.Fatalf("expected one parse error, got %v", theirs.Errors)
+	if len(theirs.Errors) != 0 {
+		t.Fatalf("orphan is not a current parse problem: %v", theirs.Errors)
 	}
 	put, ok := theirs.Ops["PUT /artifactory/api/repositories/{}"]
 	if !ok {
@@ -448,7 +455,7 @@ func TestUnitLoadAndCompare(t *testing.T) {
 	); diff != "" {
 		t.Fatal(diff)
 	}
-	if len(report.Errors) != 1 {
+	if len(report.Errors) != 0 {
 		t.Fatalf("errors should flow into the report: %v", report.Errors)
 	}
 	sum := report.Summary()
@@ -461,7 +468,7 @@ func TestUnitLoadAndCompare(t *testing.T) {
 		t.Fatal(diff)
 	}
 	text := report.String()
-	for _, want := range []string{"TOTAL", "Divergent:", "Extra (ours only):", "Parse errors:", "missing response 400"} {
+	for _, want := range []string{"TOTAL", "Divergent:", "Extra (ours only):", "missing response 400"} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("report text lacks %q:\n%s", want, text)
 		}

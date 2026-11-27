@@ -1,7 +1,6 @@
 package specoracle
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -48,40 +47,28 @@ type Oracle struct {
 	Errors []string
 }
 
-// Load reads every cached block under cacheDir. A block that fails to parse
-// is recorded in Errors and skipped: one bad page must not hide the rest.
-// The cache is exactly two levels deep (family/page.json), so a plain
-// directory listing is enough and avoids walking symlinks.
+// Load reads the manifest-declared current snapshot and rejects damaged
+// recorded files; orphan files from earlier publications are ignored. Without
+// a manifest, standalone legacy fixtures retain directory loading and parse
+// diagnostics. CheckFamilies never qualifies those unmanifested caches.
 func Load(cacheDir string) (Oracle, error) {
 	o := Oracle{Ops: map[string]Operation{}}
-	families, err := os.ReadDir(cacheDir)
+	blocks, problems, err := readBlocks(cacheDir)
 	if err != nil {
-		return o, fmt.Errorf("specoracle: read cache %s: %w", cacheDir, err)
+		return o, err
 	}
-	for _, fam := range families {
-		if !fam.IsDir() {
-			continue
-		}
-		pages, err := os.ReadDir(filepath.Join(cacheDir, fam.Name()))
-		if err != nil {
-			return o, fmt.Errorf("specoracle: read family %s: %w", fam.Name(), err)
-		}
-		for _, page := range pages {
-			if page.IsDir() || !strings.HasSuffix(page.Name(), ".json") {
-				continue
-			}
-			rel := fam.Name() + "/" + page.Name()
-			data, err := os.ReadFile(filepath.Join(cacheDir, fam.Name(), page.Name()))
-			if err != nil {
-				return o, fmt.Errorf("specoracle: read %s: %w", rel, err)
-			}
-			var doc map[string]any
-			if err := json.Unmarshal(data, &doc); err != nil {
-				o.Errors = append(o.Errors, fmt.Sprintf("%s: %v", rel, err))
-				continue
-			}
-			o.add(doc, fam.Name(), rel)
-		}
+	o.Errors = problems
+	owners, err := canonicalOwners(blocks)
+	if err != nil {
+		return o, err
+	}
+	for _, b := range blocks {
+		o.add(b.doc, b.family, b.source)
+	}
+	for key, owner := range owners {
+		op := o.Ops[key]
+		op.Family, op.Source = owner.family, owner.source
+		o.Ops[key] = op
 	}
 	return o, nil
 }

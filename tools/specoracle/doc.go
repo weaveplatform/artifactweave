@@ -15,7 +15,10 @@
 // committed); api/*.openapi.yaml for the comparisons. fetch also reads
 // api/oracle-inventory.json for the pages each family had, which find the
 // family in its parent index when its own index fails (#1308). baseline and
-// inventory refuse a cache that lacks a family, and report warns of it. The
+// inventory refuse a cache that lacks a family or a declared file. Four
+// evidenced administration aliases follow current published pages to their
+// endorsed full definitions when old indexes fail (#1988). Reads ignore orphan
+// files from older publications and verify every declared block. The
 // subcommands:
 //
 //	specoracle fetch    [-cache .specoracle]            download the documented blocks

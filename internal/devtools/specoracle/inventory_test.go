@@ -107,10 +107,11 @@ func inventoryCache(t *testing.T) string {
 			t.Fatal(err)
 		}
 	}
-	manifest := Manifest{Entries: []ManifestEntry{{
-		File: "artifactory-repositories-api/createrepository.json",
-		URL:  "https://docs.jfrog.com/artifactory/reference/createrepository.md",
-	}}}
+	manifest := Manifest{Entries: []ManifestEntry{
+		{File: "artifactory-repositories-api/createrepository.json", URL: "https://docs.jfrog.com/artifactory/reference/createrepository.md"},
+		{File: "artifactory-repositories-api/listrepositories.json"},
+		{File: "administration-jfrog-platform-rest-apis/users.json"},
+	}}
 	data, err := json.Marshal(manifest)
 	if err != nil {
 		t.Fatal(err)
@@ -127,7 +128,7 @@ func TestUnitBuildInventory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if inv.Pages != 3 || len(inv.Errors) != 1 {
+	if inv.Pages != 3 || len(inv.Errors) != 0 {
 		t.Fatalf("pages %d errors %v", inv.Pages, inv.Errors)
 	}
 	if len(inv.Operations) != 5 {

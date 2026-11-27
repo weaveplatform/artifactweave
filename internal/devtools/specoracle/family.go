@@ -17,11 +17,13 @@ import (
 type FamilyRecord struct {
 	Index  string `json:"index"`
 	Family string `json:"family"`
-	// Source is the llms.txt whose links were fetched: Index itself, or the
-	// parent index when Index failed. Empty when neither gave the pages.
+	// Source is the index whose links were fetched, or the current full
+	// definition endorsed by Discovery. Empty when no source gave the family.
 	Source string `json:"source,omitempty"`
-	// Section is the parent index heading the pages were taken from.
+	// Section is the parent index heading or verified full-definition title.
 	Section string `json:"section,omitempty"`
+	// Discovery is the live hierarchy endorsing a full definition in Source.
+	Discovery string `json:"discovery,omitempty"`
 	// Error says why Index gave no pages. It stays set when the parent index
 	// stood in, so the fetch still reports the broken family index.
 	Error string `json:"error,omitempty"`
@@ -85,6 +87,9 @@ func CheckFamilies(cacheDir string) error {
 	}
 	if len(m.Families) == 0 {
 		return fmt.Errorf("%w in %s; run make oracle-fetch again", ErrNoFamilies, cacheDir)
+	}
+	if _, err := manifestBlocks(cacheDir, m); err != nil {
+		return err
 	}
 	var errs []error
 	for _, fam := range m.Missing() {

@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-11-14T16:15:10.94569Z",
-  "pages": 648,
+  "generated_at": "2026-11-27T21:04:33.071799Z",
+  "pages": 651,
   "schemas": [
     {
       "family": "administration-jfrog-artifactory-import-export-api",
@@ -129,6 +129,51 @@
     },
     {
       "family": "administration-jfrog-artifactory-security-api",
+      "name": "ClusterLocksResponse",
+      "type": "object",
+      "fields": [
+        {
+          "name": "meta",
+          "type": "object",
+          "ref": "LocksResponseMeta",
+          "required": true
+        },
+        {
+          "name": "nodes",
+          "type": "array",
+          "items": "NodeLocks",
+          "required": true
+        },
+        {
+          "name": "summary",
+          "type": "object",
+          "ref": "LocksResponseSummary",
+          "required": true
+        },
+        {
+          "name": "warnings",
+          "type": "array",
+          "items": "LocksResponseWarning"
+        }
+      ],
+      "variants": 1,
+      "used_by": 1
+    },
+    {
+      "family": "administration-jfrog-artifactory-security-api",
+      "name": "CurationInterfaceSettings",
+      "type": "object",
+      "fields": [
+        {
+          "name": "allowDownloadWhenUnavailable",
+          "type": "boolean"
+        }
+      ],
+      "variants": 1,
+      "used_by": 2
+    },
+    {
+      "family": "administration-jfrog-artifactory-security-api",
       "name": "ErrorResponse",
       "type": "object",
       "fields": [
@@ -215,6 +260,173 @@
       ],
       "variants": 1,
       "used_by": 3
+    },
+    {
+      "family": "administration-jfrog-artifactory-security-api",
+      "name": "LockEntry",
+      "type": "object",
+      "fields": [
+        {
+          "name": "category",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "key",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "lockedSinceEpochMs",
+          "type": "integer",
+          "format": "int64",
+          "required": true
+        },
+        {
+          "name": "lockedSinceIso",
+          "type": "string",
+          "format": "date-time",
+          "required": true
+        },
+        {
+          "name": "threadId",
+          "type": "integer",
+          "format": "int64",
+          "required": true
+        },
+        {
+          "name": "threadName",
+          "type": "string",
+          "nullable": true
+        }
+      ],
+      "variants": 1,
+      "used_by": 2
+    },
+    {
+      "family": "administration-jfrog-artifactory-security-api",
+      "name": "LocksFanOutMeta",
+      "type": "object",
+      "fields": [
+        {
+          "name": "enabled",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "responded",
+          "type": "integer",
+          "required": true
+        },
+        {
+          "name": "unreachable",
+          "type": "integer",
+          "required": true
+        }
+      ],
+      "variants": 1,
+      "used_by": 1
+    },
+    {
+      "family": "administration-jfrog-artifactory-security-api",
+      "name": "LocksResponseMeta",
+      "type": "object",
+      "fields": [
+        {
+          "name": "fanOut",
+          "type": "object",
+          "ref": "LocksFanOutMeta",
+          "required": true
+        },
+        {
+          "name": "queriedAt",
+          "type": "string",
+          "format": "date-time",
+          "required": true
+        },
+        {
+          "name": "queriedByNodeId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "variants": 1,
+      "used_by": 1
+    },
+    {
+      "family": "administration-jfrog-artifactory-security-api",
+      "name": "LocksResponseSummary",
+      "type": "object",
+      "fields": [
+        {
+          "name": "nodesOk",
+          "type": "integer",
+          "required": true
+        },
+        {
+          "name": "nodesUnreachable",
+          "type": "integer",
+          "required": true
+        },
+        {
+          "name": "totalHeldLocks",
+          "type": "integer",
+          "required": true
+        }
+      ],
+      "variants": 1,
+      "used_by": 1
+    },
+    {
+      "family": "administration-jfrog-artifactory-security-api",
+      "name": "LocksResponseWarning",
+      "type": "object",
+      "fields": [
+        {
+          "name": "code",
+          "type": "string",
+          "enum": [
+            "HA_AUTH_FAN_OUT_SKIPPED"
+          ],
+          "required": true
+        },
+        {
+          "name": "message",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "variants": 1,
+      "used_by": 1
+    },
+    {
+      "family": "administration-jfrog-artifactory-security-api",
+      "name": "NodeLocks",
+      "type": "object",
+      "fields": [
+        {
+          "name": "locks",
+          "type": "array",
+          "items": "LockEntry",
+          "required": true
+        },
+        {
+          "name": "nodeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "enum": [
+            "ok",
+            "unreachable"
+          ],
+          "required": true
+        }
+      ],
+      "variants": 1,
+      "used_by": 2
     },
     {
       "family": "administration-jfrog-artifactory-security-api",
@@ -452,7 +664,7 @@
         }
       ],
       "variants": 1,
-      "used_by": 4
+      "used_by": 1
     },
     {
       "family": "administration-jfrog-platform-access-federation-api",
@@ -549,7 +761,7 @@
         }
       ],
       "variants": 1,
-      "used_by": 4
+      "used_by": 1
     },
     {
       "family": "administration-jfrog-platform-artifactory-system-api",
@@ -594,7 +806,7 @@
         }
       ],
       "variants": 1,
-      "used_by": 2
+      "used_by": 1
     },
     {
       "family": "administration-jfrog-platform-artifactory-system-api",
@@ -636,7 +848,7 @@
         }
       ],
       "variants": 1,
-      "used_by": 2
+      "used_by": 1
     },
     {
       "family": "administration-jfrog-platform-artifactory-system-api",
@@ -761,7 +973,61 @@
         }
       ],
       "variants": 1,
-      "used_by": 2
+      "used_by": 1
+    },
+    {
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "name": "SupportBundleConfig",
+      "type": "object",
+      "fields": [
+        {
+          "name": "description",
+          "type": "string"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "parameters",
+          "type": "object",
+          "ref": "SupportBundleParameters"
+        }
+      ],
+      "variants": 1,
+      "used_by": 1
+    },
+    {
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "name": "SupportBundleParameters",
+      "type": "object",
+      "fields": [
+        {
+          "name": "collectSlowQueriesFromDatabase",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "name": "configuration",
+          "type": "boolean",
+          "default": true
+        },
+        {
+          "name": "logs",
+          "type": "object"
+        },
+        {
+          "name": "system",
+          "type": "boolean",
+          "default": true
+        },
+        {
+          "name": "thread_dump",
+          "type": "object"
+        }
+      ],
+      "variants": 1,
+      "used_by": 1
     },
     {
       "family": "administration-jfrog-platform-aws-iam-api",
@@ -780,7 +1046,7 @@
         }
       ],
       "variants": 1,
-      "used_by": 2
+      "used_by": 1
     },
     {
       "family": "administration-jfrog-platform-groups-api",
@@ -906,6 +1172,90 @@
         {
           "name": "realm_attributes",
           "type": "string"
+        },
+        {
+          "name": "reports_manager",
+          "type": "boolean"
+        },
+        {
+          "name": "watch_manager",
+          "type": "boolean"
+        }
+      ],
+      "variants": 1,
+      "used_by": 1
+    },
+    {
+      "family": "administration-jfrog-platform-groups-api",
+      "name": "GroupListResponse",
+      "type": "object",
+      "fields": [
+        {
+          "name": "cursor",
+          "type": "string"
+        },
+        {
+          "name": "groups",
+          "type": "array",
+          "items": "GroupRecordResponse"
+        }
+      ],
+      "variants": 1,
+      "used_by": 1
+    },
+    {
+      "family": "administration-jfrog-platform-groups-api",
+      "name": "GroupRecordResponse",
+      "type": "object",
+      "fields": [
+        {
+          "name": "group_name",
+          "type": "string"
+        },
+        {
+          "name": "uri",
+          "type": "string"
+        }
+      ],
+      "variants": 1,
+      "used_by": 1
+    },
+    {
+      "family": "administration-jfrog-platform-groups-api",
+      "name": "GroupUpdateRequest",
+      "type": "object",
+      "fields": [
+        {
+          "name": "admin_privileges",
+          "type": "boolean"
+        },
+        {
+          "name": "auto_join",
+          "type": "boolean"
+        },
+        {
+          "name": "description",
+          "type": "string"
+        },
+        {
+          "name": "external_id",
+          "type": "string"
+        },
+        {
+          "name": "manage_resources",
+          "type": "boolean"
+        },
+        {
+          "name": "manage_webhook",
+          "type": "boolean"
+        },
+        {
+          "name": "policy_manager",
+          "type": "boolean"
+        },
+        {
+          "name": "policy_viewer",
+          "type": "boolean"
         },
         {
           "name": "reports_manager",
@@ -1102,6 +1452,10 @@
           "type": "boolean"
         },
         {
+          "name": "module",
+          "type": "string"
+        },
+        {
           "name": "requestSchema",
           "type": "string"
         },
@@ -1294,6 +1648,25 @@
       ],
       "variants": 1,
       "used_by": 1
+    },
+    {
+      "family": "administration-jfrog-platform-rest-apis",
+      "name": "AwsIamRoleAssignment",
+      "type": "object",
+      "fields": [
+        {
+          "name": "iam_role",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "username",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "variants": 1,
+      "used_by": 2
     },
     {
       "family": "administration-jfrog-platform-rest-apis",
@@ -1855,6 +2228,120 @@
         {
           "name": "name",
           "type": "string"
+        }
+      ],
+      "variants": 1,
+      "used_by": 1
+    },
+    {
+      "family": "administration-jfrog-platform-rest-apis",
+      "name": "FederationTarget",
+      "type": "object",
+      "fields": [
+        {
+          "name": "active",
+          "type": "boolean"
+        },
+        {
+          "name": "entities",
+          "type": "array",
+          "items": "string"
+        },
+        {
+          "name": "group_filters",
+          "type": "object",
+          "ref": "PatternFilter"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "permission_filters",
+          "type": "object",
+          "ref": "PatternFilter"
+        },
+        {
+          "name": "url",
+          "type": "string"
+        }
+      ],
+      "variants": 1,
+      "used_by": 4
+    },
+    {
+      "family": "administration-jfrog-platform-rest-apis",
+      "name": "FederationTargetCreate",
+      "type": "object",
+      "fields": [
+        {
+          "name": "active",
+          "type": "boolean",
+          "default": true
+        },
+        {
+          "name": "entities",
+          "type": "array",
+          "items": "string",
+          "default": [
+            "users",
+            "groups",
+            "permissions",
+            "tokens"
+          ]
+        },
+        {
+          "name": "force_override",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "name": "group_filters",
+          "type": "object",
+          "ref": "PatternFilter"
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "permission_filters",
+          "type": "object",
+          "ref": "PatternFilter"
+        },
+        {
+          "name": "url",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "variants": 1,
+      "used_by": 1
+    },
+    {
+      "family": "administration-jfrog-platform-rest-apis",
+      "name": "FederationTargetUpdate",
+      "type": "object",
+      "fields": [
+        {
+          "name": "active",
+          "type": "boolean"
+        },
+        {
+          "name": "entities",
+          "type": "array",
+          "items": "string"
+        },
+        {
+          "name": "group_filters",
+          "type": "object",
+          "ref": "PatternFilter"
+        },
+        {
+          "name": "permission_filters",
+          "type": "object",
+          "ref": "PatternFilter"
         }
       ],
       "variants": 1,
@@ -3284,6 +3771,25 @@
     },
     {
       "family": "administration-jfrog-platform-rest-apis",
+      "name": "PatternFilter",
+      "type": "object",
+      "fields": [
+        {
+          "name": "exclude_patterns",
+          "type": "array",
+          "items": "string"
+        },
+        {
+          "name": "include_patterns",
+          "type": "array",
+          "items": "string"
+        }
+      ],
+      "variants": 1,
+      "used_by": 4
+    },
+    {
+      "family": "administration-jfrog-platform-rest-apis",
       "name": "Patterns",
       "type": "object",
       "fields": [
@@ -4440,6 +4946,12 @@
       "type": "object",
       "fields": [
         {
+          "name": "eligible_jpd_count",
+          "type": "integer",
+          "format": "int32",
+          "required": true
+        },
+        {
           "name": "topologies",
           "type": "array",
           "items": "TopologyResponse",
@@ -4464,6 +4976,10 @@
           "name": "created",
           "type": "string",
           "format": "date-time"
+        },
+        {
+          "name": "delete_in_progress",
+          "type": "boolean"
         },
         {
           "name": "description",
@@ -4502,6 +5018,10 @@
         {
           "name": "is_current",
           "type": "boolean"
+        },
+        {
+          "name": "jpd_id",
+          "type": "string"
         },
         {
           "name": "location",
@@ -4831,11 +5351,19 @@
           "type": "string"
         },
         {
+          "name": "source_site_name",
+          "type": "string"
+        },
+        {
           "name": "status",
           "type": "string"
         },
         {
           "name": "target_site",
+          "type": "string"
+        },
+        {
+          "name": "target_site_name",
           "type": "string"
         }
       ],
@@ -4915,6 +5443,10 @@
       "fields": [
         {
           "name": "action",
+          "type": "string"
+        },
+        {
+          "name": "chainKey",
           "type": "string"
         },
         {
@@ -14877,6 +15409,29 @@
       "id": "deleteAccessFederation",
       "method": "DELETE",
       "path": "/access/api/v1/system/federation/{serverName}",
+      "source": "https://dash.readme.com/api/v1/api-registry/4adnhwimtsmm97l",
+      "params": [
+        {
+          "name": "serverName",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "responses": {
+        "204": null,
+        "401": null,
+        "403": null,
+        "404": null
+      }
+    },
+    {
+      "key": "DELETE /access/api/v1/system/federation/{}",
+      "family": "administration-jfrog-platform-access-federation-api",
+      "tag": "Federation",
+      "id": "deleteAccessFederation",
+      "method": "DELETE",
+      "path": "/access/api/v1/system/federation/{serverName}",
       "source": "https://docs.jfrog.com/administration/reference/deleteaccessfederation.md",
       "params": [
         {
@@ -14913,6 +15468,25 @@
       }
     },
     {
+      "key": "GET /access/api/v1/system/federation",
+      "family": "administration-jfrog-platform-access-federation-api",
+      "tag": "Federation",
+      "id": "getAllAccessFederations",
+      "method": "GET",
+      "path": "/access/api/v1/system/federation",
+      "source": "https://dash.readme.com/api/v1/api-registry/4adnhwimtsmm97l",
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "object"
+          }
+        ],
+        "401": null,
+        "403": null
+      }
+    },
+    {
       "key": "GET /access/api/v1/system/federation/{}",
       "family": "administration-jfrog-platform-access-federation-api",
       "tag": "Federation",
@@ -14920,6 +15494,35 @@
       "method": "GET",
       "path": "/access/api/v1/system/federation/{serverName}",
       "source": "https://docs.jfrog.com/administration/reference/getaccessfederation.md",
+      "params": [
+        {
+          "name": "serverName",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "FederationTarget"
+          }
+        ],
+        "400": null,
+        "401": null,
+        "403": null,
+        "404": null
+      }
+    },
+    {
+      "key": "GET /access/api/v1/system/federation/{}",
+      "family": "administration-jfrog-platform-access-federation-api",
+      "tag": "Federation",
+      "id": "getAccessFederation",
+      "method": "GET",
+      "path": "/access/api/v1/system/federation/{serverName}",
+      "source": "https://dash.readme.com/api/v1/api-registry/4adnhwimtsmm97l",
       "params": [
         {
           "name": "serverName",
@@ -14981,6 +15584,45 @@
       }
     },
     {
+      "key": "PATCH /access/api/v1/system/federation/{}",
+      "family": "administration-jfrog-platform-access-federation-api",
+      "tag": "Federation",
+      "id": "updateAccessFederation",
+      "method": "PATCH",
+      "path": "/access/api/v1/system/federation/{serverName}",
+      "source": "https://dash.readme.com/api/v1/api-registry/4adnhwimtsmm97l",
+      "params": [
+        {
+          "name": "serverName",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "request": [
+        {
+          "media": "application/json",
+          "schema": "FederationTargetUpdate"
+        },
+        {
+          "media": "application/merge-patch+json",
+          "schema": "FederationTargetUpdate"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "FederationTarget"
+          }
+        ],
+        "400": null,
+        "401": null,
+        "403": null,
+        "404": null
+      }
+    },
+    {
       "key": "POST /access/api/v1/system/federation",
       "family": "administration-jfrog-platform-access-federation-api",
       "tag": "Federation",
@@ -15005,6 +15647,54 @@
         "401": null,
         "403": null,
         "409": null
+      }
+    },
+    {
+      "key": "POST /access/api/v1/system/federation",
+      "family": "administration-jfrog-platform-access-federation-api",
+      "tag": "Federation",
+      "id": "registerAccessFederation",
+      "method": "POST",
+      "path": "/access/api/v1/system/federation",
+      "source": "https://dash.readme.com/api/v1/api-registry/4adnhwimtsmm97l",
+      "request": [
+        {
+          "media": "application/json",
+          "schema": "FederationTargetCreate"
+        }
+      ],
+      "responses": {
+        "201": [
+          {
+            "media": "application/json",
+            "schema": "FederationTarget"
+          }
+        ],
+        "400": null,
+        "401": null,
+        "403": null,
+        "409": null
+      }
+    },
+    {
+      "key": "POST /access/api/v1/system/federation/validate_server",
+      "family": "administration-jfrog-platform-access-federation-api",
+      "tag": "Federation",
+      "id": "validateFederationTarget",
+      "method": "POST",
+      "path": "/access/api/v1/system/federation/validate_server",
+      "source": "https://dash.readme.com/api/v1/api-registry/4adnhwimtsmm97l",
+      "request": [
+        {
+          "media": "application/json",
+          "schema": "object"
+        }
+      ],
+      "responses": {
+        "204": null,
+        "400": null,
+        "401": null,
+        "403": null
       }
     },
     {
@@ -15035,6 +15725,32 @@
       "id": "fullBroadcastAccessFederation",
       "method": "PUT",
       "path": "/access/api/v1/system/federation/{serverName}/full_broadcast",
+      "source": "https://dash.readme.com/api/v1/api-registry/4adnhwimtsmm97l",
+      "params": [
+        {
+          "name": "serverName",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "responses": {
+        "202": null,
+        "204": null,
+        "304": null,
+        "400": null,
+        "401": null,
+        "403": null,
+        "404": null
+      }
+    },
+    {
+      "key": "PUT /access/api/v1/system/federation/{}/full_broadcast",
+      "family": "administration-jfrog-platform-access-federation-api",
+      "tag": "Federation",
+      "id": "fullBroadcastAccessFederation",
+      "method": "PUT",
+      "path": "/access/api/v1/system/federation/{serverName}/full_broadcast",
       "source": "https://docs.jfrog.com/administration/reference/fullbroadcastaccessfederation.md",
       "params": [
         {
@@ -15049,6 +15765,108 @@
         "204": null,
         "304": null,
         "400": null,
+        "401": null,
+        "403": null,
+        "404": null
+      }
+    },
+    {
+      "key": "DELETE /artifactory/api/system/licenses",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "deleteHALicense",
+      "method": "DELETE",
+      "path": "/artifactory/api/system/licenses",
+      "source": "https://docs.jfrog.com/administration/reference/deletehalicense.md",
+      "params": [
+        {
+          "name": "licenseHash",
+          "in": "query",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "object"
+          }
+        ],
+        "400": null,
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "DELETE /artifactory/api/system/licenses",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "deleteHALicense",
+      "method": "DELETE",
+      "path": "/artifactory/api/system/licenses",
+      "source": "https://dash.readme.com/api/v1/api-registry/3q9sms4kxklk",
+      "params": [
+        {
+          "name": "licenseHash",
+          "in": "query",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "object"
+          }
+        ],
+        "400": null,
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "DELETE /artifactory/api/system/support/bundle/{}",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Support Bundle",
+      "id": "deleteSupportBundle",
+      "method": "DELETE",
+      "path": "/artifactory/api/system/support/bundle/{bundleId}",
+      "source": "https://docs.jfrog.com/administration/reference/deletesupportbundle.md",
+      "params": [
+        {
+          "name": "bundleId",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "responses": {
+        "204": null,
+        "401": null,
+        "403": null,
+        "404": null
+      }
+    },
+    {
+      "key": "DELETE /artifactory/api/system/support/bundle/{}",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Support Bundle",
+      "id": "deleteSupportBundle",
+      "method": "DELETE",
+      "path": "/artifactory/api/system/support/bundle/{bundleId}",
+      "source": "https://dash.readme.com/api/v1/api-registry/3q9sms4kxklk",
+      "params": [
+        {
+          "name": "bundleId",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "responses": {
+        "204": null,
         "401": null,
         "403": null,
         "404": null
@@ -15071,6 +15889,304 @@
         ],
         "401": null,
         "403": null
+      }
+    },
+    {
+      "key": "GET /artifactory/api/curation/interfaceSettings",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Curation",
+      "id": "getCurationInterfaceSettings",
+      "method": "GET",
+      "path": "/artifactory/api/curation/interfaceSettings",
+      "source": "https://dash.readme.com/api/v1/api-registry/3q9sms4kxklk",
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "CurationInterfaceSettings"
+          }
+        ],
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "GET /artifactory/api/system",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "getSystemInfo",
+      "method": "GET",
+      "path": "/artifactory/api/system",
+      "source": "https://dash.readme.com/api/v1/api-registry/3q9sms4kxklk",
+      "responses": {
+        "200": [
+          {
+            "media": "text/plain",
+            "schema": "string"
+          }
+        ],
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "GET /artifactory/api/system",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "getSystemInfo",
+      "method": "GET",
+      "path": "/artifactory/api/system",
+      "source": "https://docs.jfrog.com/administration/reference/getsysteminfo.md",
+      "responses": {
+        "200": [
+          {
+            "media": "text/plain",
+            "schema": "string"
+          }
+        ],
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "GET /artifactory/api/system/configuration",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "getSystemConfiguration",
+      "method": "GET",
+      "path": "/artifactory/api/system/configuration",
+      "source": "https://dash.readme.com/api/v1/api-registry/3q9sms4kxklk",
+      "responses": {
+        "200": [
+          {
+            "media": "application/xml",
+            "schema": "string"
+          }
+        ],
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "GET /artifactory/api/system/configuration",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "getSystemConfiguration",
+      "method": "GET",
+      "path": "/artifactory/api/system/configuration",
+      "source": "https://docs.jfrog.com/administration/reference/getsystemconfiguration.md",
+      "responses": {
+        "200": [
+          {
+            "media": "application/xml",
+            "schema": "string"
+          }
+        ],
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "GET /artifactory/api/system/configuration/reverseProxy/nginx",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "getReverseProxySnippet",
+      "method": "GET",
+      "path": "/artifactory/api/system/configuration/reverseProxy/nginx",
+      "source": "https://docs.jfrog.com/administration/reference/getreverseproxysnippet.md",
+      "responses": {
+        "200": [
+          {
+            "media": "text/plain",
+            "schema": "string"
+          }
+        ],
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "GET /artifactory/api/system/configuration/reverseProxy/nginx",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "getReverseProxySnippet",
+      "method": "GET",
+      "path": "/artifactory/api/system/configuration/reverseProxy/nginx",
+      "source": "https://dash.readme.com/api/v1/api-registry/3q9sms4kxklk",
+      "responses": {
+        "200": [
+          {
+            "media": "text/plain",
+            "schema": "string"
+          }
+        ],
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "GET /artifactory/api/system/configuration/webServer",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "getReverseProxyConfiguration",
+      "method": "GET",
+      "path": "/artifactory/api/system/configuration/webServer",
+      "source": "https://docs.jfrog.com/administration/reference/getreverseproxyconfiguration.md",
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "object"
+          }
+        ],
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "GET /artifactory/api/system/configuration/webServer",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "getReverseProxyConfiguration",
+      "method": "GET",
+      "path": "/artifactory/api/system/configuration/webServer",
+      "source": "https://dash.readme.com/api/v1/api-registry/3q9sms4kxklk",
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "object"
+          }
+        ],
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "GET /artifactory/api/system/license",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "getLicenseInfo",
+      "method": "GET",
+      "path": "/artifactory/api/system/license",
+      "source": "https://docs.jfrog.com/administration/reference/getlicenseinfo.md",
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "object"
+          }
+        ],
+        "400": [
+          {
+            "media": "application/json",
+            "schema": "object"
+          }
+        ],
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "GET /artifactory/api/system/license",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "getLicenseInfo",
+      "method": "GET",
+      "path": "/artifactory/api/system/license",
+      "source": "https://dash.readme.com/api/v1/api-registry/3q9sms4kxklk",
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "object"
+          }
+        ],
+        "400": [
+          {
+            "media": "application/json",
+            "schema": "object"
+          }
+        ],
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "GET /artifactory/api/system/licenses",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "getHALicenseInfo",
+      "method": "GET",
+      "path": "/artifactory/api/system/licenses",
+      "source": "https://docs.jfrog.com/administration/reference/gethalicenseinfo.md",
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "[]object"
+          }
+        ],
+        "400": [
+          {
+            "media": "application/json",
+            "schema": "object"
+          }
+        ],
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "GET /artifactory/api/system/licenses",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "getHALicenseInfo",
+      "method": "GET",
+      "path": "/artifactory/api/system/licenses",
+      "source": "https://dash.readme.com/api/v1/api-registry/3q9sms4kxklk",
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "[]object"
+          }
+        ],
+        "400": [
+          {
+            "media": "application/json",
+            "schema": "object"
+          }
+        ],
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "GET /artifactory/api/system/locks",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "getClusterLocks",
+      "method": "GET",
+      "path": "/artifactory/api/system/locks",
+      "source": "https://dash.readme.com/api/v1/api-registry/3q9sms4kxklk",
+      "params": [
+        {
+          "name": "category",
+          "in": "query",
+          "type": "string"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "ClusterLocksResponse"
+          }
+        ],
+        "401": null,
+        "403": null,
+        "503": null
       }
     },
     {
@@ -15107,6 +16223,33 @@
       "id": "getNodeLocks",
       "method": "GET",
       "path": "/artifactory/api/system/locks/local",
+      "source": "https://dash.readme.com/api/v1/api-registry/3q9sms4kxklk",
+      "params": [
+        {
+          "name": "category",
+          "in": "query",
+          "type": "string"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "NodeLocks"
+          }
+        ],
+        "401": null,
+        "403": null,
+        "503": null
+      }
+    },
+    {
+      "key": "GET /artifactory/api/system/locks/local",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "getNodeLocks",
+      "method": "GET",
+      "path": "/artifactory/api/system/locks/local",
       "source": "https://docs.jfrog.com/administration/reference/getnodelocks.md",
       "params": [
         {
@@ -15128,6 +16271,888 @@
       }
     },
     {
+      "key": "GET /artifactory/api/system/ping",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "artifactoryPing",
+      "method": "GET",
+      "path": "/artifactory/api/system/ping",
+      "source": "https://docs.jfrog.com/administration/reference/artifactoryping.md",
+      "responses": {
+        "200": [
+          {
+            "media": "text/plain",
+            "schema": "string"
+          }
+        ],
+        "500": null
+      }
+    },
+    {
+      "key": "GET /artifactory/api/system/ping",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "artifactoryPing",
+      "method": "GET",
+      "path": "/artifactory/api/system/ping",
+      "source": "https://dash.readme.com/api/v1/api-registry/3q9sms4kxklk",
+      "responses": {
+        "200": [
+          {
+            "media": "text/plain",
+            "schema": "string"
+          }
+        ],
+        "500": null
+      }
+    },
+    {
+      "key": "GET /artifactory/api/system/support/bundle/{}",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Support Bundle",
+      "id": "getSupportBundleMetadata",
+      "method": "GET",
+      "path": "/artifactory/api/system/support/bundle/{bundleId}",
+      "source": "https://dash.readme.com/api/v1/api-registry/3q9sms4kxklk",
+      "params": [
+        {
+          "name": "bundleId",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "object"
+          }
+        ],
+        "401": null,
+        "403": null,
+        "404": null
+      }
+    },
+    {
+      "key": "GET /artifactory/api/system/support/bundle/{}",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Support Bundle",
+      "id": "getSupportBundleMetadata",
+      "method": "GET",
+      "path": "/artifactory/api/system/support/bundle/{bundleId}",
+      "source": "https://docs.jfrog.com/administration/reference/getsupportbundlemetadata.md",
+      "params": [
+        {
+          "name": "bundleId",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "object"
+          }
+        ],
+        "401": null,
+        "403": null,
+        "404": null
+      }
+    },
+    {
+      "key": "GET /artifactory/api/system/support/bundle/{}/archive",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Support Bundle",
+      "id": "getSupportBundle",
+      "method": "GET",
+      "path": "/artifactory/api/system/support/bundle/{bundleId}/archive",
+      "source": "https://dash.readme.com/api/v1/api-registry/3q9sms4kxklk",
+      "params": [
+        {
+          "name": "bundleId",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/octet-stream",
+            "schema": "string"
+          }
+        ],
+        "400": null,
+        "401": null,
+        "403": null,
+        "404": null
+      }
+    },
+    {
+      "key": "GET /artifactory/api/system/support/bundle/{}/archive",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Support Bundle",
+      "id": "getSupportBundle",
+      "method": "GET",
+      "path": "/artifactory/api/system/support/bundle/{bundleId}/archive",
+      "source": "https://docs.jfrog.com/administration/reference/getsupportbundle.md",
+      "params": [
+        {
+          "name": "bundleId",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/octet-stream",
+            "schema": "string"
+          }
+        ],
+        "400": null,
+        "401": null,
+        "403": null,
+        "404": null
+      }
+    },
+    {
+      "key": "GET /artifactory/api/system/support/bundles",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Support Bundle",
+      "id": "listSupportBundles",
+      "method": "GET",
+      "path": "/artifactory/api/system/support/bundles",
+      "source": "https://dash.readme.com/api/v1/api-registry/3q9sms4kxklk",
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "object"
+          }
+        ],
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "GET /artifactory/api/system/support/bundles",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Support Bundle",
+      "id": "listSupportBundles",
+      "method": "GET",
+      "path": "/artifactory/api/system/support/bundles",
+      "source": "https://docs.jfrog.com/administration/reference/listsupportbundles.md",
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "object"
+          }
+        ],
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "GET /artifactory/api/system/version",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "getArtifactoryVersion",
+      "method": "GET",
+      "path": "/artifactory/api/system/version",
+      "source": "https://docs.jfrog.com/administration/reference/getartifactoryversion.md",
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "object"
+          },
+          {
+            "media": "application/vnd.org.jfrog.artifactory.system.Version+json",
+            "schema": "object"
+          }
+        ],
+        "401": null
+      }
+    },
+    {
+      "key": "GET /artifactory/api/system/version",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "getArtifactoryVersion",
+      "method": "GET",
+      "path": "/artifactory/api/system/version",
+      "source": "https://dash.readme.com/api/v1/api-registry/3q9sms4kxklk",
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "object"
+          },
+          {
+            "media": "application/vnd.org.jfrog.artifactory.system.Version+json",
+            "schema": "object"
+          }
+        ],
+        "401": null
+      }
+    },
+    {
+      "key": "GET /artifactory/api/v1/system/liveness",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "getLivenessProbe",
+      "method": "GET",
+      "path": "/artifactory/api/v1/system/liveness",
+      "source": "https://dash.readme.com/api/v1/api-registry/3q9sms4kxklk",
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "object"
+          }
+        ],
+        "500": null
+      }
+    },
+    {
+      "key": "GET /artifactory/api/v1/system/liveness",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "getLivenessProbe",
+      "method": "GET",
+      "path": "/artifactory/api/v1/system/liveness",
+      "source": "https://docs.jfrog.com/administration/reference/getlivenessprobe.md",
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "object"
+          }
+        ],
+        "500": null
+      }
+    },
+    {
+      "key": "GET /artifactory/api/v1/system/readiness",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "getReadinessProbe",
+      "method": "GET",
+      "path": "/artifactory/api/v1/system/readiness",
+      "source": "https://dash.readme.com/api/v1/api-registry/3q9sms4kxklk",
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "object"
+          }
+        ],
+        "500": null
+      }
+    },
+    {
+      "key": "GET /artifactory/api/v1/system/readiness",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "getReadinessProbe",
+      "method": "GET",
+      "path": "/artifactory/api/v1/system/readiness",
+      "source": "https://docs.jfrog.com/administration/reference/getreadinessprobe.md",
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "object"
+          }
+        ],
+        "500": null
+      }
+    },
+    {
+      "key": "PATCH /artifactory/api/system/configuration",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "patchSystemConfiguration",
+      "method": "PATCH",
+      "path": "/artifactory/api/system/configuration",
+      "source": "https://docs.jfrog.com/administration/reference/patchsystemconfiguration.md",
+      "request": [
+        {
+          "media": "application/yaml",
+          "schema": "string"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "text/plain",
+            "schema": "string"
+          }
+        ],
+        "400": null,
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "PATCH /artifactory/api/system/configuration",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "patchSystemConfiguration",
+      "method": "PATCH",
+      "path": "/artifactory/api/system/configuration",
+      "source": "https://dash.readme.com/api/v1/api-registry/3q9sms4kxklk",
+      "request": [
+        {
+          "media": "application/yaml",
+          "schema": "string"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "text/plain",
+            "schema": "string"
+          }
+        ],
+        "400": null,
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "POST /artifactory/api/metadata_server/reindex",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "reindexMetadataServer",
+      "method": "POST",
+      "path": "/artifactory/api/metadata_server/reindex",
+      "source": "https://docs.jfrog.com/administration/reference/reindexmetadataserver.md",
+      "params": [
+        {
+          "name": "async",
+          "in": "query",
+          "type": "boolean",
+          "default": true
+        },
+        {
+          "name": "delete_first",
+          "in": "query",
+          "type": "boolean",
+          "default": false
+        }
+      ],
+      "request": [
+        {
+          "media": "application/json",
+          "schema": "object"
+        }
+      ],
+      "responses": {
+        "200": null,
+        "202": null,
+        "400": null,
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "POST /artifactory/api/metadata_server/reindex",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "reindexMetadataServer",
+      "method": "POST",
+      "path": "/artifactory/api/metadata_server/reindex",
+      "source": "https://dash.readme.com/api/v1/api-registry/3q9sms4kxklk",
+      "params": [
+        {
+          "name": "async",
+          "in": "query",
+          "type": "boolean",
+          "default": true
+        },
+        {
+          "name": "delete_first",
+          "in": "query",
+          "type": "boolean",
+          "default": false
+        }
+      ],
+      "request": [
+        {
+          "media": "application/json",
+          "schema": "object"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "text/plain",
+            "schema": "string"
+          }
+        ],
+        "202": null,
+        "400": null,
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "POST /artifactory/api/system/configuration",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "saveSystemConfiguration",
+      "method": "POST",
+      "path": "/artifactory/api/system/configuration",
+      "source": "https://docs.jfrog.com/administration/reference/savesystemconfiguration.md",
+      "request": [
+        {
+          "media": "application/xml",
+          "schema": "string"
+        }
+      ],
+      "responses": {
+        "200": null,
+        "400": null,
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "POST /artifactory/api/system/configuration",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "saveSystemConfiguration",
+      "method": "POST",
+      "path": "/artifactory/api/system/configuration",
+      "source": "https://dash.readme.com/api/v1/api-registry/3q9sms4kxklk",
+      "request": [
+        {
+          "media": "application/xml",
+          "schema": "string"
+        }
+      ],
+      "responses": {
+        "200": null,
+        "400": null,
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "POST /artifactory/api/system/configuration/webServer",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "updateReverseProxyConfiguration",
+      "method": "POST",
+      "path": "/artifactory/api/system/configuration/webServer",
+      "source": "https://docs.jfrog.com/administration/reference/updatereverseproxyconfiguration.md",
+      "request": [
+        {
+          "media": "application/json",
+          "schema": "object"
+        }
+      ],
+      "responses": {
+        "200": null,
+        "400": null,
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "POST /artifactory/api/system/configuration/webServer",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "updateReverseProxyConfiguration",
+      "method": "POST",
+      "path": "/artifactory/api/system/configuration/webServer",
+      "source": "https://dash.readme.com/api/v1/api-registry/3q9sms4kxklk",
+      "request": [
+        {
+          "media": "application/json",
+          "schema": "object"
+        }
+      ],
+      "responses": {
+        "200": null,
+        "400": null,
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "POST /artifactory/api/system/license",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "installLicense",
+      "method": "POST",
+      "path": "/artifactory/api/system/license",
+      "source": "https://dash.readme.com/api/v1/api-registry/3q9sms4kxklk",
+      "request": [
+        {
+          "media": "application/json",
+          "schema": "object"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "object"
+          }
+        ],
+        "400": null,
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "POST /artifactory/api/system/license",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "installLicense",
+      "method": "POST",
+      "path": "/artifactory/api/system/license",
+      "source": "https://docs.jfrog.com/administration/reference/installlicense.md",
+      "request": [
+        {
+          "media": "application/json",
+          "schema": "object"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "object"
+          }
+        ],
+        "400": null,
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "POST /artifactory/api/system/licenses",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "installHALicenses",
+      "method": "POST",
+      "path": "/artifactory/api/system/licenses",
+      "source": "https://dash.readme.com/api/v1/api-registry/3q9sms4kxklk",
+      "request": [
+        {
+          "media": "application/json",
+          "schema": "[]object"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "object"
+          }
+        ],
+        "400": null,
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "POST /artifactory/api/system/licenses",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "installHALicenses",
+      "method": "POST",
+      "path": "/artifactory/api/system/licenses",
+      "source": "https://docs.jfrog.com/administration/reference/installhalicenses.md",
+      "request": [
+        {
+          "media": "application/json",
+          "schema": "[]object"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "object"
+          }
+        ],
+        "400": null,
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "POST /artifactory/api/system/migration/sha2/start",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "startSha256Migration",
+      "method": "POST",
+      "path": "/artifactory/api/system/migration/sha2/start",
+      "source": "https://dash.readme.com/api/v1/api-registry/3q9sms4kxklk",
+      "request": [
+        {
+          "media": "application/json",
+          "schema": "object"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "text/plain",
+            "schema": "string"
+          }
+        ],
+        "400": [
+          {
+            "media": "application/json",
+            "schema": "object"
+          }
+        ],
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "POST /artifactory/api/system/migration/sha2/start",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "startSha256Migration",
+      "method": "POST",
+      "path": "/artifactory/api/system/migration/sha2/start",
+      "source": "https://docs.jfrog.com/administration/reference/startsha256migration.md",
+      "request": [
+        {
+          "media": "application/json",
+          "schema": "object"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "text/plain",
+            "schema": "string"
+          }
+        ],
+        "400": [
+          {
+            "media": "application/json",
+            "schema": "object"
+          }
+        ],
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "POST /artifactory/api/system/migration/sha2/stop",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "stopSha256Migration",
+      "method": "POST",
+      "path": "/artifactory/api/system/migration/sha2/stop",
+      "source": "https://docs.jfrog.com/administration/reference/stopsha256migration.md",
+      "params": [
+        {
+          "name": "sleepIntervalMillis",
+          "in": "query",
+          "type": "integer",
+          "default": 5000
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "text/plain",
+            "schema": "string"
+          }
+        ],
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "POST /artifactory/api/system/migration/sha2/stop",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "stopSha256Migration",
+      "method": "POST",
+      "path": "/artifactory/api/system/migration/sha2/stop",
+      "source": "https://dash.readme.com/api/v1/api-registry/3q9sms4kxklk",
+      "params": [
+        {
+          "name": "sleepIntervalMillis",
+          "in": "query",
+          "type": "integer",
+          "default": 5000
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "text/plain",
+            "schema": "string"
+          }
+        ],
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "POST /artifactory/api/system/support/bundle",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Support Bundle",
+      "id": "createSupportBundle",
+      "method": "POST",
+      "path": "/artifactory/api/system/support/bundle",
+      "source": "https://docs.jfrog.com/administration/reference/createsupportbundle.md",
+      "request": [
+        {
+          "media": "application/json",
+          "schema": "SupportBundleConfig"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "object"
+          }
+        ],
+        "400": [
+          {
+            "media": "application/json",
+            "schema": "object"
+          }
+        ],
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "POST /artifactory/api/system/support/bundle",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Support Bundle",
+      "id": "createSupportBundle",
+      "method": "POST",
+      "path": "/artifactory/api/system/support/bundle",
+      "source": "https://dash.readme.com/api/v1/api-registry/3q9sms4kxklk",
+      "request": [
+        {
+          "media": "application/json",
+          "schema": "SupportBundleConfig"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "object"
+          }
+        ],
+        "400": [
+          {
+            "media": "application/json",
+            "schema": "object"
+          }
+        ],
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "POST /artifactory/api/system/verifyconnection",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "verifyConnection",
+      "method": "POST",
+      "path": "/artifactory/api/system/verifyconnection",
+      "source": "https://dash.readme.com/api/v1/api-registry/3q9sms4kxklk",
+      "request": [
+        {
+          "media": "application/json",
+          "schema": "object"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "text/plain",
+            "schema": "string"
+          }
+        ],
+        "400": [
+          {
+            "media": "application/json",
+            "schema": "object"
+          }
+        ],
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "POST /artifactory/api/system/verifyconnection",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "verifyConnection",
+      "method": "POST",
+      "path": "/artifactory/api/system/verifyconnection",
+      "source": "https://docs.jfrog.com/administration/reference/verifyconnection.md",
+      "request": [
+        {
+          "media": "application/json",
+          "schema": "object"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "text/plain",
+            "schema": "string"
+          }
+        ],
+        "400": [
+          {
+            "media": "application/json",
+            "schema": "object"
+          }
+        ],
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "PUT /artifactory/api/curation/interfaceSettings",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Curation",
+      "id": "updateCurationInterfaceSettings",
+      "method": "PUT",
+      "path": "/artifactory/api/curation/interfaceSettings",
+      "source": "https://dash.readme.com/api/v1/api-registry/3q9sms4kxklk",
+      "request": [
+        {
+          "media": "application/json",
+          "schema": "CurationInterfaceSettings"
+        }
+      ],
+      "responses": {
+        "200": null,
+        "400": null,
+        "401": null,
+        "403": null
+      }
+    },
+    {
       "key": "PUT /artifactory/api/curation/interfaceSettings",
       "family": "administration-jfrog-platform-artifactory-system-api",
       "tag": "Curation",
@@ -15143,6 +17168,81 @@
       ],
       "responses": {
         "200": null,
+        "400": null,
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "PUT /artifactory/api/system/configuration/baseUrl",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "updateCustomUrlBase",
+      "method": "PUT",
+      "path": "/artifactory/api/system/configuration/baseUrl",
+      "source": "https://dash.readme.com/api/v1/api-registry/3q9sms4kxklk",
+      "request": [
+        {
+          "media": "text/plain",
+          "schema": "string"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "text/plain",
+            "schema": "string"
+          }
+        ],
+        "400": null,
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "PUT /artifactory/api/system/configuration/baseUrl",
+      "family": "administration-jfrog-platform-artifactory-system-api",
+      "tag": "Artifactory System",
+      "id": "updateCustomUrlBase",
+      "method": "PUT",
+      "path": "/artifactory/api/system/configuration/baseUrl",
+      "source": "https://docs.jfrog.com/administration/reference/updatecustomurlbase.md",
+      "request": [
+        {
+          "media": "text/plain",
+          "schema": "string"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "text/plain",
+            "schema": "string"
+          }
+        ],
+        "400": null,
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "DELETE /access/api/v1/aws/iam_role/{}",
+      "family": "administration-jfrog-platform-aws-iam-api",
+      "tag": "AWS IAM Role",
+      "id": "deleteAwsIamRole",
+      "method": "DELETE",
+      "path": "/access/api/v1/aws/iam_role/{username}",
+      "source": "https://dash.readme.com/api/v1/api-registry/50lm8ormtsmm967",
+      "params": [
+        {
+          "name": "username",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "responses": {
+        "204": null,
         "400": null,
         "401": null,
         "403": null
@@ -15201,6 +17301,35 @@
       }
     },
     {
+      "key": "GET /access/api/v1/aws/iam_role/{}",
+      "family": "administration-jfrog-platform-aws-iam-api",
+      "tag": "AWS IAM Role",
+      "id": "getAwsIamRole",
+      "method": "GET",
+      "path": "/access/api/v1/aws/iam_role/{username}",
+      "source": "https://dash.readme.com/api/v1/api-registry/50lm8ormtsmm967",
+      "params": [
+        {
+          "name": "username",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "AwsIamRoleAssignment"
+          }
+        ],
+        "400": null,
+        "401": null,
+        "403": null,
+        "404": null
+      }
+    },
+    {
       "key": "PUT /access/api/v1/aws/iam_role",
       "family": "administration-jfrog-platform-aws-iam-api",
       "tag": "AWS IAM Role",
@@ -15224,13 +17353,268 @@
       }
     },
     {
-      "key": "PUT /access/api/v2/groups/{}",
+      "key": "PUT /access/api/v1/aws/iam_role",
+      "family": "administration-jfrog-platform-aws-iam-api",
+      "tag": "AWS IAM Role",
+      "id": "putAwsIamRole",
+      "method": "PUT",
+      "path": "/access/api/v1/aws/iam_role",
+      "source": "https://dash.readme.com/api/v1/api-registry/50lm8ormtsmm967",
+      "request": [
+        {
+          "media": "application/json",
+          "schema": "AwsIamRoleAssignment"
+        }
+      ],
+      "responses": {
+        "204": null,
+        "400": null,
+        "401": null,
+        "403": null,
+        "404": null,
+        "409": null
+      }
+    },
+    {
+      "key": "DELETE /access/api/v2/groups/{}",
       "family": "administration-jfrog-platform-groups-api",
       "tag": "Groups",
-      "id": "replaceGroup",
-      "method": "PUT",
+      "id": "deleteGroup",
+      "method": "DELETE",
       "path": "/access/api/v2/groups/{name}",
-      "source": "https://docs.jfrog.com/administration/reference/replacegroup.md",
+      "source": "https://dash.readme.com/api/v1/api-registry/3evidmunlmze9",
+      "params": [
+        {
+          "name": "name",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "responses": {
+        "204": null,
+        "401": null,
+        "403": null,
+        "404": null
+      }
+    },
+    {
+      "key": "DELETE /access/api/v2/groups/{}",
+      "family": "administration-jfrog-platform-groups-api",
+      "tag": "Groups",
+      "id": "deleteGroup",
+      "method": "DELETE",
+      "path": "/access/api/v2/groups/{name}",
+      "source": "https://docs.jfrog.com/administration/reference/deletegroup.md",
+      "params": [
+        {
+          "name": "name",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "responses": {
+        "204": null,
+        "401": null,
+        "403": null,
+        "404": null
+      }
+    },
+    {
+      "key": "GET /access/api/v2/groups",
+      "family": "administration-jfrog-platform-groups-api",
+      "tag": "Groups",
+      "id": "getGroupList",
+      "method": "GET",
+      "path": "/access/api/v2/groups",
+      "source": "https://dash.readme.com/api/v1/api-registry/3evidmunlmze9",
+      "params": [
+        {
+          "name": "cursor",
+          "in": "query",
+          "type": "string"
+        },
+        {
+          "name": "descendingOrder",
+          "in": "query",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "name": "groupName",
+          "in": "query",
+          "type": "string"
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "type": "integer",
+          "default": 1000
+        },
+        {
+          "name": "projectKey",
+          "in": "query",
+          "type": "string"
+        },
+        {
+          "name": "resourceName",
+          "in": "query",
+          "type": "string"
+        },
+        {
+          "name": "resourceType",
+          "in": "query",
+          "type": "string"
+        },
+        {
+          "name": "role",
+          "in": "query",
+          "type": "string"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "GroupListResponse"
+          }
+        ],
+        "400": null,
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "GET /access/api/v2/groups",
+      "family": "administration-jfrog-platform-groups-api",
+      "tag": "Groups",
+      "id": "getGroupList",
+      "method": "GET",
+      "path": "/access/api/v2/groups",
+      "source": "https://docs.jfrog.com/administration/reference/getgrouplist.md",
+      "params": [
+        {
+          "name": "cursor",
+          "in": "query",
+          "type": "string"
+        },
+        {
+          "name": "descendingOrder",
+          "in": "query",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "name": "groupName",
+          "in": "query",
+          "type": "string"
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "type": "integer",
+          "default": 1000
+        },
+        {
+          "name": "projectKey",
+          "in": "query",
+          "type": "string"
+        },
+        {
+          "name": "resourceName",
+          "in": "query",
+          "type": "string"
+        },
+        {
+          "name": "resourceType",
+          "in": "query",
+          "type": "string"
+        },
+        {
+          "name": "role",
+          "in": "query",
+          "type": "string"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "GroupListResponse"
+          }
+        ],
+        "400": null,
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "GET /access/api/v2/groups/{}",
+      "family": "administration-jfrog-platform-groups-api",
+      "tag": "Groups",
+      "id": "getGroupDetails",
+      "method": "GET",
+      "path": "/access/api/v2/groups/{name}",
+      "source": "https://dash.readme.com/api/v1/api-registry/3evidmunlmze9",
+      "params": [
+        {
+          "name": "name",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "GroupDetails"
+          }
+        ],
+        "400": null,
+        "401": null,
+        "403": null,
+        "404": null
+      }
+    },
+    {
+      "key": "GET /access/api/v2/groups/{}",
+      "family": "administration-jfrog-platform-groups-api",
+      "tag": "Groups",
+      "id": "getGroupDetails",
+      "method": "GET",
+      "path": "/access/api/v2/groups/{name}",
+      "source": "https://docs.jfrog.com/administration/reference/getgroupdetails.md",
+      "params": [
+        {
+          "name": "name",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "GroupDetails"
+          }
+        ],
+        "400": null,
+        "401": null,
+        "403": null,
+        "404": null
+      }
+    },
+    {
+      "key": "PATCH /access/api/v2/groups/{}",
+      "family": "administration-jfrog-platform-groups-api",
+      "tag": "Groups",
+      "id": "updateGroup",
+      "method": "PATCH",
+      "path": "/access/api/v2/groups/{name}",
+      "source": "https://dash.readme.com/api/v1/api-registry/3evidmunlmze9",
       "params": [
         {
           "name": "name",
@@ -15242,7 +17626,7 @@
       "request": [
         {
           "media": "application/json",
-          "schema": "GroupCreateRequest"
+          "schema": "GroupUpdateRequest"
         }
       ],
       "responses": {
@@ -15252,7 +17636,36 @@
             "schema": "GroupDetails"
           }
         ],
-        "201": [
+        "400": null,
+        "401": null,
+        "403": null,
+        "404": null
+      }
+    },
+    {
+      "key": "PATCH /access/api/v2/groups/{}",
+      "family": "administration-jfrog-platform-groups-api",
+      "tag": "Groups",
+      "id": "updateGroup",
+      "method": "PATCH",
+      "path": "/access/api/v2/groups/{name}",
+      "source": "https://docs.jfrog.com/administration/reference/updategroup.md",
+      "params": [
+        {
+          "name": "name",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "request": [
+        {
+          "media": "application/json",
+          "schema": "GroupUpdateRequest"
+        }
+      ],
+      "responses": {
+        "200": [
           {
             "media": "application/json",
             "schema": "GroupDetails"
@@ -15262,6 +17675,130 @@
         "401": null,
         "403": null,
         "404": null
+      }
+    },
+    {
+      "key": "PATCH /access/api/v2/groups/{}/members",
+      "family": "administration-jfrog-platform-groups-api",
+      "tag": "Groups",
+      "id": "updateGroupMembers",
+      "method": "PATCH",
+      "path": "/access/api/v2/groups/{name}/members",
+      "source": "https://dash.readme.com/api/v1/api-registry/3evidmunlmze9",
+      "params": [
+        {
+          "name": "name",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "request": [
+        {
+          "media": "application/json",
+          "schema": "object"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "object"
+          }
+        ],
+        "401": null,
+        "403": null,
+        "404": null
+      }
+    },
+    {
+      "key": "PATCH /access/api/v2/groups/{}/members",
+      "family": "administration-jfrog-platform-groups-api",
+      "tag": "Groups",
+      "id": "updateGroupMembers",
+      "method": "PATCH",
+      "path": "/access/api/v2/groups/{name}/members",
+      "source": "https://docs.jfrog.com/administration/reference/updategroupmembers.md",
+      "params": [
+        {
+          "name": "name",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "request": [
+        {
+          "media": "application/json",
+          "schema": "object"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "object"
+          }
+        ],
+        "401": null,
+        "403": null,
+        "404": null
+      }
+    },
+    {
+      "key": "POST /access/api/v2/groups",
+      "family": "administration-jfrog-platform-groups-api",
+      "tag": "Groups",
+      "id": "createGroup",
+      "method": "POST",
+      "path": "/access/api/v2/groups",
+      "source": "https://dash.readme.com/api/v1/api-registry/3evidmunlmze9",
+      "request": [
+        {
+          "media": "application/json",
+          "schema": "GroupCreateRequest"
+        }
+      ],
+      "responses": {
+        "201": [
+          {
+            "media": "application/json",
+            "schema": "GroupDetails"
+          }
+        ],
+        "400": null,
+        "401": null,
+        "403": null,
+        "404": null,
+        "409": null
+      }
+    },
+    {
+      "key": "POST /access/api/v2/groups",
+      "family": "administration-jfrog-platform-groups-api",
+      "tag": "Groups",
+      "id": "createGroup",
+      "method": "POST",
+      "path": "/access/api/v2/groups",
+      "source": "https://docs.jfrog.com/administration/reference/creategroup.md",
+      "request": [
+        {
+          "media": "application/json",
+          "schema": "GroupCreateRequest"
+        }
+      ],
+      "responses": {
+        "201": [
+          {
+            "media": "application/json",
+            "schema": "GroupDetails"
+          }
+        ],
+        "400": null,
+        "401": null,
+        "403": null,
+        "404": null,
+        "409": null
       }
     },
     {
@@ -15577,29 +18114,6 @@
       }
     },
     {
-      "key": "DELETE /access/api/v2/groups/{}",
-      "family": "administration-jfrog-platform-rest-apis",
-      "tag": "Groups",
-      "id": "deleteGroup",
-      "method": "DELETE",
-      "path": "/access/api/v2/groups/{name}",
-      "source": "https://docs.jfrog.com/administration/reference/deletegroup.md",
-      "params": [
-        {
-          "name": "name",
-          "in": "path",
-          "required": true,
-          "type": "string"
-        }
-      ],
-      "responses": {
-        "204": null,
-        "401": null,
-        "403": null,
-        "404": null
-      }
-    },
-    {
       "key": "DELETE /access/api/v2/permissions/{}",
       "family": "administration-jfrog-platform-rest-apis",
       "tag": "Permissions",
@@ -15774,57 +18288,6 @@
       }
     },
     {
-      "key": "DELETE /artifactory/api/system/licenses",
-      "family": "administration-jfrog-platform-rest-apis",
-      "tag": "Artifactory System",
-      "id": "deleteHALicense",
-      "method": "DELETE",
-      "path": "/artifactory/api/system/licenses",
-      "source": "https://docs.jfrog.com/administration/reference/deletehalicense.md",
-      "params": [
-        {
-          "name": "licenseHash",
-          "in": "query",
-          "required": true,
-          "type": "string"
-        }
-      ],
-      "responses": {
-        "200": [
-          {
-            "media": "application/json",
-            "schema": "object"
-          }
-        ],
-        "400": null,
-        "401": null,
-        "403": null
-      }
-    },
-    {
-      "key": "DELETE /artifactory/api/system/support/bundle/{}",
-      "family": "administration-jfrog-platform-rest-apis",
-      "tag": "Support Bundle",
-      "id": "deleteSupportBundle",
-      "method": "DELETE",
-      "path": "/artifactory/api/system/support/bundle/{bundleId}",
-      "source": "https://docs.jfrog.com/administration/reference/deletesupportbundle.md",
-      "params": [
-        {
-          "name": "bundleId",
-          "in": "path",
-          "required": true,
-          "type": "string"
-        }
-      ],
-      "responses": {
-        "204": null,
-        "401": null,
-        "403": null,
-        "404": null
-      }
-    },
-    {
       "key": "DELETE /bridge-client/api/v1/bridges/{}",
       "family": "administration-jfrog-platform-rest-apis",
       "tag": "Bridge Client",
@@ -15953,11 +18416,16 @@
         ],
         "409": [
           {
-            "media": "application/json",
-            "schema": "TopologyResponse"
+            "media": "application/json"
           }
         ],
         "500": [
+          {
+            "media": "application/json",
+            "schema": "Error"
+          }
+        ],
+        "503": [
           {
             "media": "application/json",
             "schema": "Error"
@@ -16119,7 +18587,8 @@
         "204": null,
         "401": null,
         "403": null,
-        "404": null
+        "404": null,
+        "409": null
       }
     },
     {
@@ -16945,99 +19414,6 @@
       }
     },
     {
-      "key": "GET /access/api/v2/groups",
-      "family": "administration-jfrog-platform-rest-apis",
-      "tag": "Groups",
-      "id": "getGroupList",
-      "method": "GET",
-      "path": "/access/api/v2/groups",
-      "source": "https://docs.jfrog.com/administration/reference/getgrouplist.md",
-      "params": [
-        {
-          "name": "cursor",
-          "in": "query",
-          "type": "string"
-        },
-        {
-          "name": "descendingOrder",
-          "in": "query",
-          "type": "boolean",
-          "default": false
-        },
-        {
-          "name": "groupName",
-          "in": "query",
-          "type": "string"
-        },
-        {
-          "name": "limit",
-          "in": "query",
-          "type": "integer",
-          "default": 1000
-        },
-        {
-          "name": "projectKey",
-          "in": "query",
-          "type": "string"
-        },
-        {
-          "name": "resourceName",
-          "in": "query",
-          "type": "string"
-        },
-        {
-          "name": "resourceType",
-          "in": "query",
-          "type": "string"
-        },
-        {
-          "name": "role",
-          "in": "query",
-          "type": "string"
-        }
-      ],
-      "responses": {
-        "200": [
-          {
-            "media": "application/json",
-            "schema": "GroupListResponse"
-          }
-        ],
-        "400": null,
-        "401": null,
-        "403": null
-      }
-    },
-    {
-      "key": "GET /access/api/v2/groups/{}",
-      "family": "administration-jfrog-platform-rest-apis",
-      "tag": "Groups",
-      "id": "getGroupDetails",
-      "method": "GET",
-      "path": "/access/api/v2/groups/{name}",
-      "source": "https://docs.jfrog.com/administration/reference/getgroupdetails.md",
-      "params": [
-        {
-          "name": "name",
-          "in": "path",
-          "required": true,
-          "type": "string"
-        }
-      ],
-      "responses": {
-        "200": [
-          {
-            "media": "application/json",
-            "schema": "GroupDetails"
-          }
-        ],
-        "400": null,
-        "401": null,
-        "403": null,
-        "404": null
-      }
-    },
-    {
       "key": "GET /access/api/v2/permissions",
       "family": "administration-jfrog-platform-rest-apis",
       "tag": "Permissions",
@@ -17519,284 +19895,6 @@
       }
     },
     {
-      "key": "GET /artifactory/api/system",
-      "family": "administration-jfrog-platform-rest-apis",
-      "tag": "Artifactory System",
-      "id": "getSystemInfo",
-      "method": "GET",
-      "path": "/artifactory/api/system",
-      "source": "https://docs.jfrog.com/administration/reference/getsysteminfo.md",
-      "responses": {
-        "200": [
-          {
-            "media": "text/plain",
-            "schema": "string"
-          }
-        ],
-        "401": null,
-        "403": null
-      }
-    },
-    {
-      "key": "GET /artifactory/api/system/configuration",
-      "family": "administration-jfrog-platform-rest-apis",
-      "tag": "Artifactory System",
-      "id": "getSystemConfiguration",
-      "method": "GET",
-      "path": "/artifactory/api/system/configuration",
-      "source": "https://docs.jfrog.com/administration/reference/getsystemconfiguration.md",
-      "responses": {
-        "200": [
-          {
-            "media": "application/xml",
-            "schema": "string"
-          }
-        ],
-        "401": null,
-        "403": null
-      }
-    },
-    {
-      "key": "GET /artifactory/api/system/configuration/reverseProxy/nginx",
-      "family": "administration-jfrog-platform-rest-apis",
-      "tag": "Artifactory System",
-      "id": "getReverseProxySnippet",
-      "method": "GET",
-      "path": "/artifactory/api/system/configuration/reverseProxy/nginx",
-      "source": "https://docs.jfrog.com/administration/reference/getreverseproxysnippet.md",
-      "responses": {
-        "200": [
-          {
-            "media": "text/plain",
-            "schema": "string"
-          }
-        ],
-        "401": null,
-        "403": null
-      }
-    },
-    {
-      "key": "GET /artifactory/api/system/configuration/webServer",
-      "family": "administration-jfrog-platform-rest-apis",
-      "tag": "Artifactory System",
-      "id": "getReverseProxyConfiguration",
-      "method": "GET",
-      "path": "/artifactory/api/system/configuration/webServer",
-      "source": "https://docs.jfrog.com/administration/reference/getreverseproxyconfiguration.md",
-      "responses": {
-        "200": [
-          {
-            "media": "application/json",
-            "schema": "object"
-          }
-        ],
-        "401": null,
-        "403": null
-      }
-    },
-    {
-      "key": "GET /artifactory/api/system/license",
-      "family": "administration-jfrog-platform-rest-apis",
-      "tag": "Artifactory System",
-      "id": "getLicenseInfo",
-      "method": "GET",
-      "path": "/artifactory/api/system/license",
-      "source": "https://docs.jfrog.com/administration/reference/getlicenseinfo.md",
-      "responses": {
-        "200": [
-          {
-            "media": "application/json",
-            "schema": "object"
-          }
-        ],
-        "400": [
-          {
-            "media": "application/json",
-            "schema": "object"
-          }
-        ],
-        "401": null,
-        "403": null
-      }
-    },
-    {
-      "key": "GET /artifactory/api/system/licenses",
-      "family": "administration-jfrog-platform-rest-apis",
-      "tag": "Artifactory System",
-      "id": "getHALicenseInfo",
-      "method": "GET",
-      "path": "/artifactory/api/system/licenses",
-      "source": "https://docs.jfrog.com/administration/reference/gethalicenseinfo.md",
-      "responses": {
-        "200": [
-          {
-            "media": "application/json",
-            "schema": "[]object"
-          }
-        ],
-        "400": [
-          {
-            "media": "application/json",
-            "schema": "object"
-          }
-        ],
-        "401": null,
-        "403": null
-      }
-    },
-    {
-      "key": "GET /artifactory/api/system/ping",
-      "family": "administration-jfrog-platform-rest-apis",
-      "tag": "Artifactory System",
-      "id": "artifactoryPing",
-      "method": "GET",
-      "path": "/artifactory/api/system/ping",
-      "source": "https://docs.jfrog.com/administration/reference/artifactoryping.md",
-      "responses": {
-        "200": [
-          {
-            "media": "text/plain",
-            "schema": "string"
-          }
-        ],
-        "500": null
-      }
-    },
-    {
-      "key": "GET /artifactory/api/system/support/bundle/{}",
-      "family": "administration-jfrog-platform-rest-apis",
-      "tag": "Support Bundle",
-      "id": "getSupportBundleMetadata",
-      "method": "GET",
-      "path": "/artifactory/api/system/support/bundle/{bundleId}",
-      "source": "https://docs.jfrog.com/administration/reference/getsupportbundlemetadata.md",
-      "params": [
-        {
-          "name": "bundleId",
-          "in": "path",
-          "required": true,
-          "type": "string"
-        }
-      ],
-      "responses": {
-        "200": [
-          {
-            "media": "application/json",
-            "schema": "object"
-          }
-        ],
-        "401": null,
-        "403": null,
-        "404": null
-      }
-    },
-    {
-      "key": "GET /artifactory/api/system/support/bundle/{}/archive",
-      "family": "administration-jfrog-platform-rest-apis",
-      "tag": "Support Bundle",
-      "id": "getSupportBundle",
-      "method": "GET",
-      "path": "/artifactory/api/system/support/bundle/{bundleId}/archive",
-      "source": "https://docs.jfrog.com/administration/reference/getsupportbundle.md",
-      "params": [
-        {
-          "name": "bundleId",
-          "in": "path",
-          "required": true,
-          "type": "string"
-        }
-      ],
-      "responses": {
-        "200": [
-          {
-            "media": "application/octet-stream",
-            "schema": "string"
-          }
-        ],
-        "400": null,
-        "401": null,
-        "403": null,
-        "404": null
-      }
-    },
-    {
-      "key": "GET /artifactory/api/system/support/bundles",
-      "family": "administration-jfrog-platform-rest-apis",
-      "tag": "Support Bundle",
-      "id": "listSupportBundles",
-      "method": "GET",
-      "path": "/artifactory/api/system/support/bundles",
-      "source": "https://docs.jfrog.com/administration/reference/listsupportbundles.md",
-      "responses": {
-        "200": [
-          {
-            "media": "application/json",
-            "schema": "object"
-          }
-        ],
-        "401": null,
-        "403": null
-      }
-    },
-    {
-      "key": "GET /artifactory/api/system/version",
-      "family": "administration-jfrog-platform-rest-apis",
-      "tag": "Artifactory System",
-      "id": "getArtifactoryVersion",
-      "method": "GET",
-      "path": "/artifactory/api/system/version",
-      "source": "https://docs.jfrog.com/administration/reference/getartifactoryversion.md",
-      "responses": {
-        "200": [
-          {
-            "media": "application/json",
-            "schema": "object"
-          },
-          {
-            "media": "application/vnd.org.jfrog.artifactory.system.Version+json",
-            "schema": "object"
-          }
-        ],
-        "401": null
-      }
-    },
-    {
-      "key": "GET /artifactory/api/v1/system/liveness",
-      "family": "administration-jfrog-platform-rest-apis",
-      "tag": "Artifactory System",
-      "id": "getLivenessProbe",
-      "method": "GET",
-      "path": "/artifactory/api/v1/system/liveness",
-      "source": "https://docs.jfrog.com/administration/reference/getlivenessprobe.md",
-      "responses": {
-        "200": [
-          {
-            "media": "application/json",
-            "schema": "object"
-          }
-        ],
-        "500": null
-      }
-    },
-    {
-      "key": "GET /artifactory/api/v1/system/readiness",
-      "family": "administration-jfrog-platform-rest-apis",
-      "tag": "Artifactory System",
-      "id": "getReadinessProbe",
-      "method": "GET",
-      "path": "/artifactory/api/v1/system/readiness",
-      "source": "https://docs.jfrog.com/administration/reference/getreadinessprobe.md",
-      "responses": {
-        "200": [
-          {
-            "media": "application/json",
-            "schema": "object"
-          }
-        ],
-        "500": null
-      }
-    },
-    {
       "key": "GET /bridge-client/api/v1/bridges/debug",
       "family": "administration-jfrog-platform-rest-apis",
       "tag": "Bridge Client",
@@ -18118,6 +20216,12 @@
             "media": "application/json",
             "schema": "Error"
           }
+        ],
+        "503": [
+          {
+            "media": "application/json",
+            "schema": "Error"
+          }
         ]
       }
     },
@@ -18149,6 +20253,12 @@
           }
         ],
         "500": [
+          {
+            "media": "application/json",
+            "schema": "Error"
+          }
+        ],
+        "503": [
           {
             "media": "application/json",
             "schema": "Error"
@@ -18202,6 +20312,12 @@
             "media": "application/json",
             "schema": "Error"
           }
+        ],
+        "503": [
+          {
+            "media": "application/json",
+            "schema": "Error"
+          }
         ]
       }
     },
@@ -18239,7 +20355,33 @@
           ]
         },
         {
+          "name": "modified_after",
+          "in": "query",
+          "type": "string"
+        },
+        {
+          "name": "modified_before",
+          "in": "query",
+          "type": "string"
+        },
+        {
+          "name": "page_size",
+          "in": "query",
+          "type": "integer",
+          "default": 50
+        },
+        {
           "name": "page_token",
+          "in": "query",
+          "type": "string"
+        },
+        {
+          "name": "search",
+          "in": "query",
+          "type": "string"
+        },
+        {
+          "name": "source_jpds",
           "in": "query",
           "type": "string"
         },
@@ -18248,10 +20390,16 @@
           "in": "query",
           "type": "string",
           "enum": [
+            "all",
             "failure",
             "in_progress",
             "success"
           ]
+        },
+        {
+          "name": "target_jpds",
+          "in": "query",
+          "type": "string"
         }
       ],
       "responses": {
@@ -18286,6 +20434,12 @@
           }
         ],
         "500": [
+          {
+            "media": "application/json",
+            "schema": "Error"
+          }
+        ],
+        "503": [
           {
             "media": "application/json",
             "schema": "Error"
@@ -18357,6 +20511,12 @@
           }
         ],
         "500": [
+          {
+            "media": "application/json",
+            "schema": "Error"
+          }
+        ],
+        "503": [
           {
             "media": "application/json",
             "schema": "Error"
@@ -18436,6 +20596,12 @@
           }
         ],
         "500": [
+          {
+            "media": "application/json",
+            "schema": "Error"
+          }
+        ],
+        "503": [
           {
             "media": "application/json",
             "schema": "Error"
@@ -19205,75 +21371,6 @@
       }
     },
     {
-      "key": "PATCH /access/api/v2/groups/{}",
-      "family": "administration-jfrog-platform-rest-apis",
-      "tag": "Groups",
-      "id": "updateGroup",
-      "method": "PATCH",
-      "path": "/access/api/v2/groups/{name}",
-      "source": "https://docs.jfrog.com/administration/reference/updategroup.md",
-      "params": [
-        {
-          "name": "name",
-          "in": "path",
-          "required": true,
-          "type": "string"
-        }
-      ],
-      "request": [
-        {
-          "media": "application/json",
-          "schema": "GroupUpdateRequest"
-        }
-      ],
-      "responses": {
-        "200": [
-          {
-            "media": "application/json",
-            "schema": "GroupDetails"
-          }
-        ],
-        "400": null,
-        "401": null,
-        "403": null,
-        "404": null
-      }
-    },
-    {
-      "key": "PATCH /access/api/v2/groups/{}/members",
-      "family": "administration-jfrog-platform-rest-apis",
-      "tag": "Groups",
-      "id": "updateGroupMembers",
-      "method": "PATCH",
-      "path": "/access/api/v2/groups/{name}/members",
-      "source": "https://docs.jfrog.com/administration/reference/updategroupmembers.md",
-      "params": [
-        {
-          "name": "name",
-          "in": "path",
-          "required": true,
-          "type": "string"
-        }
-      ],
-      "request": [
-        {
-          "media": "application/json",
-          "schema": "object"
-        }
-      ],
-      "responses": {
-        "200": [
-          {
-            "media": "application/json",
-            "schema": "object"
-          }
-        ],
-        "401": null,
-        "403": null,
-        "404": null
-      }
-    },
-    {
       "key": "PATCH /access/api/v2/permissions/{}/{}",
       "family": "administration-jfrog-platform-rest-apis",
       "tag": "Permissions",
@@ -19390,32 +21487,6 @@
       }
     },
     {
-      "key": "PATCH /artifactory/api/system/configuration",
-      "family": "administration-jfrog-platform-rest-apis",
-      "tag": "Artifactory System",
-      "id": "patchSystemConfiguration",
-      "method": "PATCH",
-      "path": "/artifactory/api/system/configuration",
-      "source": "https://docs.jfrog.com/administration/reference/patchsystemconfiguration.md",
-      "request": [
-        {
-          "media": "application/yaml",
-          "schema": "string"
-        }
-      ],
-      "responses": {
-        "200": [
-          {
-            "media": "text/plain",
-            "schema": "string"
-          }
-        ],
-        "400": null,
-        "401": null,
-        "403": null
-      }
-    },
-    {
       "key": "PATCH /bridge-client/api/v1/bridges/{}",
       "family": "administration-jfrog-platform-rest-apis",
       "tag": "Bridge Client",
@@ -19499,7 +21570,19 @@
             "schema": "Error"
           }
         ],
+        "409": [
+          {
+            "media": "application/json",
+            "schema": "Error"
+          }
+        ],
         "500": [
+          {
+            "media": "application/json",
+            "schema": "Error"
+          }
+        ],
+        "503": [
           {
             "media": "application/json",
             "schema": "Error"
@@ -20139,34 +22222,6 @@
       }
     },
     {
-      "key": "POST /access/api/v2/groups",
-      "family": "administration-jfrog-platform-rest-apis",
-      "tag": "Groups",
-      "id": "createGroup",
-      "method": "POST",
-      "path": "/access/api/v2/groups",
-      "source": "https://docs.jfrog.com/administration/reference/creategroup.md",
-      "request": [
-        {
-          "media": "application/json",
-          "schema": "GroupCreateRequest"
-        }
-      ],
-      "responses": {
-        "201": [
-          {
-            "media": "application/json",
-            "schema": "GroupDetails"
-          }
-        ],
-        "400": null,
-        "401": null,
-        "403": null,
-        "404": null,
-        "409": null
-      }
-    },
-    {
       "key": "POST /access/api/v2/permissions",
       "family": "administration-jfrog-platform-rest-apis",
       "tag": "Permissions",
@@ -20535,256 +22590,6 @@
       }
     },
     {
-      "key": "POST /artifactory/api/metadata_server/reindex",
-      "family": "administration-jfrog-platform-rest-apis",
-      "tag": "Artifactory System",
-      "id": "reindexMetadataServer",
-      "method": "POST",
-      "path": "/artifactory/api/metadata_server/reindex",
-      "source": "https://docs.jfrog.com/administration/reference/reindexmetadataserver.md",
-      "params": [
-        {
-          "name": "async",
-          "in": "query",
-          "type": "boolean",
-          "default": true
-        },
-        {
-          "name": "delete_first",
-          "in": "query",
-          "type": "boolean",
-          "default": false
-        }
-      ],
-      "request": [
-        {
-          "media": "application/json",
-          "schema": "object"
-        }
-      ],
-      "responses": {
-        "200": null,
-        "202": null,
-        "400": null,
-        "401": null,
-        "403": null
-      }
-    },
-    {
-      "key": "POST /artifactory/api/system/configuration",
-      "family": "administration-jfrog-platform-rest-apis",
-      "tag": "Artifactory System",
-      "id": "saveSystemConfiguration",
-      "method": "POST",
-      "path": "/artifactory/api/system/configuration",
-      "source": "https://docs.jfrog.com/administration/reference/savesystemconfiguration.md",
-      "request": [
-        {
-          "media": "application/xml",
-          "schema": "string"
-        }
-      ],
-      "responses": {
-        "200": null,
-        "400": null,
-        "401": null,
-        "403": null
-      }
-    },
-    {
-      "key": "POST /artifactory/api/system/configuration/webServer",
-      "family": "administration-jfrog-platform-rest-apis",
-      "tag": "Artifactory System",
-      "id": "updateReverseProxyConfiguration",
-      "method": "POST",
-      "path": "/artifactory/api/system/configuration/webServer",
-      "source": "https://docs.jfrog.com/administration/reference/updatereverseproxyconfiguration.md",
-      "request": [
-        {
-          "media": "application/json",
-          "schema": "object"
-        }
-      ],
-      "responses": {
-        "200": null,
-        "400": null,
-        "401": null,
-        "403": null
-      }
-    },
-    {
-      "key": "POST /artifactory/api/system/license",
-      "family": "administration-jfrog-platform-rest-apis",
-      "tag": "Artifactory System",
-      "id": "installLicense",
-      "method": "POST",
-      "path": "/artifactory/api/system/license",
-      "source": "https://docs.jfrog.com/administration/reference/installlicense.md",
-      "request": [
-        {
-          "media": "application/json",
-          "schema": "object"
-        }
-      ],
-      "responses": {
-        "200": [
-          {
-            "media": "application/json",
-            "schema": "object"
-          }
-        ],
-        "400": null,
-        "401": null,
-        "403": null
-      }
-    },
-    {
-      "key": "POST /artifactory/api/system/licenses",
-      "family": "administration-jfrog-platform-rest-apis",
-      "tag": "Artifactory System",
-      "id": "installHALicenses",
-      "method": "POST",
-      "path": "/artifactory/api/system/licenses",
-      "source": "https://docs.jfrog.com/administration/reference/installhalicenses.md",
-      "request": [
-        {
-          "media": "application/json",
-          "schema": "[]object"
-        }
-      ],
-      "responses": {
-        "200": [
-          {
-            "media": "application/json",
-            "schema": "object"
-          }
-        ],
-        "400": null,
-        "401": null,
-        "403": null
-      }
-    },
-    {
-      "key": "POST /artifactory/api/system/migration/sha2/start",
-      "family": "administration-jfrog-platform-rest-apis",
-      "tag": "Artifactory System",
-      "id": "startSha256Migration",
-      "method": "POST",
-      "path": "/artifactory/api/system/migration/sha2/start",
-      "source": "https://docs.jfrog.com/administration/reference/startsha256migration.md",
-      "request": [
-        {
-          "media": "application/json",
-          "schema": "object"
-        }
-      ],
-      "responses": {
-        "200": [
-          {
-            "media": "text/plain",
-            "schema": "string"
-          }
-        ],
-        "400": [
-          {
-            "media": "application/json",
-            "schema": "object"
-          }
-        ],
-        "401": null,
-        "403": null
-      }
-    },
-    {
-      "key": "POST /artifactory/api/system/migration/sha2/stop",
-      "family": "administration-jfrog-platform-rest-apis",
-      "tag": "Artifactory System",
-      "id": "stopSha256Migration",
-      "method": "POST",
-      "path": "/artifactory/api/system/migration/sha2/stop",
-      "source": "https://docs.jfrog.com/administration/reference/stopsha256migration.md",
-      "params": [
-        {
-          "name": "sleepIntervalMillis",
-          "in": "query",
-          "type": "integer",
-          "default": 5000
-        }
-      ],
-      "responses": {
-        "200": [
-          {
-            "media": "text/plain",
-            "schema": "string"
-          }
-        ],
-        "401": null,
-        "403": null
-      }
-    },
-    {
-      "key": "POST /artifactory/api/system/support/bundle",
-      "family": "administration-jfrog-platform-rest-apis",
-      "tag": "Support Bundle",
-      "id": "createSupportBundle",
-      "method": "POST",
-      "path": "/artifactory/api/system/support/bundle",
-      "source": "https://docs.jfrog.com/administration/reference/createsupportbundle.md",
-      "request": [
-        {
-          "media": "application/json",
-          "schema": "SupportBundleConfig"
-        }
-      ],
-      "responses": {
-        "200": [
-          {
-            "media": "application/json",
-            "schema": "object"
-          }
-        ],
-        "400": [
-          {
-            "media": "application/json",
-            "schema": "object"
-          }
-        ],
-        "401": null,
-        "403": null
-      }
-    },
-    {
-      "key": "POST /artifactory/api/system/verifyconnection",
-      "family": "administration-jfrog-platform-rest-apis",
-      "tag": "Artifactory System",
-      "id": "verifyConnection",
-      "method": "POST",
-      "path": "/artifactory/api/system/verifyconnection",
-      "source": "https://docs.jfrog.com/administration/reference/verifyconnection.md",
-      "request": [
-        {
-          "media": "application/json",
-          "schema": "object"
-        }
-      ],
-      "responses": {
-        "200": [
-          {
-            "media": "text/plain",
-            "schema": "string"
-          }
-        ],
-        "400": [
-          {
-            "media": "application/json",
-            "schema": "object"
-          }
-        ],
-        "401": null,
-        "403": null
-      }
-    },
-    {
       "key": "POST /bridge-client/api/v1/bridges",
       "family": "administration-jfrog-platform-rest-apis",
       "tag": "Bridge Client",
@@ -21030,6 +22835,12 @@
           }
         ],
         "500": [
+          {
+            "media": "application/json",
+            "schema": "Error"
+          }
+        ],
+        "503": [
           {
             "media": "application/json",
             "schema": "Error"
@@ -22000,32 +23811,6 @@
         "401": null,
         "403": null,
         "404": null
-      }
-    },
-    {
-      "key": "PUT /artifactory/api/system/configuration/baseUrl",
-      "family": "administration-jfrog-platform-rest-apis",
-      "tag": "Artifactory System",
-      "id": "updateCustomUrlBase",
-      "method": "PUT",
-      "path": "/artifactory/api/system/configuration/baseUrl",
-      "source": "https://docs.jfrog.com/administration/reference/updatecustomurlbase.md",
-      "request": [
-        {
-          "media": "text/plain",
-          "schema": "string"
-        }
-      ],
-      "responses": {
-        "200": [
-          {
-            "media": "text/plain",
-            "schema": "string"
-          }
-        ],
-        "400": null,
-        "401": null,
-        "403": null
       }
     },
     {
