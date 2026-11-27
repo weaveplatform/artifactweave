@@ -350,6 +350,11 @@ harness they share. `peers.Start(t, peers.Options{Instances: n, Driver: d})`
 starts a cluster and these conventions hold for every scenario, and for the
 Terraform federated scenario that reuses them (QUA-02):
 
+- **Local toolchain.** For the current P13 qualification, set
+  `GOTOOLCHAIN=go1.27.4` for Go commands and `make` children and verify
+  `go version` before the gate. An older host executable must not silently
+  repeat a superseded toolchain run; keep the patch-level build and
+  vulnerability checks enabled ([#1208](https://github.com/weaveplatform/artifactweave/issues/1208)).
 - **Processes.** Each instance is the test binary itself, re-executed into
   `TestAccPeerInstance` as P11's two-process push suites do. It loads a strict
   YAML configuration with `config.Load`, without the host's environment, and
@@ -372,6 +377,13 @@ Terraform federated scenario that reuses them (QUA-02):
   container of its own (`containertest.RunPostgres`, pinned by digest with
   mirror.gcr.io as its second source) and gives each instance a database of its
   own on it.
+- **SQLite admission.** These private multi-process SQLite fixtures set
+  `api.budget_timeout` to five seconds so race/coverage instrumentation can
+  tolerate finite metadata writer contention
+  ([#1974](https://github.com/weaveplatform/artifactweave/issues/1974)). The
+  production default remains 500ms, PostgreSQL keeps that default, and a
+  backend held beyond the fixture deadline still answers 503. This setting
+  changes neither response assertions nor retry behavior.
 - **Identity.** Each instance creates its own instance identity on its first
   start, so `GET /api/system/service_id` differs between them; each seeds
   `admin` with a password of its own.
@@ -474,6 +486,13 @@ generic and Maven files to a real instance, then invokes `file`, `awaitFile`
 and `absent` through controlled 401/403/500/503 responses and a closed
 transport. It checks the reported failures, 200 content/presence and true 404
 controls, and restores the instance address to verify both files remain.
+`TestAccPeerFixtureAdmissionWithMetadataWriter` owns the SQLite fixture's
+admission regression: it holds a real metadata writer, releases finite work
+after one second from the client's request-write signal and requires 200;
+holding the writer until the response must still yield the admission 503.
+The client signal bounds the controlled hold without claiming server-side
+admission-start synchronization. Production limit/envelope tests retain their
+500ms policy and `Retry-After` controls outside this fixture.
 
 The package acceptance lane leaves `test/peers` out (`tools/citestselection`
 scans it as it does `test/acceptance` and `test/platform`), so each cluster
