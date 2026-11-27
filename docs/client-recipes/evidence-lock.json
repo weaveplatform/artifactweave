@@ -46,7 +46,7 @@
   "test/acceptance/clients/luarocks.Dockerfile": "c1dc689834085c0bea57e3b0f14bff31761b566732416a15bce569e1ec43cb4c",
   "test/acceptance/clients/maven-3.9/Dockerfile": "8250fe49f9ca3425030933b1200262ac429efc81003f6e00679fde123a8dfa78",
   "test/acceptance/clients/maven-tools.lock.json": "97637f15b797215cf7268e3663292691b98bc9d5b6c4c3395c17f4ca9a8f5490",
-  "test/acceptance/clients/maven.Dockerfile": "19cfd05453f7f25c0ee20489e0f35021fc8e1325711ff7e728e8afe2b29d035b",
+  "test/acceptance/clients/maven.Dockerfile": "3cc44f2829b3d93b811b03e418b4303e6c2899d38657e6bbf5a78aee10c2179f",
   "test/acceptance/clients/nix.Dockerfile": "46b64bc7a1859784f7759b457c3f359581a926f5f0919dc3220b214298f7129c",
   "test/acceptance/clients/node-npm12/Dockerfile": "5cfa6f16089b3837750477022b5cfd0b44fcf56e9cd1238b9423322e1bf7e3c5",
   "test/acceptance/clients/node.Dockerfile": "f38ef4da2feb2eab624e1f5653acfb1ae7b8b3fefdc695834df82ac2cd793408",
