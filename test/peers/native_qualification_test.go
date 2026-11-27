@@ -3,8 +3,12 @@ package peers_test
 import (
 	"archive/tar"
 	"bytes"
+	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -13,6 +17,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/platform/testkit/repopath"
 	"github.com/weaveplatform/artifactweave/test/clienttest"
@@ -27,7 +32,7 @@ func testPeerClients(t *testing.T, driver peers.Driver) {
 	if runtime.GOOS != "linux" {
 		t.Skip("pinned client containers require Linux host networking")
 	}
-	for _, key := range []string{"ARTIFACTWEAVE_NODE_IMAGE", "ARTIFACTWEAVE_MAVEN_IMAGE", "ARTIFACTWEAVE_MAVEN_TOOLS", "ARTIFACTWEAVE_JF_BIN"} {
+	for _, key := range []string{"ARTIFACTWEAVE_NODE_IMAGE", "ARTIFACTWEAVE_MAVEN_IMAGE", "ARTIFACTWEAVE_MAVEN_TOOLS", "ARTIFACTWEAVE_JF_BIN", "ARTIFACTWEAVE_CRANE_BIN"} {
 		if os.Getenv(key) == "" {
 			if os.Getenv("CI") != "" || os.Getenv("ARTIFACTWEAVE_REQUIRE_DOCKER") == "1" {
 				t.Fatalf("required peer client prerequisite missing: %s", key)
@@ -229,7 +234,17 @@ func qualifyDockerClients(t *testing.T, all []*peers.Instance, origin *peers.Ins
 	importCmd := docker("import", "-")
 	importCmd.Stdin = bytes.NewReader(layer.Bytes())
 	image := strings.TrimSpace(run(importCmd, true))
-	t.Cleanup(func() { _ = docker("image", "rm", image).Run() })
+	cleanup := func(ref string) {
+		t.Cleanup(func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			cmd := clienttest.Docker(ctx, dir, config, []string{"image", "rm", ref})
+			if out, err := cmd.CombinedOutput(); err != nil && !bytes.Contains(out, []byte("No such image")) {
+				t.Errorf("remove owned Docker fixture: %v", err)
+			}
+		})
+	}
+	cleanup(image)
 	login := func(in *peers.Instance) {
 		cmd := docker("login", strings.TrimPrefix(in.URL, "http://"), "--username", "admin", "--password-stdin")
 		cmd.Stdin = strings.NewReader(in.AdminPassword)
@@ -240,7 +255,7 @@ func qualifyDockerClients(t *testing.T, all []*peers.Instance, origin *peers.Ins
 	}
 	login(origin)
 	run(docker("tag", image, ref(origin)), true)
-	t.Cleanup(func() { _ = docker("image", "rm", ref(origin)).Run() })
+	cleanup(ref(origin))
 	run(docker("push", ref(origin)), true)
 	for _, in := range all {
 		eventually(t, in, "Docker manifest", func() (bool, string) {
@@ -259,7 +274,46 @@ func qualifyDockerClients(t *testing.T, all []*peers.Instance, origin *peers.Ins
 		if got != image {
 			t.Fatal("Docker resolved different image content")
 		}
-		in := in
-		t.Cleanup(func() { _ = docker("image", "rm", ref(in)).Run() })
+		if in != origin {
+			cleanup(ref(in))
+		}
+		// crane has no daemon image cache. Each fresh archive therefore
+		// requires this member's actual config and layer blobs, even when
+		// the Docker daemon already holds the image used by the publisher.
+		archive := filepath.Join(t.TempDir(), "cold-image.tar")
+		run(clienttest.Registry(t.Context(), dir, config, os.Getenv("ARTIFACTWEAVE_CRANE_BIN"),
+			[]string{"pull", "--format", "oci", ref(in), archive}), true)
+		verifyColdImage(t, archive, image)
 	}
+}
+
+func verifyColdImage(t *testing.T, archive, image string) {
+	t.Helper()
+	file, err := os.Open(archive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = file.Close() }()
+	reader := tar.NewReader(file)
+	for {
+		head, err := reader.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.TrimPrefix(head.Name, "./") == "blobs/sha256/"+strings.TrimPrefix(image, "sha256:") {
+			data, err := io.ReadAll(reader)
+			if err != nil {
+				t.Fatal(err)
+			}
+			sum := sha256.Sum256(data)
+			if "sha256:"+hex.EncodeToString(sum[:]) != image {
+				t.Fatal("cold image config digest differs")
+			}
+			return
+		}
+	}
+	t.Fatal("cold registry download omitted the image config")
 }

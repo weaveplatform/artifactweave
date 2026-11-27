@@ -400,6 +400,11 @@ jobs:
       - name: Install pinned JFrog CLI
         uses: ./.github/actions/jfrog-cli
 
+      - name: Install pinned registry client
+        uses: ./.github/actions/registry-clients
+        with:
+          clients: crane
+
       - name: Build pinned peer client images
         run: |
           docker build -t artifactweave-peer-node -f test/acceptance/clients/node.Dockerfile test/acceptance/clients

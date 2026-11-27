@@ -13,7 +13,9 @@
 //     often each reads its peers' status, and the outbox retention window
 //     when a scenario outlasts it.
 //   - The test binary itself: every instance is a process of it running
-//     InstanceTest, which the binary declares by calling RunInstance.
+//     InstanceTest, which the binary declares by calling RunInstance. A test
+//     stream selects its own child entry, registers streamtest.Kind in a
+//     production-cost runtime and shares app.RunRuntime's serving lifecycle.
 //   - Docker, for a PostgreSQL cluster's own container.
 //   - ARTIFACTWEAVE_TEST_PROCESS_LOG_DIR, where the server logs are kept
 //     when it is set.
@@ -28,7 +30,7 @@
 //     reaches the others through; Cut and Restore, Partition and Heal,
 //     which refuse destinations at the egress; DoFrom; DoHeader, for a
 //     request that needs its own headers; Stop, which stops one instance;
-//     Close and Leftovers; on each Instance, Identity, Peer and SetPeerKey
+//     Restart, which reuses its configuration, identity and data; Close and Leftovers; on each Instance, Identity, Peer and SetPeerKey
 //     over its database.
 //   - Each instance's coverage, written in its own directory and collected
 //     into the binary's -test.gocoverdir after the instance exits.
@@ -45,7 +47,9 @@
 //     reconnect, propagateCreatedTime and removeMember; failed binaries
 //     (failed_binaries_test.go): source outage, replay, SHA-1 deletion,
 //     superseded content and full-sync repair after task cancellation; the other P13
-//     tickets add theirs.
+//     qualification adds live signature/refusal and secret-material checks,
+//     exact ordered stream histories through restart/pull/pruning/snapshot,
+//     the six API-only types and pinned native-client convergence.
 //   - Shared file assertions (file_assertions_test.go): only HTTP 404 proves
 //     absence; authorization, server and transport failures fail the scenario.
 //     A real SQLite instance holds generic and Maven files while controlled

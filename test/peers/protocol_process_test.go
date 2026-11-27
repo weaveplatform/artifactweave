@@ -3,10 +3,12 @@ package peers_test
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -19,23 +21,77 @@ func TestAccPeerProtocolSQLite(t *testing.T)   { t.Parallel(); testPeerProtocol(
 func TestAccPeerProtocolPostgres(t *testing.T) { t.Parallel(); testPeerProtocol(t, peers.Postgres) }
 
 func testPeerProtocol(t *testing.T, driver peers.Driver) {
-	c, all := federation(t, driver)
-	pairReceiver(t, all[0], all[2])
+	c := peers.Start(t, peers.Options{Instances: 3, Driver: driver})
+	all := c.Instances
+	var keys, sensitive []string
+	for _, in := range all {
+		key := in.Identity(t).PrivateKey
+		for _, material := range [][]byte{key, key.Seed()} {
+			keys = append(keys, string(material), hex.EncodeToString(material))
+			for _, encoding := range []*base64.Encoding{base64.StdEncoding, base64.RawStdEncoding, base64.URLEncoding, base64.RawURLEncoding} {
+				keys = append(keys, encoding.EncodeToString(material))
+			}
+		}
+	}
+	pairForProof := func(issuer, redeemer *peers.Instance, use string) {
+		status, body := issuer.Do(t, http.MethodPost, stPairing+use, "")
+		assertProtocolRedacted(t, []byte(body), keys)
+		var token struct {
+			Value string `json:"pairing_token"`
+		}
+		if status != http.StatusOK || json.Unmarshal([]byte(body), &token) != nil || token.Value == "" {
+			t.Fatal("pairing token was not issued")
+		}
+		sensitive = append(sensitive, token.Value)
+		parts := strings.Split(token.Value, ".")
+		if len(parts) != 3 {
+			t.Fatal("unexpected pairing token shape")
+		}
+		sensitive = append(sensitive, parts[2])
+		payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+		if err != nil {
+			t.Fatal("invalid pairing token payload")
+		}
+		var claims struct {
+			Nonce string `json:"nonce"`
+		}
+		if json.Unmarshal(payload, &claims) != nil || claims.Nonce == "" {
+			t.Fatal("pairing token omitted nonce")
+		}
+		sensitive = append(sensitive, claims.Nonce)
+		status, body = redeemer.Do(t, http.MethodPut, stPairing+use, tokenBody(token.Value))
+		assertProtocolRedacted(t, []byte(body), append(slices.Clone(keys), sensitive...))
+		if status != http.StatusOK || strings.TrimSpace(body) != `{"message":"Trust with service federated-repo was established successfully"}` {
+			t.Fatal("pairing redemption failed")
+		}
+	}
+	for i, in := range all {
+		for _, other := range all[i+1:] {
+			pairForProof(in, other, "federated-repo/*")
+		}
+	}
+	pairForProof(all[0], all[2], "federated-repo/r")
 	for _, in := range all {
 		_, body := in.Do(t, http.MethodGet, stPairings+"federated-repo/*", "")
+		assertProtocolRedacted(t, []byte(body), append(slices.Clone(keys), sensitive...))
 		for _, other := range all {
 			if in != other && !strings.Contains(body, other.URL) {
 				t.Fatal("pairings omitted a member")
 			}
 		}
 	}
-	var sensitive []string
-	var privateKeys [][]byte
+	captureSignature := func(header http.Header) {
+		parsed, err := corepeer.ParseSignature(header)
+		if err != nil {
+			t.Fatal("invalid signature fields")
+		}
+		sensitive = append(sensitive, header.Get(corepeer.HeaderSignature), header.Get(corepeer.HeaderSignatureInput), parsed.Params.Nonce)
+		_, value, _ := strings.Cut(header.Get(corepeer.HeaderSignature), "=")
+		sensitive = append(sensitive, strings.Trim(value, ":"))
+	}
 	client := &http.Client{Timeout: 10 * time.Second}
 	for i, from := range all {
 		identity := from.Identity(t)
-		privateKeys = append(privateKeys, identity.PrivateKey)
-		sensitive = append(sensitive, base64.StdEncoding.EncodeToString(identity.PrivateKey))
 		to := all[(i+1)%len(all)]
 		remote := to.Identity(t)
 		newRequest := func(when time.Time) *http.Request {
@@ -47,7 +103,7 @@ func testPeerProtocol(t *testing.T, driver peers.Driver) {
 			if err := signer.SignRequest(req.Method, req.URL.String(), req.Header, nil); err != nil {
 				t.Fatal(err)
 			}
-			sensitive = append(sensitive, req.Header.Get(corepeer.HeaderSignature), req.Header.Get(corepeer.HeaderSignatureInput))
+			captureSignature(req.Header)
 			return req
 		}
 		call := func(req *http.Request, want int, signed bool) {
@@ -64,11 +120,7 @@ func testPeerProtocol(t *testing.T, driver peers.Driver) {
 			if resp.StatusCode != want {
 				t.Fatalf("peer response status %d, want %d", resp.StatusCode, want)
 			}
-			for _, in := range all {
-				if bytes.Contains(body, in.Identity(t).PrivateKey) {
-					t.Fatal("response disclosed a private key")
-				}
-			}
+			assertProtocolRedacted(t, body, append(slices.Clone(keys), sensitive...))
 			if signed {
 				msg := corepeer.Message{Method: req.Method, TargetURI: req.URL.String(), Header: req.Header}
 				answer := corepeer.Message{Status: resp.StatusCode, Header: resp.Header, Request: &msg}
@@ -78,16 +130,9 @@ func testPeerProtocol(t *testing.T, driver peers.Driver) {
 				if err := corepeer.VerifyResponse(answer, append(bytes.Clone(body), 'x'), remote.InstanceID, remote.PublicKey, time.Now()); err == nil {
 					t.Fatal("tampered response verified")
 				}
-				sensitive = append(sensitive, resp.Header.Get(corepeer.HeaderSignature), resp.Header.Get(corepeer.HeaderSignatureInput))
+				captureSignature(resp.Header)
 			} else if resp.Header.Get(corepeer.HeaderSignature) != "" || resp.Header.Get(corepeer.HeaderSignatureInput) != "" {
 				t.Fatal("preauthentication refusal was signed")
-			}
-			if want != http.StatusOK {
-				for _, secret := range sensitive {
-					if secret != "" && bytes.Contains(body, []byte(secret)) {
-						t.Fatal("refusal disclosed protocol material")
-					}
-				}
 			}
 		}
 		req := newRequest(time.Now())
@@ -128,15 +173,16 @@ func testPeerProtocol(t *testing.T, driver peers.Driver) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, key := range privateKeys {
-			if bytes.Contains(data, key) {
-				t.Fatal("server log disclosed a private key")
-			}
-		}
-		for _, secret := range sensitive {
-			if secret != "" && bytes.Contains(data, []byte(secret)) {
-				t.Fatal("server log disclosed protocol material")
-			}
+		assertProtocolRedacted(t, data, append(slices.Clone(keys), sensitive...))
+	}
+}
+
+// No assertion includes the matching bytes: failing evidence must stay redacted.
+func assertProtocolRedacted(t *testing.T, data []byte, forbidden []string) {
+	t.Helper()
+	for _, value := range forbidden {
+		if value != "" && bytes.Contains(data, []byte(value)) {
+			t.Fatal("response or server log disclosed sensitive protocol material")
 		}
 	}
 }

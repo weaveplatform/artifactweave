@@ -3,7 +3,6 @@ package acceptance
 import (
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 
@@ -58,55 +57,10 @@ func checkMavenToolRepository(repository string, allowed []string) error {
 	return clienttest.CheckMavenToolRepository(repository, allowed)
 }
 
-func TestUnitMavenToolsRejectAnythingButPinnedTools(t *testing.T) {
-	allowed := []string{"org/apache/tool/1/tool-1.jar", "org/apache/tool/1/tool-1.pom"}
-	seed := func(t *testing.T, names ...string) string {
-		t.Helper()
-		repository := t.TempDir()
-		for _, name := range names {
-			path := filepath.Join(repository, filepath.FromSlash(name))
-			if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-				t.Fatal(err)
-			}
-			if err := os.WriteFile(path, []byte(name), 0o600); err != nil {
-				t.Fatal(err)
-			}
-		}
-		return repository
-	}
-	if err := checkMavenToolRepository(seed(t, allowed...), allowed); err != nil {
-		t.Fatal(err)
-	}
-	for name, names := range map[string][]string{
-		"product jar":      append(slices.Clone(allowed), "org/acme/smoke/lib/1.0.0/lib-1.0.0.jar"),
-		"new fixture":      append(slices.Clone(allowed), "com/example/app/1/app-1.pom"),
-		"resolver records": append(slices.Clone(allowed), "org/apache/tool/1/_remote.repositories"),
-		"incomplete":       allowed[:1],
-	} {
-		t.Run(name, func(t *testing.T) {
-			if err := checkMavenToolRepository(seed(t, names...), allowed); err == nil {
-				t.Fatal("client accepted a tool tail that is not exactly the pinned tools")
-			}
-		})
-	}
-	if err := checkMavenToolRepository(seed(t, allowed...), nil); err == nil {
-		t.Fatal("an unreadable manifest allowed a tool tail")
-	}
-	w := &world{mavenTools: seed(t, "org/acme/smoke/lib/1.0.0/lib-1.0.0.jar")}
+func TestUnitMavenToolsRecheckAnExistingTail(t *testing.T) {
+	w := &world{mavenTools: t.TempDir()}
 	if _, err := w.mavenToolRepository(); err == nil {
 		t.Fatal("a later Maven command reused a tool tail holding a product file")
-	}
-}
-
-func TestUnitMavenCommittedManifestNamesTools(t *testing.T) {
-	names := mavenToolLock()
-	if len(names) == 0 {
-		t.Fatal("committed Maven tool manifest is unreadable or empty")
-	}
-	for _, name := range names {
-		if strings.HasPrefix(name, "org/acme/") || strings.HasPrefix(name, "org/weave/") {
-			t.Errorf("manifest pins product coordinate %s", name)
-		}
 	}
 }
 

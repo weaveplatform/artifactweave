@@ -1,5 +1,3 @@
-// Package clienttest supplies the pinned clients' process and cache isolation
-// shared by single-instance acceptance and multi-instance qualification.
 package clienttest
 
 import (
@@ -81,5 +79,13 @@ func JF(ctx context.Context, dir, home, dockerConfig string, env, argv []string)
 func Docker(ctx context.Context, dir, config string, argv []string) *exec.Cmd {
 	cmd := exec.CommandContext(ctx, "docker", append([]string{"--config", config}, argv...)...)
 	cmd.Dir = dir
+	return cmd
+}
+
+// Registry gives pinned crane, oras and cosign the scenario's credentials.
+func Registry(ctx context.Context, dir, config, binary string, argv []string) *exec.Cmd {
+	cmd := exec.CommandContext(ctx, binary, argv...)
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "DOCKER_CONFIG="+config, "COSIGN_PASSWORD=", "COSIGN_YES=true")
 	return cmd
 }
