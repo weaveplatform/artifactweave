@@ -48,7 +48,7 @@
   "test/acceptance/clients/maven-tools.lock.json": "97637f15b797215cf7268e3663292691b98bc9d5b6c4c3395c17f4ca9a8f5490",
   "test/acceptance/clients/maven.Dockerfile": "19cfd05453f7f25c0ee20489e0f35021fc8e1325711ff7e728e8afe2b29d035b",
   "test/acceptance/clients/nix.Dockerfile": "46b64bc7a1859784f7759b457c3f359581a926f5f0919dc3220b214298f7129c",
-  "test/acceptance/clients/node-npm12/Dockerfile": "71b5459365b2c2f1fce33b83b7712b39ed4d2504deda7b6a6a18c61b04f366f5",
+  "test/acceptance/clients/node-npm12/Dockerfile": "5cfa6f16089b3837750477022b5cfd0b44fcf56e9cd1238b9423322e1bf7e3c5",
   "test/acceptance/clients/node.Dockerfile": "f38ef4da2feb2eab624e1f5653acfb1ae7b8b3fefdc695834df82ac2cd793408",
   "test/acceptance/clients/opkg.Dockerfile": "ea6752b7884ea46718722033afb44360fcc335683c5e80f4028663f23574dd2f",
   "test/acceptance/clients/p2.Dockerfile": "8a57051d75b4cef1d8a3da7c4afda14b55546d82ff21a62203457ca79e60af7d",
