@@ -346,6 +346,10 @@ func (UnimplementedStrict) ExportSystem(context.Context, ExportSystemRequestObje
 	return nil, apierror.ErrNotImplemented
 }
 
+func (UnimplementedStrict) GetFederationBaseUrlAndRepositories(context.Context, GetFederationBaseUrlAndRepositoriesRequestObject) (GetFederationBaseUrlAndRepositoriesResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
 func (UnimplementedStrict) DeleteFailedBinaryTasks(context.Context, DeleteFailedBinaryTasksRequestObject) (DeleteFailedBinaryTasksResponseObject, error) {
 	return nil, apierror.ErrNotImplemented
 }
@@ -358,7 +362,19 @@ func (UnimplementedStrict) ReplayFailedBinaryTasks(context.Context, ReplayFailed
 	return nil, apierror.ErrNotImplemented
 }
 
+func (UnimplementedStrict) GetFederationInternalBinaryTasks(context.Context, GetFederationInternalBinaryTasksRequestObject) (GetFederationInternalBinaryTasksResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) PutFederationInternalBinaryTasks(context.Context, PutFederationInternalBinaryTasksRequestObject) (PutFederationInternalBinaryTasksResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
 func (UnimplementedStrict) GetFederatedBinaryTasks(context.Context, GetFederatedBinaryTasksRequestObject) (GetFederatedBinaryTasksResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) CheckFederationInternalBinary(context.Context, CheckFederationInternalBinaryRequestObject) (CheckFederationInternalBinaryResponseObject, error) {
 	return nil, apierror.ErrNotImplemented
 }
 
@@ -370,6 +386,26 @@ func (UnimplementedStrict) ConvertFederatedRepositoryToLocal(context.Context, Co
 	return nil, apierror.ErrNotImplemented
 }
 
+func (UnimplementedStrict) DisableFederationRemoteMember(context.Context, DisableFederationRemoteMemberRequestObject) (DisableFederationRemoteMemberResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) PostFederationDryFullSyncFile(context.Context, PostFederationDryFullSyncFileRequestObject) (PostFederationDryFullSyncFileResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) GetFederationExtendedInfo(context.Context, GetFederationExtendedInfoRequestObject) (GetFederationExtendedInfoResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) GetFederationConfigInfo(context.Context, GetFederationConfigInfoRequestObject) (GetFederationConfigInfoResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) GetFederationRepositoryConfigInfo(context.Context, GetFederationRepositoryConfigInfoRequestObject) (GetFederationRepositoryConfigInfoResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
 func (UnimplementedStrict) FederatedRepositoryForceFullSync(context.Context, FederatedRepositoryForceFullSyncRequestObject) (FederatedRepositoryForceFullSyncResponseObject, error) {
 	return nil, apierror.ErrNotImplemented
 }
@@ -378,11 +414,71 @@ func (UnimplementedStrict) FederatedRepositoryFullSync(context.Context, Federate
 	return nil, apierror.ErrNotImplemented
 }
 
+func (UnimplementedStrict) DeleteFederationFullSyncFile(context.Context, DeleteFederationFullSyncFileRequestObject) (DeleteFederationFullSyncFileResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) GetFederationFullSyncFile(context.Context, GetFederationFullSyncFileRequestObject) (GetFederationFullSyncFileResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) PostFederationFullSyncFile(context.Context, PostFederationFullSyncFileRequestObject) (PostFederationFullSyncFileResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) PostFederationFullSyncSystemRepository(context.Context, PostFederationFullSyncSystemRepositoryRequestObject) (PostFederationFullSyncSystemRepositoryResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) PostFederationGridTopologyEvents(context.Context, PostFederationGridTopologyEventsRequestObject) (PostFederationGridTopologyEventsResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
 func (UnimplementedStrict) GetListOfInconsistentFederatedRepositories(context.Context, GetListOfInconsistentFederatedRepositoriesRequestObject) (GetListOfInconsistentFederatedRepositoriesResponseObject, error) {
 	return nil, apierror.ErrNotImplemented
 }
 
+func (UnimplementedStrict) GetFederationLastIdInSystem(context.Context, GetFederationLastIdInSystemRequestObject) (GetFederationLastIdInSystemResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) EnableFederationInternalMember(context.Context, EnableFederationInternalMemberRequestObject) (EnableFederationInternalMemberResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) PostFederationInternalMetadata(context.Context, PostFederationInternalMetadataRequestObject) (PostFederationInternalMetadataResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) PutFederationInternalMetadata(context.Context, PutFederationInternalMetadataRequestObject) (PutFederationInternalMetadataResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) InvalidateFederationInternalMetadata(context.Context, InvalidateFederationInternalMetadataRequestObject) (InvalidateFederationInternalMetadataResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
 func (UnimplementedStrict) ConvertLocalRepositoryToFederated(context.Context, ConvertLocalRepositoryToFederatedRequestObject) (ConvertLocalRepositoryToFederatedResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) PutFederationMigration(context.Context, PutFederationMigrationRequestObject) (PutFederationMigrationResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) GetFederationMigrationStatus(context.Context, GetFederationMigrationStatusRequestObject) (GetFederationMigrationStatusResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) GetFederationVerboseMigrationStatus(context.Context, GetFederationVerboseMigrationStatusRequestObject) (GetFederationVerboseMigrationStatusResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) PutFederationVerboseMigrationStatus(context.Context, PutFederationVerboseMigrationStatusRequestObject) (PutFederationVerboseMigrationStatusResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) DisableFederationNegotiation(context.Context, DisableFederationNegotiationRequestObject) (DisableFederationNegotiationResponseObject, error) {
 	return nil, apierror.ErrNotImplemented
 }
 
@@ -391,6 +487,42 @@ func (UnimplementedStrict) PrioritizeFederatedRepository(context.Context, Priori
 }
 
 func (UnimplementedStrict) PropagateCreationTimeMetadataDuringFullSync(context.Context, PropagateCreationTimeMetadataDuringFullSyncRequestObject) (PropagateCreationTimeMetadataDuringFullSyncResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) GetFederationInternalProperties(context.Context, GetFederationInternalPropertiesRequestObject) (GetFederationInternalPropertiesResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) GetFederationInternalProperty(context.Context, GetFederationInternalPropertyRequestObject) (GetFederationInternalPropertyResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) DeregisterFederationQueue(context.Context, DeregisterFederationQueueRequestObject) (DeregisterFederationQueueResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) GetFederationQueueRemaining(context.Context, GetFederationQueueRemainingRequestObject) (GetFederationQueueRemainingResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) ResetFederationQueue(context.Context, ResetFederationQueueRequestObject) (ResetFederationQueueResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) GetFederationQueueState(context.Context, GetFederationQueueStateRequestObject) (GetFederationQueueStateResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) PutFederationQueueState(context.Context, PutFederationQueueStateRequestObject) (PutFederationQueueStateResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) StopFederationQueue(context.Context, StopFederationQueueRequestObject) (StopFederationQueueResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) GetFederationRepositoryReady(context.Context, GetFederationRepositoryReadyRequestObject) (GetFederationRepositoryReadyResponseObject, error) {
 	return nil, apierror.ErrNotImplemented
 }
 
@@ -410,7 +542,35 @@ func (UnimplementedStrict) ReplaceFederatedMemberBaseUrl(context.Context, Replac
 	return nil, apierror.ErrNotImplemented
 }
 
+func (UnimplementedStrict) GetFederationRepositoryExists(context.Context, GetFederationRepositoryExistsRequestObject) (GetFederationRepositoryExistsResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) GetFederationInternalRepositories(context.Context, GetFederationInternalRepositoriesRequestObject) (GetFederationInternalRepositoriesResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) EnableFederationInternalRepositories(context.Context, EnableFederationInternalRepositoriesRequestObject) (EnableFederationInternalRepositoriesResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) GetFederationServiceConnection(context.Context, GetFederationServiceConnectionRequestObject) (GetFederationServiceConnectionResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) PutFederationServiceConnection(context.Context, PutFederationServiceConnectionRequestObject) (PutFederationServiceConnectionResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) SnapshotFederationRepositories(context.Context, SnapshotFederationRepositoriesRequestObject) (SnapshotFederationRepositoriesResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
 func (UnimplementedStrict) GetFederationSyncState(context.Context, GetFederationSyncStateRequestObject) (GetFederationSyncStateResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) GetFederationInternalStatus(context.Context, GetFederationInternalStatusRequestObject) (GetFederationInternalStatusResponseObject, error) {
 	return nil, apierror.ErrNotImplemented
 }
 
@@ -423,6 +583,10 @@ func (UnimplementedStrict) GetFederationMirrorLagTime(context.Context, GetFedera
 }
 
 func (UnimplementedStrict) GetFederatedRepositoryStatus(context.Context, GetFederatedRepositoryStatusRequestObject) (GetFederatedRepositoryStatusResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) GetFederatedRepositoryStatusProjection(context.Context, GetFederatedRepositoryStatusProjectionRequestObject) (GetFederatedRepositoryStatusProjectionResponseObject, error) {
 	return nil, apierror.ErrNotImplemented
 }
 
@@ -442,7 +606,19 @@ func (UnimplementedStrict) GetUnavailableMirrors(context.Context, GetUnavailable
 	return nil, apierror.ErrNotImplemented
 }
 
+func (UnimplementedStrict) SubmitFederationInternalTask(context.Context, SubmitFederationInternalTaskRequestObject) (SubmitFederationInternalTaskResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) GetFederationTenantMoveStatus(context.Context, GetFederationTenantMoveStatusRequestObject) (GetFederationTenantMoveStatusResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
 func (UnimplementedStrict) UpdateFederatedMemberUrl(context.Context, UpdateFederatedMemberUrlRequestObject) (UpdateFederatedMemberUrlResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) ValidateFederationRepository(context.Context, ValidateFederationRepositoryRequestObject) (ValidateFederationRepositoryResponseObject, error) {
 	return nil, apierror.ErrNotImplemented
 }
 
@@ -1187,6 +1363,10 @@ func (UnimplementedStrict) GetUploadsConfig(context.Context, GetUploadsConfigReq
 }
 
 func (UnimplementedStrict) GetFederatedRepositoryStatusV2(context.Context, GetFederatedRepositoryStatusV2RequestObject) (GetFederatedRepositoryStatusV2ResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) GetFederatedRepositoryStatusProjectionV2(context.Context, GetFederatedRepositoryStatusProjectionV2RequestObject) (GetFederatedRepositoryStatusProjectionV2ResponseObject, error) {
 	return nil, apierror.ErrNotImplemented
 }
 

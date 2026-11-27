@@ -73,3 +73,23 @@ func (f federatedItems) Holds(ctx context.Context, repoKey, sha256 string) (bool
 	}
 	return f.items.HoldsFederated(ctx, cfg, sha256) //nolint:wrapcheck // the item service names the lookup
 }
+
+// NewFederationStatusItemReader supplies read-only item state for monitoring,
+// including the local and remote-cache repositories the legacy endpoint accepts.
+func NewFederationStatusItemReader(store Store) artifactsapi.FederatedItemReader {
+	return federationStatusItems{store: store, items: &item.Service{Store: store}}
+}
+
+type federationStatusItems struct {
+	store Store
+	items *item.Service
+}
+
+func (f federationStatusItems) List(ctx context.Context, key, after string, limit int, properties bool) ([]artifactsapi.ItemChange, error) {
+	stored, cached := repo.ResolveKey(key)
+	cfg, err := f.store.Repos().Get(ctx, stored)
+	if err != nil {
+		return nil, fmt.Errorf("status repository %s: %w", key, err)
+	}
+	return f.items.ListRepositoryItems(ctx, cfg, cached, after, limit, properties) //nolint:wrapcheck // the item service names the read
+}

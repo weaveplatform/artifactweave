@@ -466,8 +466,13 @@ func federatedAPIs(cfg RouterConfig) (federationhttp.FederatedAPI, federationpee
 	if b, err := cfg.Federation.Binaries(); err == nil {
 		ops.Binaries = b
 	}
+	if cfg.Store != nil {
+		if status, err := cfg.Federation.Monitoring(artifacts.NewFederationStatusItemReader(cfg.Store)); err == nil {
+			ops.Monitoring = status
+		}
+	}
 	if r, err := cfg.Federation.Receiver(); err == nil {
-		receiver.Receiver = r
+		receiver.Receiver, receiver.Reader = r, r
 	}
 	return ops, receiver
 }
@@ -1404,7 +1409,7 @@ var errorProfileRules = []httpkit.ProfileRule{
 // backend's that verify themselves, and those a mounted protocol skips.
 func skipsAuthentication(mounted []pkgroute.Protocol) func(*http.Request) bool {
 	return func(req *http.Request) bool {
-		if peerRequest(req) {
+		if peerRequest(req) || federationhttp.SkipsRTFSAuthentication(req) {
 			return true
 		}
 		if terraformbackendhttp.IsPath(req.URL.Path) {
@@ -1640,6 +1645,17 @@ func (s peerService) PutRepositoryConfiguration(
 		return s.UnimplementedStrict.PutRepositoryConfiguration(ctx, req) //nolint:wrapcheck // the generated 501
 	}
 	return s.repos.PutRepositoryConfiguration(ctx, req) //nolint:wrapcheck // as RedeemPairing
+}
+
+// GetRepositoryConfiguration reads a current member's masked configuration.
+func (s peerService) GetRepositoryConfiguration(
+	ctx context.Context,
+	req peergen.GetRepositoryConfigurationRequestObject,
+) (peergen.GetRepositoryConfigurationResponseObject, error) {
+	if s.repos.Reader == nil {
+		return s.UnimplementedStrict.GetRepositoryConfiguration(ctx, req) //nolint:wrapcheck // the generated 501
+	}
+	return s.repos.GetRepositoryConfiguration(ctx, req) //nolint:wrapcheck // the peer adapter owns the answer
 }
 
 // GetPeerStatus answers a peer's signed liveness and version read (#1949);

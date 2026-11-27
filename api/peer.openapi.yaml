@@ -176,6 +176,52 @@ paths:
         - header:Signature-Input
       x-cost: ordinary
   /repositories/{repoKey}:
+    get:
+      description: >-
+        Returns the masked shared configuration of a federated repository to a current member paired for the federated repository use case. The caller's membership and grant are checked again in the read transaction. Used to detect configuration drift; no configuration is changed.
+      operationId: getRepositoryConfiguration
+      summary: Read a member repository's shared configuration
+      tags: [repositories]
+      parameters:
+        - name: repoKey
+          in: path
+          required: true
+          description: Required path parameter. The repository key on this instance.
+          schema:
+            type: string
+        - $ref: '#/components/parameters/PeerProtocol'
+        - $ref: '#/components/parameters/PeerDate'
+        - $ref: '#/components/parameters/PeerSignature'
+        - $ref: '#/components/parameters/PeerSignatureInput'
+      responses:
+        '200':
+          description: The shared configuration, with secrets masked and the self member resolved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryConfiguration'
+        '400':
+          description: The protocol major version is not supported.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/PeerUnauthorized'
+        '403':
+          description: The current caller is not a member with a federation grant. No repository state is disclosed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/PeerInternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: >-
         Creates or updates this instance's copy of a federated repository the caller is a member of. The configuration is validated against this instance's own peers before it is stored, and nothing is stored when it is refused. Its members must name this instance, at its own federated base URL with the key in the path, and the caller; this instance does not send the configuration on.

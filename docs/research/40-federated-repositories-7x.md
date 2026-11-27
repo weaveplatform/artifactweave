@@ -261,6 +261,15 @@ migration is complete:
   (the last value of `FederationMigrationStatus`, `base/.../repo/FederationMigrationStatus.java`).
 - The RTFS-era operations (`stateList`, `stateSummary`, `connectionStates`, `prioritization`,
   `propagateCreatedTime`, `removeMember`, receiver members) are served.
+- [S] `stateList` and `stateSummary` check the configured federation base before asking
+  the service, even when there are no federated repositories. Without one they answer
+  400 with `{"federations":[]}` and a `federationStates` object containing eight zero
+  counters respectively (`FederatedStatusResource.java:168-175,194-205`). The summary
+  includes `READ_ONLY` (`StateSummaryRtfsResponse.java:23-38`). [I] artifactweave keeps
+  receiver direction separate from health: its current RTFS classifier emits no
+  distinct read-only health state, so that counter is zero. The cached service
+  implementation supplies no classification algorithm; receiving-only mode is not
+  evidence for a `READ_ONLY` RTFS count. This remains a P19 comparison on #216.
 - The legacy monitoring operations (`state`, `status/repo` v1 and v2, `mirrorsLag`,
   `unavailableMirrors`) are served too, from the same cursors. 7.161.26 answers them 405 or
   blocks them once RTFS is enabled (`FederatedRepoResource.java:273-277`,
@@ -298,8 +307,8 @@ Paths are under `/artifactory/api/`. Line numbers are the `@Path` lines in
 | `GET federation/state` | `:270` | yes | P13 FED-05 | Legacy monitoring, served (deviation above) |
 | `GET federation/inconsistentRepos` | `:957` | yes | P13 FED-05 | |
 | `GET federation/status/repo/{repoKey}` | `FederatedStatusResource.java:125` | yes | P13 FED-05 | Body in "Status payloads" below |
-| `GET federation/status/repo/{repoKey}/{federatedKey}` | `:132` | no | P13 FED-05 | The same, for one member |
-| `GET v2/federation/status/repo/{repoKey}` and `.../{federatedKey}` | `FederatedStatusResourceV2.java:34`, `:41` | yes | P13 FED-05 | |
+| `GET federation/status/repo/{repoKey}/{federatedKey}` | `:132` | no | P13 FED-05 | The `mirrors` or `binaries` projection, not a member selector |
+| `GET v2/federation/status/repo/{repoKey}` and `.../{federatedKey}` | `FederatedStatusResourceV2.java:34`, `:41` | yes | P13 FED-05 | The same full DTO or projection, with v2 mirror states |
 | `GET federation/status/mirrorsLag`, `.../unavailableMirrors` | `FederatedStatusResource.java:91`, `:108` | yes | P13 FED-05 | Legacy monitoring, served |
 | `GET federation/status/stateList`, `.../stateSummary` | `:155`, `:183` | yes | P13 FED-05 | |
 | `GET federation/status/connectionStates/{repoKey}` | `:216`, `:232-243`, `:293-295` | yes | P13 FED-03 (connectionStates); FED-05 (other status) | Unknown/non-federated: 200 empty `memberConnections`; federated without a base URL: 400 with the same empty envelope. Receiver `mode` reads `Receiving_Only` [I] field name; health remains `HEALTHY` when healthy |
@@ -344,6 +353,48 @@ The repository status body's last two fields, untyped in the oracle
   (`storage/common/.../federation/FederatedArtifactStatus.java:9-10`).
 
 The JSON names follow the field names, as the classes carry no `@JsonProperty` [I].
+
+The last path segment selects `mirrors` or `binaries`, not a remote member [S]
+(`FederatedStatusResource.java:62–63`, `:321–343`). `mirrors` projects
+`{localKey, mirrorEventsStatusInfo[]}` (`FederatedMirrorEventsStatusInfo.java`);
+`binaries` projects `{localKey, binariesTasksInfo, federatedArtifactStatus}`
+(`FederatedArtifactsStatusInfo.java`). An unrecognized selector is 400, after the
+repository-existence check. The source resource accepts federated and local/cached
+repositories for these legacy status reads (`:299–302`); a missing repository is 404.
+`connectionStates` returns 200 with an empty list for an unknown or non-federated
+repository (`:232–234`). The source handles base-URL absence separately; the
+artifactweave status read uses its configured member base.
+
+### FED-05 implemented status choices
+
+[I] Status computation follows decision 0022's durable records. The monitoring lag
+threshold is one minute. Pending lag is the age of the first unacknowledged entry;
+acknowledged entries contribute no pending count, registration time or lag. A
+recorded delivery failure, unavailable/incompatible peer or pending snapshot makes
+an enabled member out of sync. An intentionally disabled target does not make the
+repository out of sync; disabling the local member reports `DISABLED`.
+
+[I] Event counters use the operation recorded by the item service's actual admission:
+create, overwrite/update, property change or deletion. Delivery still carries whole
+item state. Older `item.put` entries lacking that optional category count as updates;
+a cursor with a delivery error attributes its queued entries to `errorEvents`.
+
+[I] `countFullyReplicateArtifacts` counts current files whose winning state is not
+waiting for content; `countArtificiallyReplicatedArtifacts` counts pending file
+paths. A pending replacement excludes the old file from the complete count.
+`failingTasks` counts recorded failed content fetches, while `inProgressTasks` counts
+distinct pending contents without a recorded failure. These task-count meanings
+remain inferred, separately from FED-06's `{failedTasks}` task endpoints.
+
+[I] Configuration drift compares masked configurations read from reachable current
+members over the signed peer API. Member order, equivalent defaults and different
+local repository keys are normalized. A missing/unavailable answer is not evidence
+of different configuration. The read rechecks trust and membership before disclosure;
+the report refreshes administrator authority after remote calls.
+
+Serving legacy monitoring beside RTFS, migration-tool refusals for every caller and
+internal RTFS paths returning 404 are registered as DV-208, DV-209 and DV-210.
+
 
 ## 8. Clients
 

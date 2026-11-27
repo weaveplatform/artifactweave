@@ -81,6 +81,7 @@ type TransferResult struct {
 // copied file replaces. A file also carries the properties it lands with,
 // as the target's format admitted them, and what that format inspected.
 type step struct {
+	existed    bool
 	src        model.Item
 	dst        string
 	replace    model.Item
@@ -367,6 +368,7 @@ func (s *Service) check(ctx context.Context, t Transfer, st step) (step, string,
 	if err != nil {
 		return st, "", fmt.Errorf("item: target %s: %w", dst, err)
 	}
+	st.existed = true
 	label := fmt.Sprintf("%s:%s to %s:%s", t.From.Repo.Key, src.FullPath(), t.To.Repo.Key, dst)
 	switch {
 	case src.Folder && !existing.Folder:
@@ -607,7 +609,7 @@ func (s *Service) apply(ctx context.Context, t Transfer, steps []step, res *Tran
 		if err := s.emitPropertyChanges(ctx, landed, before, t.By, now); err != nil {
 			return err
 		}
-		if err := s.feed(ctx, landed); err != nil {
+		if err := s.feed(ctx, landed, writeOperation(st.existed)); err != nil {
 			return err
 		}
 		if st.src.Folder {

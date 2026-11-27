@@ -91,3 +91,26 @@ func (r ConfigRemote) RequestResync(ctx context.Context, peer model.Peer, stream
 	}
 	return refusal
 }
+
+// Configuration reads a member's shared configuration over the same verified
+// peer transport as configSync. Network failures are availability failures,
+// never evidence that the repository configurations differ.
+func (r ConfigRemote) Configuration(ctx context.Context, peer model.Peer, key string) (map[string]any, error) {
+	c, err := r.Factory.Client(ctx, peer)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", federated.ErrUnavailable, err)
+	}
+	defer c.Close()
+	api, err := c.API()
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", federated.ErrUnavailable, err)
+	}
+	resp, err := api.GetRepositoryConfigurationWithResponse(ctx, key, &peerclient.GetRepositoryConfigurationParams{})
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", federated.ErrUnavailable, err)
+	}
+	if resp.StatusCode() != http.StatusOK || resp.JSON200 == nil || resp.JSON200.Stream != model.RepositoryStream(key) {
+		return nil, &federated.RemoteRefusal{Status: resp.StatusCode(), Message: "member did not provide its repository configuration"}
+	}
+	return resp.JSON200.Configuration, nil
+}

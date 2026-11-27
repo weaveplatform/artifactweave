@@ -34,15 +34,16 @@ const (
 // payload is an entry's payload. A file's content is the entry's blob,
 // whose SHA-256 and size are the entry's own.
 type payload struct {
-	Path       string              `json:"path"`
-	Folder     bool                `json:"folder,omitempty"`
-	Actual     kernel.Checksums    `json:"actual,omitzero"`
-	Original   kernel.Checksums    `json:"original,omitzero"`
-	Created    time.Time           `json:"created,omitzero"`
-	CreatedBy  string              `json:"created_by,omitempty"`
-	Modified   time.Time           `json:"modified,omitzero"`
-	ModifiedBy string              `json:"modified_by,omitempty"`
-	Properties map[string][]string `json:"properties,omitempty"`
+	Operation  artifactsapi.ItemOperation `json:"operation,omitempty"`
+	Path       string                     `json:"path"`
+	Folder     bool                       `json:"folder,omitempty"`
+	Actual     kernel.Checksums           `json:"actual,omitzero"`
+	Original   kernel.Checksums           `json:"original,omitzero"`
+	Created    time.Time                  `json:"created,omitzero"`
+	CreatedBy  string                     `json:"created_by,omitempty"`
+	Modified   time.Time                  `json:"modified,omitzero"`
+	ModifiedBy string                     `json:"modified_by,omitempty"`
+	Properties map[string][]string        `json:"properties,omitempty"`
 }
 
 // errRaced reports a record another transaction changed between the
@@ -254,7 +255,7 @@ func (s Stream) ItemChanged(ctx context.Context, c artifactsapi.ItemChange) erro
 		return fmt.Errorf("stamp of %s:%s: %w", c.Repository, c.Path, err)
 	}
 	en := outbox.OutboxEntry{Stream: model.RepositoryStream(c.Repository), EventType: EventPut}
-	p := payload{Path: c.Path, Folder: c.Folder}
+	p := payload{Path: c.Path, Folder: c.Folder, Operation: c.Operation}
 	if c.Deleted {
 		en.EventType = EventDelete
 	} else {

@@ -1,0 +1,249 @@
+components:
+  schemas:
+    FederatedRepositoryStatus:
+      type: object
+      description: Repository key, outbound member event state, binary tasks and artifact counts.
+      x-unverified: true
+      properties:
+        localKey:
+          description: Optional within this object. The repository key on this instance.
+          x-unverified: true
+          type: string
+        binariesTasksInfo:
+          description: Optional within this object. Binary tasks recorded for this repository.
+          x-unverified: true
+          $ref: '#/components/schemas/FederatedStatusBinaryTasks'
+        mirrorEventsStatusInfo:
+          description: Optional within this object. Outbound event state for each current remote member.
+          x-unverified: true
+          type: array
+          items:
+            $ref: '#/components/schemas/FederatedMirrorEvents'
+        federatedArtifactStatus:
+          description: Optional within this object. Actual files and changes awaiting a binary.
+          x-unverified: true
+          $ref: '#/components/schemas/FederatedArtifactStatus'
+    FederatedStatusBinaryTasks:
+      type: object
+      description: Optional within this object. Binary task counts from current pending changes and failed-fetch records.
+      x-unverified: true
+      properties:
+        failingTasks:
+          type: integer
+          description: Optional within this object. Recorded content fetches with a failed attempt.
+          x-unverified: true
+          format: int64
+        inProgressTasks:
+          type: integer
+          description: Optional within this object. Distinct pending contents with no recorded failed fetch.
+          x-unverified: true
+          format: int64
+    FederatedArtifactStatus:
+      type: object
+      description: Optional within this object. Counts of replicated files and files awaiting content.
+      x-unverified: true
+      properties:
+        countFullyReplicateArtifacts:
+          type: integer
+          description: Optional within this object. Files currently present, excluding paths with a newer change awaiting content.
+          x-unverified: true
+          format: int64
+        countArtificiallyReplicatedArtifacts:
+          type: integer
+          description: Optional within this object. File paths whose winning metadata is still awaiting content.
+          x-unverified: true
+          format: int64
+    FederatedMirrorEvents:
+      type: object
+      description: Pending events and delivery state for one outbound member.
+      x-unverified: true
+      properties:
+        remoteUrl:
+          type: string
+          description: Optional within this object. The member instance base URL.
+          x-unverified: true
+        remoteRepoKey:
+          type: string
+          description: Optional within this object. The member repository key.
+          x-unverified: true
+        status:
+          type: string
+          description: Optional within this object. Version 1 uses SYNCED or OUT_OF_SYNC; version 2 uses its detailed member state.
+          x-unverified: true
+        createEvents:
+          type: integer
+          description: Optional within this object. Undelivered creates.
+          x-unverified: true
+          format: int64
+        updateEvents:
+          type: integer
+          description: Optional within this object. Undelivered updates. Entries written before operation categories were recorded count as updates.
+          x-unverified: true
+          format: int64
+        deleteEvents:
+          type: integer
+          description: Optional within this object. Undelivered deletions.
+          x-unverified: true
+          format: int64
+        propsEvents:
+          type: integer
+          description: Optional within this object. Undelivered property changes.
+          x-unverified: true
+          format: int64
+        errorEvents:
+          type: integer
+          description: Optional within this object. Queued events on a cursor with a recorded delivery error.
+          x-unverified: true
+          format: int64
+        lagInMS:
+          type: integer
+          description: Optional within this object. Age of the oldest unacknowledged event in milliseconds; zero when caught up.
+          x-unverified: true
+          format: int64
+        eventRegistrationTimeStamp:
+          type: integer
+          description: Optional within this object. Registration time of that event in epoch milliseconds; zero when caught up.
+          x-unverified: true
+          format: int64
+paths:
+  /api/federation/status/repo/{repoKey}/{federatedKey}:
+    get:
+      deprecated: true
+      description: 'Detailed sync status of one federated repository: binary transfer tasks, event delivery per
+        member and artifact counts. Expensive on large repositories; use the connection state operation for routine
+        monitoring.'
+      operationId: getFederatedRepositoryStatusProjection
+      parameters:
+      - description: Required path parameter. Key of the federated repository.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Repository key.
+          type: string
+      - description: Required path parameter. Select mirrors or binaries; any other value is refused.
+        in: path
+        name: federatedKey
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FederatedRepositoryStatus'
+          description: The sync status.
+        '400':
+          description: The projection selector is not mirrors or binaries.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The named resource does not exist.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not returned.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: Get federated repository sync status
+      tags:
+      - federation
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getfederatedrepositorystatus.md
+      x-unverified: true
+      x-idempotency: safe
+      x-cost: ordinary
+  /api/v2/federation/status/repo/{repoKey}/{federatedKey}:
+    get:
+      deprecated: true
+      description: Version 2 of the repository sync status, which reports a wider set of member states. The fields
+        are those of version 1.
+      operationId: getFederatedRepositoryStatusProjectionV2
+      parameters:
+      - description: Required path parameter. Key of the federated repository.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Repository key.
+          type: string
+      - description: Required path parameter. Select mirrors or binaries; any other value is refused.
+        in: path
+        name: federatedKey
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FederatedRepositoryStatus'
+          description: The sync status.
+        '400':
+          description: The projection selector is not mirrors or binaries.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The named resource does not exist.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not returned.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: Get federated repository sync status (version 2)
+      tags:
+      - federation
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getfederatedrepositorystatusv2.md
+      x-unverified: true
+      x-idempotency: safe
+      x-cost: ordinary

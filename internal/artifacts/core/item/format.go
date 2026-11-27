@@ -308,7 +308,7 @@ func (s *Service) annotate(
 		if err := s.emitPropertyChanges(ctx, it, before, "", now); err != nil {
 			return err
 		}
-		return s.feed(ctx, it)
+		return s.feed(ctx, it, artapi.ItemProperties)
 	})
 	if err != nil {
 		return err //nolint:wrapcheck // the transaction returns ours

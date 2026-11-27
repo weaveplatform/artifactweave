@@ -71,14 +71,14 @@ func TestUnitFeedReportsClientChanges(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(f.got) != 1 || f.got[0].Actual.SHA256 != sums("one").SHA256 || f.got[0].Size != 3 ||
-		f.got[0].CreatedBy != "alice" || f.got[0].Repository != "libs" {
+		f.got[0].CreatedBy != "alice" || f.got[0].Repository != "libs" || f.got[0].Operation != artapi.ItemCreate {
 		t.Fatalf("deploy fed %+v", f.got)
 	}
 	wantHeard(t, f, "put a/b/f.txt")
 	if err := w.svc.Annotate(ctx, w.loc, it, model.Properties{"k": {"v"}}, nil); err != nil {
 		t.Fatal(err)
 	}
-	if len(f.got) != 1 || !slices.Equal(f.got[0].Properties["k"], []string{"v"}) {
+	if len(f.got) != 1 || !slices.Equal(f.got[0].Properties["k"], []string{"v"}) || f.got[0].Operation != artapi.ItemProperties {
 		t.Fatalf("annotate fed %+v", f.got)
 	}
 	wantHeard(t, f, "put a/b/f.txt")
@@ -250,5 +250,18 @@ func TestUnitDeleteFederated(t *testing.T) {
 	wantHeard(t, f)
 	if err := w.svc.DeleteFederated(ctx, fed, "", false); !errors.Is(err, kernel.ErrInvalidItemPath) {
 		t.Fatalf("empty path: %v", err)
+	}
+}
+
+func TestUnitFeedClassifiesOverwriteWithoutComparingTimestamps(t *testing.T) {
+	w, f := feedWorld(t)
+	if _, err := w.deploy("same.txt", "one", kernel.Checksums{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.deploy("same.txt", "two", kernel.Checksums{}); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.got) != 2 || f.got[0].Operation != artapi.ItemCreate || f.got[1].Operation != artapi.ItemUpdate || !f.got[0].Modified.Equal(f.got[1].Modified) {
+		t.Fatalf("same-clock writes %+v", f.got)
 	}
 }

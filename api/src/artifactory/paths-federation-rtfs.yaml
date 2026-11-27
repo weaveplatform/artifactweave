@@ -1,0 +1,810 @@
+# RTFS-only resource declarations from research 40 section 7.
+paths:
+  /api/federation/status:
+    get:
+      operationId: getFederationInternalStatus
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/federation/validate/{repoKey}:
+    get:
+      operationId: validateFederationRepository
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      parameters:
+      - name: repoKey
+        in: path
+        required: true
+        description: Required path parameter. The internal repoKey.
+        schema:
+          type: string
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/federation/repos:
+    get:
+      operationId: getFederationInternalRepositories
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/federation/baseUrlAndRepos:
+    get:
+      operationId: getFederationBaseUrlAndRepositories
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/federation/properties/{repoKey}:
+    post:
+      operationId: getFederationInternalProperties
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      parameters:
+      - name: repoKey
+        in: path
+        required: true
+        description: Required path parameter. The internal repoKey.
+        schema:
+          type: string
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/federation/property/{repoKey}/{fileName}:
+    get:
+      operationId: getFederationInternalProperty
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      parameters:
+      - name: repoKey
+        in: path
+        required: true
+        description: Required path parameter. The internal repoKey.
+        schema:
+          type: string
+      - name: fileName
+        in: path
+        required: true
+        description: Required path parameter. The internal fileName.
+        schema:
+          type: string
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/federation/extendedInfo/{repoKey}:
+    get:
+      operationId: getFederationExtendedInfo
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      parameters:
+      - name: repoKey
+        in: path
+        required: true
+        description: Required path parameter. The internal repoKey.
+        schema:
+          type: string
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/federation/ready/{repoKey}:
+    get:
+      operationId: getFederationRepositoryReady
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      parameters:
+      - name: repoKey
+        in: path
+        required: true
+        description: Required path parameter. The internal repoKey.
+        schema:
+          type: string
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/federation/repoExists/{repoKey}:
+    get:
+      operationId: getFederationRepositoryExists
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      parameters:
+      - name: repoKey
+        in: path
+        required: true
+        description: Required path parameter. The internal repoKey.
+        schema:
+          type: string
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/federation/metadata:
+    post:
+      operationId: postFederationInternalMetadata
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      operationId: putFederationInternalMetadata
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/federation/metadata/invalidate:
+    post:
+      operationId: invalidateFederationInternalMetadata
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/federation/negotiation/disable:
+    put:
+      operationId: disableFederationNegotiation
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/federation/repos/enable:
+    post:
+      operationId: enableFederationInternalRepositories
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/federation/dryfullsync/repo/{fileName}:
+    post:
+      operationId: postFederationDryFullSyncFile
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      parameters:
+      - name: fileName
+        in: path
+        required: true
+        description: Required path parameter. The internal fileName.
+        schema:
+          type: string
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/federation/fullsync/repo/{fileName}:
+    post:
+      operationId: postFederationFullSyncFile
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      parameters:
+      - name: fileName
+        in: path
+        required: true
+        description: Required path parameter. The internal fileName.
+        schema:
+          type: string
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    get:
+      operationId: getFederationFullSyncFile
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      parameters:
+      - name: fileName
+        in: path
+        required: true
+        description: Required path parameter. The internal fileName.
+        schema:
+          type: string
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      operationId: deleteFederationFullSyncFile
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      parameters:
+      - name: fileName
+        in: path
+        required: true
+        description: Required path parameter. The internal fileName.
+        schema:
+          type: string
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/federation/fullsync/systemRepo:
+    post:
+      operationId: postFederationFullSyncSystemRepository
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/federation/federatedRepoConfigInfo:
+    get:
+      operationId: getFederationRepositoryConfigInfo
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/federation/federatedConfigInfo/{repoKey}:
+    get:
+      operationId: getFederationConfigInfo
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      parameters:
+      - name: repoKey
+        in: path
+        required: true
+        description: Required path parameter. The internal repoKey.
+        schema:
+          type: string
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/federation/disableRemoteMember:
+    post:
+      operationId: disableFederationRemoteMember
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/federation/member/enable:
+    post:
+      operationId: enableFederationInternalMember
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/federation/lastIdInSystem:
+    get:
+      operationId: getFederationLastIdInSystem
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/federation/task/submit:
+    post:
+      operationId: submitFederationInternalTask
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/federation/binary/provider/v2/check:
+    get:
+      operationId: checkFederationInternalBinary
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/federation/queue/remaining:
+    post:
+      operationId: getFederationQueueRemaining
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/federation/queue/stop:
+    put:
+      operationId: stopFederationQueue
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/federation/queue/deregister:
+    put:
+      operationId: deregisterFederationQueue
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/federation/queue/reset:
+    post:
+      operationId: resetFederationQueue
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/federation/queue/state:
+    get:
+      operationId: getFederationQueueState
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/federation/queue/state/{state}:
+    put:
+      operationId: putFederationQueueState
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      parameters:
+      - name: state
+        in: path
+        required: true
+        description: Required path parameter. The internal state.
+        schema:
+          type: string
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/federation/tenant/move/status:
+    get:
+      operationId: getFederationTenantMoveStatus
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/federation/snapshotFederatedRepos:
+    put:
+      operationId: snapshotFederationRepositories
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/federation/migration/status/verbose:
+    get:
+      operationId: getFederationVerboseMigrationStatus
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      operationId: putFederationVerboseMigrationStatus
+      summary: Refuses the migration-tool-only write for every caller.
+      description: Refuses the migration-tool-only write for every caller. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '400':
+          description: Access denied. This endpoint is restricted to migration tool calls only.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/federation/binaries/rtfs:
+    put:
+      operationId: putFederationInternalBinaryTasks
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    get:
+      operationId: getFederationInternalBinaryTasks
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/federation/grid/topology/events:
+    post:
+      operationId: postFederationGridTopologyEvents
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/federation/rtfs:
+    put:
+      operationId: putFederationServiceConnection
+      summary: Refuses the migration-tool-only write for every caller.
+      description: Refuses the migration-tool-only write for every caller. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '400':
+          description: Access denied. This endpoint is restricted to migration tool calls only.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    get:
+      operationId: getFederationServiceConnection
+      summary: Reports the integrated federation service state; administrators only.
+      description: Reports the integrated federation service state; administrators only. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '200':
+          description: The integrated service state.
+          content:
+            text/plain:
+              schema:
+                type: string
+        '401':
+          description: Credentials are required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: An administrator is required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: The server could not check current authority.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/federation/migration:
+    put:
+      operationId: putFederationMigration
+      summary: Refuses the migration-tool-only write for every caller.
+      description: Refuses the migration-tool-only write for every caller. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '400':
+          description: Access denied. This endpoint is restricted to migration tool calls only.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/federation/migration/status:
+    get:
+      operationId: getFederationMigrationStatus
+      summary: Reports the integrated federation service state; administrators only.
+      description: Reports the integrated federation service state; administrators only. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '200':
+          description: The integrated service state.
+          content:
+            text/plain:
+              schema:
+                type: string
+        '401':
+          description: Credentials are required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: An administrator is required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: The server could not check current authority.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'

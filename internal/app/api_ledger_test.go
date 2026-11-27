@@ -792,6 +792,12 @@ func apiReviewCompleteText(e *apiReviewOperation) string {
 // content is known only once every element is read, so writing it as it
 // is read would change the bytes.
 var apiReviewCollected = map[string]string{
+	"GET /artifactory/api/federation/state":                     "the legacy complete report uses one transaction's repository, member and cursor snapshot; 7.x supplies no page parameter",
+	"GET /artifactory/api/federation/status/mirrorsLag":         "member lag rows share the same transaction's catalog and cursor snapshot, with the threshold applied to that view",
+	"GET /artifactory/api/federation/status/unavailableMirrors": "unavailable members are selected from one transaction's complete repository/peer/cursor snapshot",
+	"GET /artifactory/api/federation/status/stateList":          "the complete nested federation/member report uses one metadata snapshot and filters its member states after aggregation",
+	"GET /artifactory/api/federation/inconsistentRepos":         "the complete drift result is withheld until signed member comparisons finish and current administrator authority is checked again",
+
 	"GET /artifactory/api/federation/status/connectionStates/{repoKey}":                "membership is capped at ten including self; the complete connection list has at most nine peer rows",
 	"GET /artifactory/api/cleanup/policies/view":                                       "administrator-defined configuration in the authorized global/project scope, with current labels and last-run/schedule metadata under one authority transaction; commit or visibility failure must not publish a partial overview",
 	"GET /artifactory/api/replications/{repoKey}":                                      "one repository's single configured target is authorized and redacted under its metadata guard before publication; legacy multi-target configurations are rejected, never published as a list",

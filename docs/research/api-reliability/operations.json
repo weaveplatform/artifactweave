@@ -1454,6 +1454,31 @@
     ]
   },
   {
+    "route": "DELETE /artifactory/api/federation/fullsync/repo/{fileName}",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "deleteFederationFullSyncFile",
+    "state": "implemented",
+    "contract": "The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.DeleteFederationFullSyncFile",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
     "route": "DELETE /artifactory/api/gems/{repoKey}/api/v1/gems/yank",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
     "handler": "internal/app/router.go: internal/artifacts/ecosystem/gems/http.handler.yank-fm",
@@ -5921,6 +5946,31 @@
     ]
   },
   {
+    "route": "GET /artifactory/api/federation/baseUrlAndRepos",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "getFederationBaseUrlAndRepositories",
+    "state": "implemented",
+    "contract": "The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.GetFederationBaseUrlAndRepositories",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
     "route": "GET /artifactory/api/federation/binaries/failures/list",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "getListOfFailedBinaryTasks",
@@ -5957,6 +6007,31 @@
     ]
   },
   {
+    "route": "GET /artifactory/api/federation/binaries/rtfs",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "getFederationInternalBinaryTasks",
+    "state": "implemented",
+    "contract": "The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.GetFederationInternalBinaryTasks",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
     "route": "GET /artifactory/api/federation/binaries/tasks/{repoKey}",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "getFederatedBinaryTasks",
@@ -5982,43 +6057,443 @@
     ]
   },
   {
+    "route": "GET /artifactory/api/federation/binary/provider/v2/check",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "checkFederationInternalBinary",
+    "state": "implemented",
+    "contract": "The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.CheckFederationInternalBinary",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "GET /artifactory/api/federation/extendedInfo/{repoKey}",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "getFederationExtendedInfo",
+    "state": "implemented",
+    "contract": "The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.GetFederationExtendedInfo",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "GET /artifactory/api/federation/federatedConfigInfo/{repoKey}",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "getFederationConfigInfo",
+    "state": "implemented",
+    "contract": "The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.GetFederationConfigInfo",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "GET /artifactory/api/federation/federatedRepoConfigInfo",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "getFederationRepositoryConfigInfo",
+    "state": "implemented",
+    "contract": "The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.GetFederationRepositoryConfigInfo",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "GET /artifactory/api/federation/fullsync/repo/{fileName}",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "getFederationFullSyncFile",
+    "state": "implemented",
+    "contract": "The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.GetFederationFullSyncFile",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
     "route": "GET /artifactory/api/federation/inconsistentRepos",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "getListOfInconsistentFederatedRepositories",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Lists federated repositories whose shared configuration differs from at least one member's. Repair them with the configuration sync operation.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "handler": "internal/federation/adapters/http/monitor.go: FederatedAPI.GetListOfInconsistentFederatedRepositories",
+    "direct_calls": [
+      "a.monitor",
+      "artgen.GetListOfInconsistentFederatedRepositories200JSONResponse",
+      "query.Inconsistent"
+    ],
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "response_collections": [
       "200 application/json[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes; declared complete",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: the complete drift result is withheld until signed member comparisons finish and current administrator authority is checked again; content-and-configuration: singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "GET /artifactory/api/federation/lastIdInSystem",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "getFederationLastIdInSystem",
+    "state": "implemented",
+    "contract": "The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.GetFederationLastIdInSystem",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "GET /artifactory/api/federation/migration/status",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "getFederationMigrationStatus",
+    "state": "implemented",
+    "contract": "Reports the integrated federation service state; administrators only. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.GetFederationMigrationStatus",
+    "direct_calls": [
+      "a.ops",
+      "artgen.GetFederationMigrationStatus200TextResponse",
+      "ops.Administrator"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "GET /artifactory/api/federation/migration/status/verbose",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "getFederationVerboseMigrationStatus",
+    "state": "implemented",
+    "contract": "The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.GetFederationVerboseMigrationStatus",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "GET /artifactory/api/federation/property/{repoKey}/{fileName}",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "getFederationInternalProperty",
+    "state": "implemented",
+    "contract": "The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.GetFederationInternalProperty",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "GET /artifactory/api/federation/queue/state",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "getFederationQueueState",
+    "state": "implemented",
+    "contract": "The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.GetFederationQueueState",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "GET /artifactory/api/federation/ready/{repoKey}",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "getFederationRepositoryReady",
+    "state": "implemented",
+    "contract": "The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.GetFederationRepositoryReady",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "GET /artifactory/api/federation/repoExists/{repoKey}",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "getFederationRepositoryExists",
+    "state": "implemented",
+    "contract": "The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.GetFederationRepositoryExists",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "GET /artifactory/api/federation/repos",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "getFederationInternalRepositories",
+    "state": "implemented",
+    "contract": "The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.GetFederationInternalRepositories",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "GET /artifactory/api/federation/rtfs",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "getFederationServiceConnection",
+    "state": "implemented",
+    "contract": "Reports the integrated federation service state; administrators only. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.GetFederationServiceConnection",
+    "direct_calls": [
+      "a.ops",
+      "artgen.GetFederationServiceConnection200TextResponse",
+      "ops.Administrator"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "GET /artifactory/api/federation/state",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "getFederationSyncState",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Lists every federated repository on this instance with its members and sync state.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "handler": "internal/federation/adapters/http/monitor.go: FederatedAPI.GetFederationSyncState",
+    "direct_calls": [
+      "a.monitor",
+      "artgen.GetFederationSyncState200JSONResponseBodyStatus",
+      "httpkit.PtrTo",
+      "query.List"
+    ],
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "response_collections": [
       "200 application/json[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes; declared complete",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: the legacy complete report uses one transaction's repository, member and cursor snapshot; 7.x supplies no page parameter; content-and-configuration: singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "GET /artifactory/api/federation/status",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "getFederationInternalStatus",
+    "state": "implemented",
+    "contract": "The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.GetFederationInternalStatus",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -6053,40 +6528,87 @@
     "route": "GET /artifactory/api/federation/status/mirrorsLag",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "getFederationMirrorLagTime",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Lists, per federated repository and member, how long the oldest undelivered event has waited.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "handler": "internal/federation/adapters/http/monitor.go: FederatedAPI.GetFederationMirrorLagTime",
+    "direct_calls": [
+      "a.monitor",
+      "query.List"
+    ],
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "response_collections": [
       "200 application/json[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes; declared complete",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: member lag rows share the same transaction's catalog and cursor snapshot, with the threshold applied to that view; content-and-configuration: singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "GET /artifactory/api/federation/status/repo/{repoKey}",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "getFederatedRepositoryStatus",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Detailed sync status of one federated repository: binary transfer tasks, event delivery per member and artifact counts. Expensive on large repositories; use the connection state operation for routine monitoring.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "handler": "internal/federation/adapters/http/monitor.go: FederatedAPI.GetFederatedRepositoryStatus",
+    "direct_calls": [
+      "a.repositoryStatus",
+      "artgen.GetFederatedRepositoryStatus200JSONResponse"
+    ],
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "response_collections": [
       "200 application/json.mirrorEventsStatusInfo[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "GET /artifactory/api/federation/status/repo/{repoKey}/{federatedKey}",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "getFederatedRepositoryStatusProjection",
+    "state": "implemented",
+    "contract": "Detailed sync status of one federated repository: binary transfer tasks, event delivery per member and artifact counts. Expensive on large repositories; use the connection state operation for routine monitoring.",
+    "handler": "internal/federation/adapters/http/monitor.go: FederatedAPI.GetFederatedRepositoryStatusProjection",
+    "direct_calls": [
+      "a.repositoryStatus",
+      "artgen.GetFederatedRepositoryStatusProjection200JSONResponse"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "response_collections": [
+      "200 application/json.mirrorEventsStatusInfo[]"
+    ],
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -6118,57 +6640,147 @@
     "route": "GET /artifactory/api/federation/status/stateList",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "getFederationStateDetails",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Lists each federation on this instance with the aggregated state of its members, optionally filtered by state.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "handler": "internal/federation/adapters/http/monitor.go: FederatedAPI.GetFederationStateDetails",
+    "direct_calls": [
+      "a.monitor",
+      "apierror.New",
+      "artgen.FederationStateListFederationsPriority",
+      "errors.Is",
+      "federated.StatusLagThreshold.Milliseconds",
+      "fmt.Errorf",
+      "httpkit.PtrTo",
+      "query.ListWithBase",
+      "response.FromFederationStateList",
+      "strings.Split",
+      "strings.TrimSpace"
+    ],
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "response_collections": [
       "200 application/json.federations[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes; declared complete",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: the complete nested federation/member report uses one metadata snapshot and filters its member states after aggregation; content-and-configuration: singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "GET /artifactory/api/federation/status/stateSummary",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "getFederationStateSummaries",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Counts federation members by state across every federated repository on this instance.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "handler": "internal/federation/adapters/http/monitor.go: FederatedAPI.GetFederationStateSummaries",
+    "direct_calls": [
+      "a.monitor",
+      "artgen.GetFederationStateSummaries200JSONResponse",
+      "errors.Is",
+      "fmt.Errorf",
+      "query.ListWithBase",
+      "response.FromFederationStateSummary"
+    ],
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "GET /artifactory/api/federation/status/unavailableMirrors",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "getUnavailableMirrors",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Lists members that are not synchronizing: newly added members waiting for their first full sync, members of repositories being converted from local, and members past the error threshold.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "handler": "internal/federation/adapters/http/monitor.go: FederatedAPI.GetUnavailableMirrors",
+    "direct_calls": [
+      "a.monitor",
+      "query.List"
+    ],
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "response_collections": [
       "200 application/json[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes; declared complete",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: unavailable members are selected from one transaction's complete repository/peer/cursor snapshot; content-and-configuration: singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "GET /artifactory/api/federation/tenant/move/status",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "getFederationTenantMoveStatus",
+    "state": "implemented",
+    "contract": "The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.GetFederationTenantMoveStatus",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "GET /artifactory/api/federation/validate/{repoKey}",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "validateFederationRepository",
+    "state": "implemented",
+    "contract": "The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.ValidateFederationRepository",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -10496,20 +11108,58 @@
     "route": "GET /artifactory/api/v2/federation/status/repo/{repoKey}",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "getFederatedRepositoryStatusV2",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Version 2 of the repository sync status, which reports a wider set of member states. The fields are those of version 1.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "handler": "internal/federation/adapters/http/monitor.go: FederatedAPI.GetFederatedRepositoryStatusV2",
+    "direct_calls": [
+      "a.repositoryStatus",
+      "artgen.GetFederatedRepositoryStatusV2200JSONResponse"
+    ],
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "response_collections": [
       "200 application/json.mirrorEventsStatusInfo[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "GET /artifactory/api/v2/federation/status/repo/{repoKey}/{federatedKey}",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "getFederatedRepositoryStatusProjectionV2",
+    "state": "implemented",
+    "contract": "Version 2 of the repository sync status, which reports a wider set of member states. The fields are those of version 1.",
+    "handler": "internal/federation/adapters/http/monitor.go: FederatedAPI.GetFederatedRepositoryStatusProjectionV2",
+    "direct_calls": [
+      "a.repositoryStatus",
+      "artgen.GetFederatedRepositoryStatusProjectionV2200JSONResponse"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "response_collections": [
+      "200 application/json.mirrorEventsStatusInfo[]"
+    ],
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -11423,6 +12073,23 @@
       "internal/access/adapters/sql/projects.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "GET /artifactweave/peer/v1/repositories/{repoKey}",
+    "spec": "peer.openapi.yaml",
+    "operation_id": "getRepositoryConfiguration",
+    "state": "stub: 501",
+    "contract": "Returns the masked shared configuration of a federated repository to a current member paired for the federated repository use case. The caller's membership and grant are checked again in the read transaction. Used to detect configuration drift; no configuration is changed.",
+    "handler": "internal/platform/gen/peer/unimplemented.gen.go",
+    "review_family": "content-and-configuration",
+    "effects": "no operation effect; user authentication skips the peer API, admission still limits",
+    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "schema-only; no collection query executes",
+    "evidence": [
+      "internal/platform/gen/peer/unimplemented.gen.go",
+      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
     ]
   },
   {
@@ -17379,6 +18046,56 @@
     ]
   },
   {
+    "route": "POST /artifactory/api/federation/disableRemoteMember",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "disableFederationRemoteMember",
+    "state": "implemented",
+    "contract": "The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.DisableFederationRemoteMember",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "POST /artifactory/api/federation/dryfullsync/repo/{fileName}",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "postFederationDryFullSyncFile",
+    "state": "implemented",
+    "contract": "The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.PostFederationDryFullSyncFile",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
     "route": "POST /artifactory/api/federation/forceFullSync/{repoKey}",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "federatedRepositoryForceFullSync",
@@ -17439,6 +18156,156 @@
     ]
   },
   {
+    "route": "POST /artifactory/api/federation/fullsync/repo/{fileName}",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "postFederationFullSyncFile",
+    "state": "implemented",
+    "contract": "The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.PostFederationFullSyncFile",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "POST /artifactory/api/federation/fullsync/systemRepo",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "postFederationFullSyncSystemRepository",
+    "state": "implemented",
+    "contract": "The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.PostFederationFullSyncSystemRepository",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "POST /artifactory/api/federation/grid/topology/events",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "postFederationGridTopologyEvents",
+    "state": "implemented",
+    "contract": "The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.PostFederationGridTopologyEvents",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "POST /artifactory/api/federation/member/enable",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "enableFederationInternalMember",
+    "state": "implemented",
+    "contract": "The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.EnableFederationInternalMember",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "POST /artifactory/api/federation/metadata",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "postFederationInternalMetadata",
+    "state": "implemented",
+    "contract": "The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.PostFederationInternalMetadata",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "POST /artifactory/api/federation/metadata/invalidate",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "invalidateFederationInternalMetadata",
+    "state": "implemented",
+    "contract": "The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.InvalidateFederationInternalMetadata",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
     "route": "POST /artifactory/api/federation/migrate/{repoKey}",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "convertLocalRepositoryToFederated",
@@ -17455,6 +18322,81 @@
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "natural on path:repoKey: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "POST /artifactory/api/federation/properties/{repoKey}",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "getFederationInternalProperties",
+    "state": "implemented",
+    "contract": "The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.GetFederationInternalProperties",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "POST /artifactory/api/federation/queue/remaining",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "getFederationQueueRemaining",
+    "state": "implemented",
+    "contract": "The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.GetFederationQueueRemaining",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "POST /artifactory/api/federation/queue/reset",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "resetFederationQueue",
+    "state": "implemented",
+    "contract": "The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.ResetFederationQueue",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "pagination_execution": "not a collection",
     "evidence": [
       "internal/app/router.go",
@@ -17565,6 +18507,56 @@
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "natural on body:: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "POST /artifactory/api/federation/repos/enable",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "enableFederationInternalRepositories",
+    "state": "implemented",
+    "contract": "The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.EnableFederationInternalRepositories",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "POST /artifactory/api/federation/task/submit",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "submitFederationInternalTask",
+    "state": "implemented",
+    "contract": "The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.SubmitFederationInternalTask",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "pagination_execution": "not a collection",
     "evidence": [
       "internal/app/router.go",
@@ -22998,6 +23990,131 @@
     ]
   },
   {
+    "route": "PUT /artifactory/api/federation/binaries/rtfs",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "putFederationInternalBinaryTasks",
+    "state": "implemented",
+    "contract": "The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.PutFederationInternalBinaryTasks",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "PUT /artifactory/api/federation/metadata",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "putFederationInternalMetadata",
+    "state": "implemented",
+    "contract": "The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.PutFederationInternalMetadata",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "PUT /artifactory/api/federation/migration",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "putFederationMigration",
+    "state": "implemented",
+    "contract": "Refuses the migration-tool-only write for every caller. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.PutFederationMigration",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "PUT /artifactory/api/federation/migration/status/verbose",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "putFederationVerboseMigrationStatus",
+    "state": "implemented",
+    "contract": "Refuses the migration-tool-only write for every caller. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.PutFederationVerboseMigrationStatus",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "PUT /artifactory/api/federation/negotiation/disable",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "disableFederationNegotiation",
+    "state": "implemented",
+    "contract": "The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.DisableFederationNegotiation",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
     "route": "PUT /artifactory/api/federation/prioritization/{repoKey}",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "prioritizeFederatedRepository",
@@ -23041,6 +24158,131 @@
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "natural on route: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "PUT /artifactory/api/federation/queue/deregister",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "deregisterFederationQueue",
+    "state": "implemented",
+    "contract": "The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.DeregisterFederationQueue",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "PUT /artifactory/api/federation/queue/state/{state}",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "putFederationQueueState",
+    "state": "implemented",
+    "contract": "The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.PutFederationQueueState",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "PUT /artifactory/api/federation/queue/stop",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "stopFederationQueue",
+    "state": "implemented",
+    "contract": "The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.StopFederationQueue",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "PUT /artifactory/api/federation/rtfs",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "putFederationServiceConnection",
+    "state": "implemented",
+    "contract": "Refuses the migration-tool-only write for every caller. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.PutFederationServiceConnection",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "PUT /artifactory/api/federation/snapshotFederatedRepos",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "snapshotFederationRepositories",
+    "state": "implemented",
+    "contract": "The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.",
+    "handler": "internal/federation/adapters/http/rtfs.go: FederatedAPI.SnapshotFederationRepositories",
+    "direct_calls": [
+      "apierror.New"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "pagination_execution": "not a collection",
     "evidence": [
       "internal/app/router.go",

@@ -409,6 +409,24 @@ func (e FederationConnectionStatus) Valid() bool {
 	}
 }
 
+// Defines values for FederationStateListFederationsPriority.
+const (
+	HIGH     FederationStateListFederationsPriority = "HIGH"
+	STANDARD FederationStateListFederationsPriority = "STANDARD"
+)
+
+// Valid indicates whether the value is a known member of the FederationStateListFederationsPriority enum.
+func (e FederationStateListFederationsPriority) Valid() bool {
+	switch e {
+	case HIGH:
+		return true
+	case STANDARD:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for KeyPairInputPairType.
 const (
 	ECDSA   KeyPairInputPairType = "ECDSA"
@@ -1810,24 +1828,6 @@ func (e GetFederationSyncState200JSONResponseBodyStatus) Valid() bool {
 	case GetFederationSyncState200JSONResponseBodyStatusOUTOFSYNC:
 		return true
 	case GetFederationSyncState200JSONResponseBodyStatusSYNCING:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for GetFederationStateDetails200JSONResponseBodyFederationsPriority.
-const (
-	HIGH     GetFederationStateDetails200JSONResponseBodyFederationsPriority = "HIGH"
-	STANDARD GetFederationStateDetails200JSONResponseBodyFederationsPriority = "STANDARD"
-)
-
-// Valid indicates whether the value is a known member of the GetFederationStateDetails200JSONResponseBodyFederationsPriority enum.
-func (e GetFederationStateDetails200JSONResponseBodyFederationsPriority) Valid() bool {
-	switch e {
-	case HIGH:
-		return true
-	case STANDARD:
 		return true
 	default:
 		return false
@@ -4454,6 +4454,15 @@ type ExportSettings struct {
 	Verbose *bool `json:"verbose,omitempty"`
 }
 
+// FederatedArtifactStatus Optional within this object. Counts of replicated files and files awaiting content.
+type FederatedArtifactStatus struct {
+	// CountArtificiallyReplicatedArtifacts Optional within this object. File paths whose winning metadata is still awaiting content.
+	CountArtificiallyReplicatedArtifacts *int64 `json:"countArtificiallyReplicatedArtifacts,omitempty"`
+
+	// CountFullyReplicateArtifacts Optional within this object. Files currently present, excluding paths with a newer change awaiting content.
+	CountFullyReplicateArtifacts *int64 `json:"countFullyReplicateArtifacts,omitempty"`
+}
+
 // FederatedBinaryTaskCounts Counts derived from failed-fetch records. The proprietary DTO is unavailable; these fields are inferred.
 type FederatedBinaryTaskCounts struct {
 	// FailedTasks Required within this object. Content fetches currently recorded as failed for this repository.
@@ -4478,6 +4487,39 @@ type FederatedFailedBinary struct {
 	Sha1 *string `json:"sha1,omitempty"`
 }
 
+// FederatedMirrorEvents Pending events and delivery state for one outbound member.
+type FederatedMirrorEvents struct {
+	// CreateEvents Optional within this object. Undelivered creates.
+	CreateEvents *int64 `json:"createEvents,omitempty"`
+
+	// DeleteEvents Optional within this object. Undelivered deletions.
+	DeleteEvents *int64 `json:"deleteEvents,omitempty"`
+
+	// ErrorEvents Optional within this object. Queued events on a cursor with a recorded delivery error.
+	ErrorEvents *int64 `json:"errorEvents,omitempty"`
+
+	// EventRegistrationTimeStamp Optional within this object. Registration time of that event in epoch milliseconds; zero when caught up.
+	EventRegistrationTimeStamp *int64 `json:"eventRegistrationTimeStamp,omitempty"`
+
+	// LagInMS Optional within this object. Age of the oldest unacknowledged event in milliseconds; zero when caught up.
+	LagInMS *int64 `json:"lagInMS,omitempty"`
+
+	// PropsEvents Optional within this object. Undelivered property changes.
+	PropsEvents *int64 `json:"propsEvents,omitempty"`
+
+	// RemoteRepoKey Optional within this object. The member repository key.
+	RemoteRepoKey *string `json:"remoteRepoKey,omitempty"`
+
+	// RemoteUrl Optional within this object. The member instance base URL.
+	RemoteUrl *string `json:"remoteUrl,omitempty"`
+
+	// Status Optional within this object. Version 1 uses SYNCED or OUT_OF_SYNC; version 2 uses its detailed member state.
+	Status *string `json:"status,omitempty"`
+
+	// UpdateEvents Optional within this object. Undelivered updates. Entries written before operation categories were recorded count as updates.
+	UpdateEvents *int64 `json:"updateEvents,omitempty"`
+}
+
 // FederatedReplaceUrl A member base URL and its replacement (7.161.26's ReplaceUrlConfig).
 type FederatedReplaceUrl struct {
 	// NewBaseUrl Required within this object. The base URL they should name, with or without /artifactory.
@@ -4489,6 +4531,30 @@ type FederatedReplaceUrl struct {
 
 // FederatedRepositoryConfiguration Configuration of a federated repository: a local repository whose content and metadata are kept in sync with copies on other instances of this server (decision 0022). Members are instances of this server that trust each other through pairing (decision 0021). Deploys, deletes, moves, copies and property changes on any member are sent to the others as ordered events; where two members change the same item, the change with the later event time wins and the originating instance id breaks ties. A full sync repairs members that missed events.
 type FederatedRepositoryConfiguration = repo.Config
+
+// FederatedRepositoryStatus Repository key, outbound member event state, binary tasks and artifact counts.
+type FederatedRepositoryStatus struct {
+	// BinariesTasksInfo Optional within this object. Binary task counts from current pending changes and failed-fetch records.
+	BinariesTasksInfo *FederatedStatusBinaryTasks `json:"binariesTasksInfo,omitempty"`
+
+	// FederatedArtifactStatus Optional within this object. Counts of replicated files and files awaiting content.
+	FederatedArtifactStatus *FederatedArtifactStatus `json:"federatedArtifactStatus,omitempty"`
+
+	// LocalKey Optional within this object. The repository key on this instance.
+	LocalKey *string `json:"localKey,omitempty"`
+
+	// MirrorEventsStatusInfo Optional within this object. Outbound event state for each current remote member.
+	MirrorEventsStatusInfo *[]FederatedMirrorEvents `json:"mirrorEventsStatusInfo,omitempty"`
+}
+
+// FederatedStatusBinaryTasks Optional within this object. Binary task counts from current pending changes and failed-fetch records.
+type FederatedStatusBinaryTasks struct {
+	// FailingTasks Optional within this object. Recorded content fetches with a failed attempt.
+	FailingTasks *int64 `json:"failingTasks,omitempty"`
+
+	// InProgressTasks Optional within this object. Distinct pending contents with no recorded failed fetch.
+	InProgressTasks *int64 `json:"inProgressTasks,omitempty"`
+}
 
 // FederationConnection One member connection.
 type FederationConnection struct {
@@ -4525,6 +4591,72 @@ type FederationConnection struct {
 
 // FederationConnectionStatus Optional within this object. Dashboard state of the connection from the local member to the remote one. HEALTHY: events flow promptly. DELAYED: HEALTHY with lag above the threshold. ERROR: any underlying error state (generic, inactive target, out of sync). PENDING_FS: waiting for a full sync. FULL_SYNC_RUNNING: a full sync is preparing or running. DISABLED: the member is disabled. UNSUPPORTED: the remote member cannot report status. READONLY: the member is receiving-only. N/A: the state cannot be determined because a side is unreachable.
 type FederationConnectionStatus string
+
+// FederationStateList Federations and member states.
+type FederationStateList struct {
+	// Federations Optional within this object. One entry per federated repository.
+	Federations *[]struct {
+		// LocalRepoKey Optional within this object. Repository key on this instance.
+		LocalRepoKey *string `json:"localRepoKey,omitempty"`
+
+		// MemberInfoList Optional within this object. The members and their state.
+		MemberInfoList *[]struct {
+			// AggregatedStatus Optional within this object. The member's state, one of those counted by the state summary operation.
+			AggregatedStatus *string `json:"aggregatedStatus,omitempty"`
+
+			// IsDisabled Optional within this object. True when sync to this member is turned off.
+			IsDisabled *bool `json:"isDisabled,omitempty"`
+
+			// IsInLag Optional within this object. True when the member's oldest undelivered event is older than the lag threshold.
+			IsInLag *bool `json:"isInLag,omitempty"`
+
+			// IsSupported Optional within this object. False when the member's sync protocol version is incompatible.
+			IsSupported *bool `json:"isSupported,omitempty"`
+
+			// RepoKey Optional within this object. Repository key on the member.
+			RepoKey *string `json:"repoKey,omitempty"`
+
+			// Url Optional within this object. Base URL of the member instance.
+			Url *string `json:"url,omitempty"`
+		} `json:"memberInfoList,omitempty"`
+
+		// Priority Optional within this object. Queue priority of the repository, `HIGH` or `STANDARD`.
+		Priority *FederationStateListFederationsPriority `json:"priority,omitempty"`
+	} `json:"federations,omitempty"`
+}
+
+// FederationStateListFederationsPriority Optional within this object. Queue priority of the repository, `HIGH` or `STANDARD`.
+type FederationStateListFederationsPriority string
+
+// FederationStateSummary Member counts per state.
+type FederationStateSummary struct {
+	// FederationStates Optional within this object. Number of members in each state.
+	FederationStates *struct {
+		// DELAYED Optional within this object. Members whose events wait longer than the lag threshold.
+		DELAYED *int64 `json:"DELAYED,omitempty"`
+
+		// DISABLED Optional within this object. Members with sync turned off.
+		DISABLED *int64 `json:"DISABLED,omitempty"`
+
+		// ERROR Optional within this object. Members whose events fail after every retry.
+		ERROR *int64 `json:"ERROR,omitempty"`
+
+		// FULLSYNCRUNNING Optional within this object. Members in a full sync.
+		FULLSYNCRUNNING *int64 `json:"FULL_SYNC_RUNNING,omitempty"`
+
+		// HEALTHY Optional within this object. Members receiving events promptly.
+		HEALTHY *int64 `json:"HEALTHY,omitempty"`
+
+		// NOTAVAILABLE Optional within this object. Members that cannot be reached.
+		NOTAVAILABLE *int64 `json:"NOT_AVAILABLE,omitempty"`
+
+		// PENDINGFS Optional within this object. Members waiting for a full sync, for example right after joining.
+		PENDINGFS *int64 `json:"PENDING_FS,omitempty"`
+
+		// READONLY Optional within this object. Members in a read-only state. Receiving-only mode alone does not count as this state.
+		READONLY *int64 `json:"READ_ONLY,omitempty"`
+	} `json:"federationStates,omitempty"`
+}
 
 // FileInfo Metadata of one file item as returned by the storage API without a mode query parameter. Timestamps are RFC 3339 with millisecond precision and a zone offset.
 type FileInfo struct {
@@ -7414,8 +7546,15 @@ type GetFederationStateDetailsParams struct {
 	Status *string `form:"status,omitempty" json:"status,omitempty"`
 }
 
-// GetFederationStateDetails200JSONResponseBodyFederationsPriority defines parameters for GetFederationStateDetails.
-type GetFederationStateDetails200JSONResponseBodyFederationsPriority string
+// GetFederationStateDetails400JSONResponseBody defines parameters for GetFederationStateDetails.
+type GetFederationStateDetails400JSONResponseBody struct {
+	union json.RawMessage
+}
+
+// GetFederationStateSummaries400JSONResponseBody defines parameters for GetFederationStateSummaries.
+type GetFederationStateSummaries400JSONResponseBody struct {
+	union json.RawMessage
+}
 
 // SetGpgPrivateKeyTextBody defines parameters for SetGpgPrivateKey.
 type SetGpgPrivateKeyTextBody = string
@@ -9432,6 +9571,130 @@ func (t *ConvertFederatedRepositoryToLocal200JSONResponseBody) UnmarshalJSON(b [
 	return err
 }
 
+// AsFederationStateList returns the union data inside the GetFederationStateDetails400JSONResponseBody as a FederationStateList
+func (t GetFederationStateDetails400JSONResponseBody) AsFederationStateList() (FederationStateList, error) {
+	var body FederationStateList
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromFederationStateList overwrites any union data inside the GetFederationStateDetails400JSONResponseBody as the provided FederationStateList
+func (t *GetFederationStateDetails400JSONResponseBody) FromFederationStateList(v FederationStateList) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeFederationStateList performs a merge with any union data inside the GetFederationStateDetails400JSONResponseBody, using the provided FederationStateList
+func (t *GetFederationStateDetails400JSONResponseBody) MergeFederationStateList(v FederationStateList) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsErrorResponse returns the union data inside the GetFederationStateDetails400JSONResponseBody as a ErrorResponse
+func (t GetFederationStateDetails400JSONResponseBody) AsErrorResponse() (ErrorResponse, error) {
+	var body ErrorResponse
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromErrorResponse overwrites any union data inside the GetFederationStateDetails400JSONResponseBody as the provided ErrorResponse
+func (t *GetFederationStateDetails400JSONResponseBody) FromErrorResponse(v ErrorResponse) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeErrorResponse performs a merge with any union data inside the GetFederationStateDetails400JSONResponseBody, using the provided ErrorResponse
+func (t *GetFederationStateDetails400JSONResponseBody) MergeErrorResponse(v ErrorResponse) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetFederationStateDetails400JSONResponseBody) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetFederationStateDetails400JSONResponseBody) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsFederationStateSummary returns the union data inside the GetFederationStateSummaries400JSONResponseBody as a FederationStateSummary
+func (t GetFederationStateSummaries400JSONResponseBody) AsFederationStateSummary() (FederationStateSummary, error) {
+	var body FederationStateSummary
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromFederationStateSummary overwrites any union data inside the GetFederationStateSummaries400JSONResponseBody as the provided FederationStateSummary
+func (t *GetFederationStateSummaries400JSONResponseBody) FromFederationStateSummary(v FederationStateSummary) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeFederationStateSummary performs a merge with any union data inside the GetFederationStateSummaries400JSONResponseBody, using the provided FederationStateSummary
+func (t *GetFederationStateSummaries400JSONResponseBody) MergeFederationStateSummary(v FederationStateSummary) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsErrorResponse returns the union data inside the GetFederationStateSummaries400JSONResponseBody as a ErrorResponse
+func (t GetFederationStateSummaries400JSONResponseBody) AsErrorResponse() (ErrorResponse, error) {
+	var body ErrorResponse
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromErrorResponse overwrites any union data inside the GetFederationStateSummaries400JSONResponseBody as the provided ErrorResponse
+func (t *GetFederationStateSummaries400JSONResponseBody) FromErrorResponse(v ErrorResponse) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeErrorResponse performs a merge with any union data inside the GetFederationStateSummaries400JSONResponseBody, using the provided ErrorResponse
+func (t *GetFederationStateSummaries400JSONResponseBody) MergeErrorResponse(v ErrorResponse) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetFederationStateSummaries400JSONResponseBody) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetFederationStateSummaries400JSONResponseBody) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsReplicationConfigRequest returns the union data inside the GetRepositoryReplicationConfiguration200JSONResponseBody as a ReplicationConfigRequest
 func (t GetRepositoryReplicationConfiguration200JSONResponseBody) AsReplicationConfigRequest() (ReplicationConfigRequest, error) {
 	var body ReplicationConfigRequest
@@ -10576,6 +10839,13 @@ type ClientInterface interface {
 	// Corresponds with POST /api/export/system (the `ExportSystem` operationId).
 	ExportSystemWithApplicationVndOrgJfrogArtifactorySystemExportSettingsPlusJSONBody(ctx context.Context, body ExportSystemApplicationVndOrgJfrogArtifactorySystemExportSettingsPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetFederationBaseUrlAndRepositories The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with GET /api/federation/baseUrlAndRepos (the `GetFederationBaseUrlAndRepositories` operationId).
+	GetFederationBaseUrlAndRepositories(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// DeleteFailedBinaryTasks Delete failed binary transfer tasks
 	//
 	// Deletes recorded failed content-fetch tasks of a federated repository, all of them or only the tasks for one SHA-1. Cancellation prevents their queued or in-flight retries from publishing; a newer event or full sync can supply the content later.
@@ -10597,12 +10867,33 @@ type ClientInterface interface {
 	// Corresponds with PUT /api/federation/binaries/failures/replay (the `ReplayFailedBinaryTasks` operationId).
 	ReplayFailedBinaryTasks(ctx context.Context, params *ReplayFailedBinaryTasksParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetFederationInternalBinaryTasks The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with GET /api/federation/binaries/rtfs (the `GetFederationInternalBinaryTasks` operationId).
+	GetFederationInternalBinaryTasks(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutFederationInternalBinaryTasks The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with PUT /api/federation/binaries/rtfs (the `PutFederationInternalBinaryTasks` operationId).
+	PutFederationInternalBinaryTasks(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetFederatedBinaryTasks Get federated binary task counts
 	//
 	// Returns failed content-fetch counts for a federated repository. Administrators only. The closed-source DTO shape is inferred.
 	//
 	// Corresponds with GET /api/federation/binaries/tasks/{repoKey} (the `GetFederatedBinaryTasks` operationId).
 	GetFederatedBinaryTasks(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CheckFederationInternalBinary The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with GET /api/federation/binary/provider/v2/check (the `CheckFederationInternalBinary` operationId).
+	CheckFederationInternalBinary(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SynchronizeFederatedMemberConfiguration Push federated repository configuration to members
 	//
@@ -10629,6 +10920,41 @@ type ClientInterface interface {
 	// Corresponds with POST /api/federation/convertToLocal (the `ConvertFederatedRepositoryToLocal` operationId).
 	ConvertFederatedRepositoryToLocal(ctx context.Context, body ConvertFederatedRepositoryToLocalJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// DisableFederationRemoteMember The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with POST /api/federation/disableRemoteMember (the `DisableFederationRemoteMember` operationId).
+	DisableFederationRemoteMember(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostFederationDryFullSyncFile The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with POST /api/federation/dryfullsync/repo/{fileName} (the `PostFederationDryFullSyncFile` operationId).
+	PostFederationDryFullSyncFile(ctx context.Context, fileName string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetFederationExtendedInfo The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with GET /api/federation/extendedInfo/{repoKey} (the `GetFederationExtendedInfo` operationId).
+	GetFederationExtendedInfo(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetFederationConfigInfo The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with GET /api/federation/federatedConfigInfo/{repoKey} (the `GetFederationConfigInfo` operationId).
+	GetFederationConfigInfo(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetFederationRepositoryConfigInfo The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with GET /api/federation/federatedRepoConfigInfo (the `GetFederationRepositoryConfigInfo` operationId).
+	GetFederationRepositoryConfigInfo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// FederatedRepositoryForceFullSync Force a full sync of a federated repository
 	//
 	// Starts a full synchronization of a federated repository, interrupting one already in progress. Use it when a full sync appears stuck.
@@ -10643,6 +10969,41 @@ type ClientInterface interface {
 	// Corresponds with POST /api/federation/fullSync/{repoKey} (the `FederatedRepositoryFullSync` operationId).
 	FederatedRepositoryFullSync(ctx context.Context, repoKey string, params *FederatedRepositoryFullSyncParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// DeleteFederationFullSyncFile The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with DELETE /api/federation/fullsync/repo/{fileName} (the `DeleteFederationFullSyncFile` operationId).
+	DeleteFederationFullSyncFile(ctx context.Context, fileName string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetFederationFullSyncFile The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with GET /api/federation/fullsync/repo/{fileName} (the `GetFederationFullSyncFile` operationId).
+	GetFederationFullSyncFile(ctx context.Context, fileName string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostFederationFullSyncFile The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with POST /api/federation/fullsync/repo/{fileName} (the `PostFederationFullSyncFile` operationId).
+	PostFederationFullSyncFile(ctx context.Context, fileName string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostFederationFullSyncSystemRepository The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with POST /api/federation/fullsync/systemRepo (the `PostFederationFullSyncSystemRepository` operationId).
+	PostFederationFullSyncSystemRepository(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostFederationGridTopologyEvents The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with POST /api/federation/grid/topology/events (the `PostFederationGridTopologyEvents` operationId).
+	PostFederationGridTopologyEvents(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetListOfInconsistentFederatedRepositories List federated repositories with configuration drift
 	//
 	// Lists federated repositories whose shared configuration differs from at least one member's. Repair them with the configuration sync operation.
@@ -10650,12 +11011,82 @@ type ClientInterface interface {
 	// Corresponds with GET /api/federation/inconsistentRepos (the `GetListOfInconsistentFederatedRepositories` operationId).
 	GetListOfInconsistentFederatedRepositories(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetFederationLastIdInSystem The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with GET /api/federation/lastIdInSystem (the `GetFederationLastIdInSystem` operationId).
+	GetFederationLastIdInSystem(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// EnableFederationInternalMember The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with POST /api/federation/member/enable (the `EnableFederationInternalMember` operationId).
+	EnableFederationInternalMember(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostFederationInternalMetadata The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with POST /api/federation/metadata (the `PostFederationInternalMetadata` operationId).
+	PostFederationInternalMetadata(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutFederationInternalMetadata The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with PUT /api/federation/metadata (the `PutFederationInternalMetadata` operationId).
+	PutFederationInternalMetadata(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// InvalidateFederationInternalMetadata The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with POST /api/federation/metadata/invalidate (the `InvalidateFederationInternalMetadata` operationId).
+	InvalidateFederationInternalMetadata(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ConvertLocalRepositoryToFederated Convert a local repository to federated
 	//
 	// Converts a local repository into a federated repository with this instance as its only member, keeping content and metadata. Add members afterwards by updating the repository's `members`. Inside a project, every member of a federation must carry the same project key. A package type that cannot be federated (terraformbackend), a repository that is not local and one with push replication configured answer 400. Administrators only.
 	//
 	// Corresponds with POST /api/federation/migrate/{repoKey} (the `ConvertLocalRepositoryToFederated` operationId).
 	ConvertLocalRepositoryToFederated(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutFederationMigration Refuses the migration-tool-only write for every caller.
+	//
+	// Refuses the migration-tool-only write for every caller. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with PUT /api/federation/migration (the `PutFederationMigration` operationId).
+	PutFederationMigration(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetFederationMigrationStatus Reports the integrated federation service state; administrators only.
+	//
+	// Reports the integrated federation service state; administrators only. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with GET /api/federation/migration/status (the `GetFederationMigrationStatus` operationId).
+	GetFederationMigrationStatus(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetFederationVerboseMigrationStatus The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with GET /api/federation/migration/status/verbose (the `GetFederationVerboseMigrationStatus` operationId).
+	GetFederationVerboseMigrationStatus(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutFederationVerboseMigrationStatus Refuses the migration-tool-only write for every caller.
+	//
+	// Refuses the migration-tool-only write for every caller. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with PUT /api/federation/migration/status/verbose (the `PutFederationVerboseMigrationStatus` operationId).
+	PutFederationVerboseMigrationStatus(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DisableFederationNegotiation The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with PUT /api/federation/negotiation/disable (the `DisableFederationNegotiation` operationId).
+	DisableFederationNegotiation(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// PrioritizeFederatedRepository Set federated repository sync priority
 	//
@@ -10670,6 +11101,69 @@ type ClientInterface interface {
 	//
 	// Corresponds with PUT /api/federation/propagateCreatedTime (the `PropagateCreationTimeMetadataDuringFullSync` operationId).
 	PropagateCreationTimeMetadataDuringFullSync(ctx context.Context, params *PropagateCreationTimeMetadataDuringFullSyncParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetFederationInternalProperties The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with POST /api/federation/properties/{repoKey} (the `GetFederationInternalProperties` operationId).
+	GetFederationInternalProperties(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetFederationInternalProperty The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with GET /api/federation/property/{repoKey}/{fileName} (the `GetFederationInternalProperty` operationId).
+	GetFederationInternalProperty(ctx context.Context, repoKey string, fileName string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeregisterFederationQueue The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with PUT /api/federation/queue/deregister (the `DeregisterFederationQueue` operationId).
+	DeregisterFederationQueue(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetFederationQueueRemaining The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with POST /api/federation/queue/remaining (the `GetFederationQueueRemaining` operationId).
+	GetFederationQueueRemaining(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ResetFederationQueue The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with POST /api/federation/queue/reset (the `ResetFederationQueue` operationId).
+	ResetFederationQueue(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetFederationQueueState The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with GET /api/federation/queue/state (the `GetFederationQueueState` operationId).
+	GetFederationQueueState(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutFederationQueueState The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with PUT /api/federation/queue/state/{state} (the `PutFederationQueueState` operationId).
+	PutFederationQueueState(ctx context.Context, state string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// StopFederationQueue The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with PUT /api/federation/queue/stop (the `StopFederationQueue` operationId).
+	StopFederationQueue(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetFederationRepositoryReady The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with GET /api/federation/ready/{repoKey} (the `GetFederationRepositoryReady` operationId).
+	GetFederationRepositoryReady(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ReconnectToFederationClient Reconnect the federation sync worker
 	//
@@ -10721,6 +11215,48 @@ type ClientInterface interface {
 	// Corresponds with POST /api/federation/replaceUrl (the `ReplaceFederatedMemberBaseUrl` operationId).
 	ReplaceFederatedMemberBaseUrl(ctx context.Context, body ReplaceFederatedMemberBaseUrlJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetFederationRepositoryExists The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with GET /api/federation/repoExists/{repoKey} (the `GetFederationRepositoryExists` operationId).
+	GetFederationRepositoryExists(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetFederationInternalRepositories The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with GET /api/federation/repos (the `GetFederationInternalRepositories` operationId).
+	GetFederationInternalRepositories(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// EnableFederationInternalRepositories The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with POST /api/federation/repos/enable (the `EnableFederationInternalRepositories` operationId).
+	EnableFederationInternalRepositories(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetFederationServiceConnection Reports the integrated federation service state; administrators only.
+	//
+	// Reports the integrated federation service state; administrators only. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with GET /api/federation/rtfs (the `GetFederationServiceConnection` operationId).
+	GetFederationServiceConnection(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutFederationServiceConnection Refuses the migration-tool-only write for every caller.
+	//
+	// Refuses the migration-tool-only write for every caller. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with PUT /api/federation/rtfs (the `PutFederationServiceConnection` operationId).
+	PutFederationServiceConnection(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SnapshotFederationRepositories The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with PUT /api/federation/snapshotFederatedRepos (the `SnapshotFederationRepositories` operationId).
+	SnapshotFederationRepositories(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetFederationSyncState List federated repository sync state
 	//
 	// Lists every federated repository on this instance with its members and sync state.
@@ -10729,6 +11265,13 @@ type ClientInterface interface {
 	//
 	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	GetFederationSyncState(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetFederationInternalStatus The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with GET /api/federation/status (the `GetFederationInternalStatus` operationId).
+	GetFederationInternalStatus(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetFederationConnectionDetails Get federated repository connection state
 	//
@@ -10754,6 +11297,15 @@ type ClientInterface interface {
 	//
 	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	GetFederatedRepositoryStatus(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetFederatedRepositoryStatusProjection Get federated repository sync status
+	//
+	// Detailed sync status of one federated repository: binary transfer tasks, event delivery per member and artifact counts. Expensive on large repositories; use the connection state operation for routine monitoring.
+	//
+	// Corresponds with GET /api/federation/status/repo/{repoKey}/{federatedKey} (the `GetFederatedRepositoryStatusProjection` operationId).
+	//
+	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+	GetFederatedRepositoryStatusProjection(ctx context.Context, repoKey string, federatedKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetFederatedRepositoryBinaryState Get read-authorized repository binary state
 	//
@@ -10785,6 +11337,20 @@ type ClientInterface interface {
 	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	GetUnavailableMirrors(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// SubmitFederationInternalTask The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with POST /api/federation/task/submit (the `SubmitFederationInternalTask` operationId).
+	SubmitFederationInternalTask(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetFederationTenantMoveStatus The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with GET /api/federation/tenant/move/status (the `GetFederationTenantMoveStatus` operationId).
+	GetFederationTenantMoveStatus(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// UpdateFederatedMemberUrlWithBody Update a federated member's URL
 	//
 	// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource) with the same body and effect as replaceUrl. Administrators only.
@@ -10802,6 +11368,13 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /api/federation/updateMemberUrl (the `UpdateFederatedMemberUrl` operationId).
 	UpdateFederatedMemberUrl(ctx context.Context, body UpdateFederatedMemberUrlJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ValidateFederationRepository The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Corresponds with GET /api/federation/validate/{repoKey} (the `ValidateFederationRepository` operationId).
+	ValidateFederationRepository(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CalculateRubyGemsIndex performs a POST /api/gems/{repoKey}/reindex (the `CalculateRubyGemsIndex` operationId) request.
 	//
@@ -12716,6 +13289,15 @@ type ClientInterface interface {
 	//
 	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	GetFederatedRepositoryStatusV2(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetFederatedRepositoryStatusProjectionV2 Get federated repository sync status (version 2)
+	//
+	// Version 2 of the repository sync status, which reports a wider set of member states. The fields are those of version 1.
+	//
+	// Corresponds with GET /api/v2/federation/status/repo/{repoKey}/{federatedKey} (the `GetFederatedRepositoryStatusProjectionV2` operationId).
+	//
+	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+	GetFederatedRepositoryStatusProjectionV2(ctx context.Context, repoKey string, federatedKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteRepositoriesWithBody Delete several repositories
 	//
@@ -15222,6 +15804,23 @@ func (c *Client) ExportSystemWithApplicationVndOrgJfrogArtifactorySystemExportSe
 	return c.Client.Do(req)
 }
 
+// GetFederationBaseUrlAndRepositories The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Corresponds with GET /api/federation/baseUrlAndRepos (the `GetFederationBaseUrlAndRepositories` operationId).
+func (c *Client) GetFederationBaseUrlAndRepositories(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetFederationBaseUrlAndRepositoriesRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // DeleteFailedBinaryTasks Delete failed binary transfer tasks
 //
 // Deletes recorded failed content-fetch tasks of a federated repository, all of them or only the tasks for one SHA-1. Cancellation prevents their queued or in-flight retries from publishing; a newer event or full sync can supply the content later.
@@ -15273,6 +15872,40 @@ func (c *Client) ReplayFailedBinaryTasks(ctx context.Context, params *ReplayFail
 	return c.Client.Do(req)
 }
 
+// GetFederationInternalBinaryTasks The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Corresponds with GET /api/federation/binaries/rtfs (the `GetFederationInternalBinaryTasks` operationId).
+func (c *Client) GetFederationInternalBinaryTasks(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetFederationInternalBinaryTasksRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutFederationInternalBinaryTasks The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Corresponds with PUT /api/federation/binaries/rtfs (the `PutFederationInternalBinaryTasks` operationId).
+func (c *Client) PutFederationInternalBinaryTasks(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutFederationInternalBinaryTasksRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // GetFederatedBinaryTasks Get federated binary task counts
 //
 // Returns failed content-fetch counts for a federated repository. Administrators only. The closed-source DTO shape is inferred.
@@ -15280,6 +15913,23 @@ func (c *Client) ReplayFailedBinaryTasks(ctx context.Context, params *ReplayFail
 // Corresponds with GET /api/federation/binaries/tasks/{repoKey} (the `GetFederatedBinaryTasks` operationId).
 func (c *Client) GetFederatedBinaryTasks(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetFederatedBinaryTasksRequest(c.Server, repoKey)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CheckFederationInternalBinary The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Corresponds with GET /api/federation/binary/provider/v2/check (the `CheckFederationInternalBinary` operationId).
+func (c *Client) CheckFederationInternalBinary(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCheckFederationInternalBinaryRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -15345,6 +15995,91 @@ func (c *Client) ConvertFederatedRepositoryToLocal(ctx context.Context, body Con
 	return c.Client.Do(req)
 }
 
+// DisableFederationRemoteMember The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Corresponds with POST /api/federation/disableRemoteMember (the `DisableFederationRemoteMember` operationId).
+func (c *Client) DisableFederationRemoteMember(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDisableFederationRemoteMemberRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PostFederationDryFullSyncFile The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Corresponds with POST /api/federation/dryfullsync/repo/{fileName} (the `PostFederationDryFullSyncFile` operationId).
+func (c *Client) PostFederationDryFullSyncFile(ctx context.Context, fileName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostFederationDryFullSyncFileRequest(c.Server, fileName)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetFederationExtendedInfo The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Corresponds with GET /api/federation/extendedInfo/{repoKey} (the `GetFederationExtendedInfo` operationId).
+func (c *Client) GetFederationExtendedInfo(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetFederationExtendedInfoRequest(c.Server, repoKey)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetFederationConfigInfo The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Corresponds with GET /api/federation/federatedConfigInfo/{repoKey} (the `GetFederationConfigInfo` operationId).
+func (c *Client) GetFederationConfigInfo(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetFederationConfigInfoRequest(c.Server, repoKey)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetFederationRepositoryConfigInfo The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Corresponds with GET /api/federation/federatedRepoConfigInfo (the `GetFederationRepositoryConfigInfo` operationId).
+func (c *Client) GetFederationRepositoryConfigInfo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetFederationRepositoryConfigInfoRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // FederatedRepositoryForceFullSync Force a full sync of a federated repository
 //
 // Starts a full synchronization of a federated repository, interrupting one already in progress. Use it when a full sync appears stuck.
@@ -15379,6 +16114,91 @@ func (c *Client) FederatedRepositoryFullSync(ctx context.Context, repoKey string
 	return c.Client.Do(req)
 }
 
+// DeleteFederationFullSyncFile The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Corresponds with DELETE /api/federation/fullsync/repo/{fileName} (the `DeleteFederationFullSyncFile` operationId).
+func (c *Client) DeleteFederationFullSyncFile(ctx context.Context, fileName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteFederationFullSyncFileRequest(c.Server, fileName)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetFederationFullSyncFile The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Corresponds with GET /api/federation/fullsync/repo/{fileName} (the `GetFederationFullSyncFile` operationId).
+func (c *Client) GetFederationFullSyncFile(ctx context.Context, fileName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetFederationFullSyncFileRequest(c.Server, fileName)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PostFederationFullSyncFile The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Corresponds with POST /api/federation/fullsync/repo/{fileName} (the `PostFederationFullSyncFile` operationId).
+func (c *Client) PostFederationFullSyncFile(ctx context.Context, fileName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostFederationFullSyncFileRequest(c.Server, fileName)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PostFederationFullSyncSystemRepository The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Corresponds with POST /api/federation/fullsync/systemRepo (the `PostFederationFullSyncSystemRepository` operationId).
+func (c *Client) PostFederationFullSyncSystemRepository(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostFederationFullSyncSystemRepositoryRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PostFederationGridTopologyEvents The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Corresponds with POST /api/federation/grid/topology/events (the `PostFederationGridTopologyEvents` operationId).
+func (c *Client) PostFederationGridTopologyEvents(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostFederationGridTopologyEventsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // GetListOfInconsistentFederatedRepositories List federated repositories with configuration drift
 //
 // Lists federated repositories whose shared configuration differs from at least one member's. Repair them with the configuration sync operation.
@@ -15396,6 +16216,91 @@ func (c *Client) GetListOfInconsistentFederatedRepositories(ctx context.Context,
 	return c.Client.Do(req)
 }
 
+// GetFederationLastIdInSystem The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Corresponds with GET /api/federation/lastIdInSystem (the `GetFederationLastIdInSystem` operationId).
+func (c *Client) GetFederationLastIdInSystem(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetFederationLastIdInSystemRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// EnableFederationInternalMember The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Corresponds with POST /api/federation/member/enable (the `EnableFederationInternalMember` operationId).
+func (c *Client) EnableFederationInternalMember(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewEnableFederationInternalMemberRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PostFederationInternalMetadata The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Corresponds with POST /api/federation/metadata (the `PostFederationInternalMetadata` operationId).
+func (c *Client) PostFederationInternalMetadata(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostFederationInternalMetadataRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutFederationInternalMetadata The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Corresponds with PUT /api/federation/metadata (the `PutFederationInternalMetadata` operationId).
+func (c *Client) PutFederationInternalMetadata(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutFederationInternalMetadataRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// InvalidateFederationInternalMetadata The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Corresponds with POST /api/federation/metadata/invalidate (the `InvalidateFederationInternalMetadata` operationId).
+func (c *Client) InvalidateFederationInternalMetadata(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewInvalidateFederationInternalMetadataRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ConvertLocalRepositoryToFederated Convert a local repository to federated
 //
 // Converts a local repository into a federated repository with this instance as its only member, keeping content and metadata. Add members afterwards by updating the repository's `members`. Inside a project, every member of a federation must carry the same project key. A package type that cannot be federated (terraformbackend), a repository that is not local and one with push replication configured answer 400. Administrators only.
@@ -15403,6 +16308,91 @@ func (c *Client) GetListOfInconsistentFederatedRepositories(ctx context.Context,
 // Corresponds with POST /api/federation/migrate/{repoKey} (the `ConvertLocalRepositoryToFederated` operationId).
 func (c *Client) ConvertLocalRepositoryToFederated(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewConvertLocalRepositoryToFederatedRequest(c.Server, repoKey)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutFederationMigration Refuses the migration-tool-only write for every caller.
+//
+// Refuses the migration-tool-only write for every caller. See research 40 section 7 and decision 0022.
+//
+// Corresponds with PUT /api/federation/migration (the `PutFederationMigration` operationId).
+func (c *Client) PutFederationMigration(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutFederationMigrationRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetFederationMigrationStatus Reports the integrated federation service state; administrators only.
+//
+// Reports the integrated federation service state; administrators only. See research 40 section 7 and decision 0022.
+//
+// Corresponds with GET /api/federation/migration/status (the `GetFederationMigrationStatus` operationId).
+func (c *Client) GetFederationMigrationStatus(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetFederationMigrationStatusRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetFederationVerboseMigrationStatus The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Corresponds with GET /api/federation/migration/status/verbose (the `GetFederationVerboseMigrationStatus` operationId).
+func (c *Client) GetFederationVerboseMigrationStatus(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetFederationVerboseMigrationStatusRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutFederationVerboseMigrationStatus Refuses the migration-tool-only write for every caller.
+//
+// Refuses the migration-tool-only write for every caller. See research 40 section 7 and decision 0022.
+//
+// Corresponds with PUT /api/federation/migration/status/verbose (the `PutFederationVerboseMigrationStatus` operationId).
+func (c *Client) PutFederationVerboseMigrationStatus(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutFederationVerboseMigrationStatusRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DisableFederationNegotiation The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Corresponds with PUT /api/federation/negotiation/disable (the `DisableFederationNegotiation` operationId).
+func (c *Client) DisableFederationNegotiation(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDisableFederationNegotiationRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -15437,6 +16427,159 @@ func (c *Client) PrioritizeFederatedRepository(ctx context.Context, repoKey stri
 // Corresponds with PUT /api/federation/propagateCreatedTime (the `PropagateCreationTimeMetadataDuringFullSync` operationId).
 func (c *Client) PropagateCreationTimeMetadataDuringFullSync(ctx context.Context, params *PropagateCreationTimeMetadataDuringFullSyncParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPropagateCreationTimeMetadataDuringFullSyncRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetFederationInternalProperties The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Corresponds with POST /api/federation/properties/{repoKey} (the `GetFederationInternalProperties` operationId).
+func (c *Client) GetFederationInternalProperties(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetFederationInternalPropertiesRequest(c.Server, repoKey)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetFederationInternalProperty The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Corresponds with GET /api/federation/property/{repoKey}/{fileName} (the `GetFederationInternalProperty` operationId).
+func (c *Client) GetFederationInternalProperty(ctx context.Context, repoKey string, fileName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetFederationInternalPropertyRequest(c.Server, repoKey, fileName)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeregisterFederationQueue The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Corresponds with PUT /api/federation/queue/deregister (the `DeregisterFederationQueue` operationId).
+func (c *Client) DeregisterFederationQueue(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeregisterFederationQueueRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetFederationQueueRemaining The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Corresponds with POST /api/federation/queue/remaining (the `GetFederationQueueRemaining` operationId).
+func (c *Client) GetFederationQueueRemaining(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetFederationQueueRemainingRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ResetFederationQueue The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Corresponds with POST /api/federation/queue/reset (the `ResetFederationQueue` operationId).
+func (c *Client) ResetFederationQueue(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewResetFederationQueueRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetFederationQueueState The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Corresponds with GET /api/federation/queue/state (the `GetFederationQueueState` operationId).
+func (c *Client) GetFederationQueueState(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetFederationQueueStateRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutFederationQueueState The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Corresponds with PUT /api/federation/queue/state/{state} (the `PutFederationQueueState` operationId).
+func (c *Client) PutFederationQueueState(ctx context.Context, state string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutFederationQueueStateRequest(c.Server, state)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// StopFederationQueue The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Corresponds with PUT /api/federation/queue/stop (the `StopFederationQueue` operationId).
+func (c *Client) StopFederationQueue(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewStopFederationQueueRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetFederationRepositoryReady The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Corresponds with GET /api/federation/ready/{repoKey} (the `GetFederationRepositoryReady` operationId).
+func (c *Client) GetFederationRepositoryReady(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetFederationRepositoryReadyRequest(c.Server, repoKey)
 	if err != nil {
 		return nil, err
 	}
@@ -15557,6 +16700,108 @@ func (c *Client) ReplaceFederatedMemberBaseUrl(ctx context.Context, body Replace
 	return c.Client.Do(req)
 }
 
+// GetFederationRepositoryExists The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Corresponds with GET /api/federation/repoExists/{repoKey} (the `GetFederationRepositoryExists` operationId).
+func (c *Client) GetFederationRepositoryExists(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetFederationRepositoryExistsRequest(c.Server, repoKey)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetFederationInternalRepositories The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Corresponds with GET /api/federation/repos (the `GetFederationInternalRepositories` operationId).
+func (c *Client) GetFederationInternalRepositories(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetFederationInternalRepositoriesRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// EnableFederationInternalRepositories The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Corresponds with POST /api/federation/repos/enable (the `EnableFederationInternalRepositories` operationId).
+func (c *Client) EnableFederationInternalRepositories(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewEnableFederationInternalRepositoriesRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetFederationServiceConnection Reports the integrated federation service state; administrators only.
+//
+// Reports the integrated federation service state; administrators only. See research 40 section 7 and decision 0022.
+//
+// Corresponds with GET /api/federation/rtfs (the `GetFederationServiceConnection` operationId).
+func (c *Client) GetFederationServiceConnection(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetFederationServiceConnectionRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutFederationServiceConnection Refuses the migration-tool-only write for every caller.
+//
+// Refuses the migration-tool-only write for every caller. See research 40 section 7 and decision 0022.
+//
+// Corresponds with PUT /api/federation/rtfs (the `PutFederationServiceConnection` operationId).
+func (c *Client) PutFederationServiceConnection(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutFederationServiceConnectionRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SnapshotFederationRepositories The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Corresponds with PUT /api/federation/snapshotFederatedRepos (the `SnapshotFederationRepositories` operationId).
+func (c *Client) SnapshotFederationRepositories(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSnapshotFederationRepositoriesRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // GetFederationSyncState List federated repository sync state
 //
 // Lists every federated repository on this instance with its members and sync state.
@@ -15565,6 +16810,23 @@ func (c *Client) ReplaceFederatedMemberBaseUrl(ctx context.Context, body Replace
 // Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 func (c *Client) GetFederationSyncState(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetFederationSyncStateRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetFederationInternalStatus The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Corresponds with GET /api/federation/status (the `GetFederationInternalStatus` operationId).
+func (c *Client) GetFederationInternalStatus(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetFederationInternalStatusRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -15618,6 +16880,24 @@ func (c *Client) GetFederationMirrorLagTime(ctx context.Context, params *GetFede
 // Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 func (c *Client) GetFederatedRepositoryStatus(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetFederatedRepositoryStatusRequest(c.Server, repoKey)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetFederatedRepositoryStatusProjection Get federated repository sync status
+//
+// Detailed sync status of one federated repository: binary transfer tasks, event delivery per member and artifact counts. Expensive on large repositories; use the connection state operation for routine monitoring.
+//
+// Corresponds with GET /api/federation/status/repo/{repoKey}/{federatedKey} (the `GetFederatedRepositoryStatusProjection` operationId).
+// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+func (c *Client) GetFederatedRepositoryStatusProjection(ctx context.Context, repoKey string, federatedKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetFederatedRepositoryStatusProjectionRequest(c.Server, repoKey, federatedKey)
 	if err != nil {
 		return nil, err
 	}
@@ -15697,6 +16977,40 @@ func (c *Client) GetUnavailableMirrors(ctx context.Context, reqEditors ...Reques
 	return c.Client.Do(req)
 }
 
+// SubmitFederationInternalTask The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Corresponds with POST /api/federation/task/submit (the `SubmitFederationInternalTask` operationId).
+func (c *Client) SubmitFederationInternalTask(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSubmitFederationInternalTaskRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetFederationTenantMoveStatus The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Corresponds with GET /api/federation/tenant/move/status (the `GetFederationTenantMoveStatus` operationId).
+func (c *Client) GetFederationTenantMoveStatus(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetFederationTenantMoveStatusRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // UpdateFederatedMemberUrlWithBody Update a federated member's URL
 //
 // Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource) with the same body and effect as replaceUrl. Administrators only.
@@ -15725,6 +17039,23 @@ func (c *Client) UpdateFederatedMemberUrlWithBody(ctx context.Context, contentTy
 // Corresponds with POST /api/federation/updateMemberUrl (the `UpdateFederatedMemberUrl` operationId).
 func (c *Client) UpdateFederatedMemberUrl(ctx context.Context, body UpdateFederatedMemberUrlJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateFederatedMemberUrlRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ValidateFederationRepository The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Corresponds with GET /api/federation/validate/{repoKey} (the `ValidateFederationRepository` operationId).
+func (c *Client) ValidateFederationRepository(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewValidateFederationRepositoryRequest(c.Server, repoKey)
 	if err != nil {
 		return nil, err
 	}
@@ -20067,6 +21398,24 @@ func (c *Client) GetUploadsConfig(ctx context.Context, reqEditors ...RequestEdit
 // Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 func (c *Client) GetFederatedRepositoryStatusV2(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetFederatedRepositoryStatusV2Request(c.Server, repoKey)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetFederatedRepositoryStatusProjectionV2 Get federated repository sync status (version 2)
+//
+// Version 2 of the repository sync status, which reports a wider set of member states. The fields are those of version 1.
+//
+// Corresponds with GET /api/v2/federation/status/repo/{repoKey}/{federatedKey} (the `GetFederatedRepositoryStatusProjectionV2` operationId).
+// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+func (c *Client) GetFederatedRepositoryStatusProjectionV2(ctx context.Context, repoKey string, federatedKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetFederatedRepositoryStatusProjectionV2Request(c.Server, repoKey, federatedKey)
 	if err != nil {
 		return nil, err
 	}
@@ -25508,6 +26857,33 @@ func NewExportSystemRequestWithBody(server string, contentType string, body io.R
 	return req, nil
 }
 
+// NewGetFederationBaseUrlAndRepositoriesRequest constructs an http.Request for the GetFederationBaseUrlAndRepositories method
+func NewGetFederationBaseUrlAndRepositoriesRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/baseUrlAndRepos")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewDeleteFailedBinaryTasksRequest constructs an http.Request for the DeleteFailedBinaryTasks method
 func NewDeleteFailedBinaryTasksRequest(server string, params *DeleteFailedBinaryTasksParams) (*http.Request, error) {
 	var err error
@@ -25706,6 +27082,60 @@ func NewReplayFailedBinaryTasksRequest(server string, params *ReplayFailedBinary
 	return req, nil
 }
 
+// NewGetFederationInternalBinaryTasksRequest constructs an http.Request for the GetFederationInternalBinaryTasks method
+func NewGetFederationInternalBinaryTasksRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/binaries/rtfs")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPutFederationInternalBinaryTasksRequest constructs an http.Request for the PutFederationInternalBinaryTasks method
+func NewPutFederationInternalBinaryTasksRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/binaries/rtfs")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetFederatedBinaryTasksRequest constructs an http.Request for the GetFederatedBinaryTasks method
 func NewGetFederatedBinaryTasksRequest(server string, repoKey string) (*http.Request, error) {
 	var err error
@@ -25723,6 +27153,33 @@ func NewGetFederatedBinaryTasksRequest(server string, repoKey string) (*http.Req
 	}
 
 	operationPath := fmt.Sprintf("/api/federation/binaries/tasks/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCheckFederationInternalBinaryRequest constructs an http.Request for the CheckFederationInternalBinary method
+func NewCheckFederationInternalBinaryRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/binary/provider/v2/check")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -25810,6 +27267,162 @@ func NewConvertFederatedRepositoryToLocalRequestWithBody(server string, contentT
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDisableFederationRemoteMemberRequest constructs an http.Request for the DisableFederationRemoteMember method
+func NewDisableFederationRemoteMemberRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/disableRemoteMember")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPostFederationDryFullSyncFileRequest constructs an http.Request for the PostFederationDryFullSyncFile method
+func NewPostFederationDryFullSyncFileRequest(server string, fileName string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "fileName", fileName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/dryfullsync/repo/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetFederationExtendedInfoRequest constructs an http.Request for the GetFederationExtendedInfo method
+func NewGetFederationExtendedInfoRequest(server string, repoKey string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "repoKey", repoKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/extendedInfo/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetFederationConfigInfoRequest constructs an http.Request for the GetFederationConfigInfo method
+func NewGetFederationConfigInfoRequest(server string, repoKey string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "repoKey", repoKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/federatedConfigInfo/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetFederationRepositoryConfigInfoRequest constructs an http.Request for the GetFederationRepositoryConfigInfo method
+func NewGetFederationRepositoryConfigInfoRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/federatedRepoConfigInfo")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -25948,6 +27561,162 @@ func NewFederatedRepositoryFullSyncRequest(server string, repoKey string, params
 	return req, nil
 }
 
+// NewDeleteFederationFullSyncFileRequest constructs an http.Request for the DeleteFederationFullSyncFile method
+func NewDeleteFederationFullSyncFileRequest(server string, fileName string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "fileName", fileName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/fullsync/repo/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetFederationFullSyncFileRequest constructs an http.Request for the GetFederationFullSyncFile method
+func NewGetFederationFullSyncFileRequest(server string, fileName string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "fileName", fileName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/fullsync/repo/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPostFederationFullSyncFileRequest constructs an http.Request for the PostFederationFullSyncFile method
+func NewPostFederationFullSyncFileRequest(server string, fileName string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "fileName", fileName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/fullsync/repo/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPostFederationFullSyncSystemRepositoryRequest constructs an http.Request for the PostFederationFullSyncSystemRepository method
+func NewPostFederationFullSyncSystemRepositoryRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/fullsync/systemRepo")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPostFederationGridTopologyEventsRequest constructs an http.Request for the PostFederationGridTopologyEvents method
+func NewPostFederationGridTopologyEventsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/grid/topology/events")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetListOfInconsistentFederatedRepositoriesRequest constructs an http.Request for the GetListOfInconsistentFederatedRepositories method
 func NewGetListOfInconsistentFederatedRepositoriesRequest(server string) (*http.Request, error) {
 	var err error
@@ -25968,6 +27737,141 @@ func NewGetListOfInconsistentFederatedRepositoriesRequest(server string) (*http.
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetFederationLastIdInSystemRequest constructs an http.Request for the GetFederationLastIdInSystem method
+func NewGetFederationLastIdInSystemRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/lastIdInSystem")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewEnableFederationInternalMemberRequest constructs an http.Request for the EnableFederationInternalMember method
+func NewEnableFederationInternalMemberRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/member/enable")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPostFederationInternalMetadataRequest constructs an http.Request for the PostFederationInternalMetadata method
+func NewPostFederationInternalMetadataRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/metadata")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPutFederationInternalMetadataRequest constructs an http.Request for the PutFederationInternalMetadata method
+func NewPutFederationInternalMetadataRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/metadata")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewInvalidateFederationInternalMetadataRequest constructs an http.Request for the InvalidateFederationInternalMetadata method
+func NewInvalidateFederationInternalMetadataRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/metadata/invalidate")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -26002,6 +27906,141 @@ func NewConvertLocalRepositoryToFederatedRequest(server string, repoKey string) 
 	}
 
 	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPutFederationMigrationRequest constructs an http.Request for the PutFederationMigration method
+func NewPutFederationMigrationRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/migration")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetFederationMigrationStatusRequest constructs an http.Request for the GetFederationMigrationStatus method
+func NewGetFederationMigrationStatusRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/migration/status")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetFederationVerboseMigrationStatusRequest constructs an http.Request for the GetFederationVerboseMigrationStatus method
+func NewGetFederationVerboseMigrationStatusRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/migration/status/verbose")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPutFederationVerboseMigrationStatusRequest constructs an http.Request for the PutFederationVerboseMigrationStatus method
+func NewPutFederationVerboseMigrationStatusRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/migration/status/verbose")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDisableFederationNegotiationRequest constructs an http.Request for the DisableFederationNegotiation method
+func NewDisableFederationNegotiationRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/negotiation/disable")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -26109,6 +28148,284 @@ func NewPropagateCreationTimeMetadataDuringFullSyncRequest(server string, params
 	}
 
 	req, err := http.NewRequest(http.MethodPut, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetFederationInternalPropertiesRequest constructs an http.Request for the GetFederationInternalProperties method
+func NewGetFederationInternalPropertiesRequest(server string, repoKey string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "repoKey", repoKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/properties/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetFederationInternalPropertyRequest constructs an http.Request for the GetFederationInternalProperty method
+func NewGetFederationInternalPropertyRequest(server string, repoKey string, fileName string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "repoKey", repoKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "fileName", fileName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/property/%s/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDeregisterFederationQueueRequest constructs an http.Request for the DeregisterFederationQueue method
+func NewDeregisterFederationQueueRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/queue/deregister")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetFederationQueueRemainingRequest constructs an http.Request for the GetFederationQueueRemaining method
+func NewGetFederationQueueRemainingRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/queue/remaining")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewResetFederationQueueRequest constructs an http.Request for the ResetFederationQueue method
+func NewResetFederationQueueRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/queue/reset")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetFederationQueueStateRequest constructs an http.Request for the GetFederationQueueState method
+func NewGetFederationQueueStateRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/queue/state")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPutFederationQueueStateRequest constructs an http.Request for the PutFederationQueueState method
+func NewPutFederationQueueStateRequest(server string, state string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "state", state, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/queue/state/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewStopFederationQueueRequest constructs an http.Request for the StopFederationQueue method
+func NewStopFederationQueueRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/queue/stop")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetFederationRepositoryReadyRequest constructs an http.Request for the GetFederationRepositoryReady method
+func NewGetFederationRepositoryReadyRequest(server string, repoKey string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "repoKey", repoKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/ready/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -26289,6 +28606,175 @@ func NewReplaceFederatedMemberBaseUrlRequestWithBody(server string, contentType 
 	return req, nil
 }
 
+// NewGetFederationRepositoryExistsRequest constructs an http.Request for the GetFederationRepositoryExists method
+func NewGetFederationRepositoryExistsRequest(server string, repoKey string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "repoKey", repoKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/repoExists/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetFederationInternalRepositoriesRequest constructs an http.Request for the GetFederationInternalRepositories method
+func NewGetFederationInternalRepositoriesRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/repos")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewEnableFederationInternalRepositoriesRequest constructs an http.Request for the EnableFederationInternalRepositories method
+func NewEnableFederationInternalRepositoriesRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/repos/enable")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetFederationServiceConnectionRequest constructs an http.Request for the GetFederationServiceConnection method
+func NewGetFederationServiceConnectionRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/rtfs")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPutFederationServiceConnectionRequest constructs an http.Request for the PutFederationServiceConnection method
+func NewPutFederationServiceConnectionRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/rtfs")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewSnapshotFederationRepositoriesRequest constructs an http.Request for the SnapshotFederationRepositories method
+func NewSnapshotFederationRepositoriesRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/snapshotFederatedRepos")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetFederationSyncStateRequest constructs an http.Request for the GetFederationSyncState method
 func NewGetFederationSyncStateRequest(server string) (*http.Request, error) {
 	var err error
@@ -26299,6 +28785,33 @@ func NewGetFederationSyncStateRequest(server string) (*http.Request, error) {
 	}
 
 	operationPath := fmt.Sprintf("/api/federation/state")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetFederationInternalStatusRequest constructs an http.Request for the GetFederationInternalStatus method
+func NewGetFederationInternalStatusRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/status")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -26421,6 +28934,47 @@ func NewGetFederatedRepositoryStatusRequest(server string, repoKey string) (*htt
 	}
 
 	operationPath := fmt.Sprintf("/api/federation/status/repo/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetFederatedRepositoryStatusProjectionRequest constructs an http.Request for the GetFederatedRepositoryStatusProjection method
+func NewGetFederatedRepositoryStatusProjectionRequest(server string, repoKey string, federatedKey string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "repoKey", repoKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "federatedKey", federatedKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/status/repo/%s/%s", pathParam0, pathParam1)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -26580,6 +29134,60 @@ func NewGetUnavailableMirrorsRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewSubmitFederationInternalTaskRequest constructs an http.Request for the SubmitFederationInternalTask method
+func NewSubmitFederationInternalTaskRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/task/submit")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetFederationTenantMoveStatusRequest constructs an http.Request for the GetFederationTenantMoveStatus method
+func NewGetFederationTenantMoveStatusRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/tenant/move/status")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewUpdateFederatedMemberUrlRequest calls the generic UpdateFederatedMemberUrl builder with application/json body
 func NewUpdateFederatedMemberUrlRequest(server string, body UpdateFederatedMemberUrlJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -26616,6 +29224,40 @@ func NewUpdateFederatedMemberUrlRequestWithBody(server string, contentType strin
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewValidateFederationRepositoryRequest constructs an http.Request for the ValidateFederationRepository method
+func NewValidateFederationRepositoryRequest(server string, repoKey string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "repoKey", repoKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/validate/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -35039,6 +37681,47 @@ func NewGetFederatedRepositoryStatusV2Request(server string, repoKey string) (*h
 	return req, nil
 }
 
+// NewGetFederatedRepositoryStatusProjectionV2Request constructs an http.Request for the GetFederatedRepositoryStatusProjectionV2 method
+func NewGetFederatedRepositoryStatusProjectionV2Request(server string, repoKey string, federatedKey string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "repoKey", repoKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "federatedKey", federatedKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v2/federation/status/repo/%s/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewDeleteRepositoriesRequest calls the generic DeleteRepositories builder with application/json body
 func NewDeleteRepositoriesRequest(server string, body DeleteRepositoriesJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -38433,6 +41116,15 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /api/export/system (the `ExportSystem` operationId).
 	ExportSystemWithApplicationVndOrgJfrogArtifactorySystemExportSettingsPlusJSONBodyWithResponse(ctx context.Context, body ExportSystemApplicationVndOrgJfrogArtifactorySystemExportSettingsPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*ExportSystemResponse, error)
 
+	// GetFederationBaseUrlAndRepositoriesWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/federation/baseUrlAndRepos (the `GetFederationBaseUrlAndRepositories` operationId).
+	GetFederationBaseUrlAndRepositoriesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetFederationBaseUrlAndRepositoriesResponse, error)
+
 	// DeleteFailedBinaryTasksWithResponse Delete failed binary transfer tasks
 	//
 	// Deletes recorded failed content-fetch tasks of a federated repository, all of them or only the tasks for one SHA-1. Cancellation prevents their queued or in-flight retries from publishing; a newer event or full sync can supply the content later.
@@ -38460,6 +41152,24 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with PUT /api/federation/binaries/failures/replay (the `ReplayFailedBinaryTasks` operationId).
 	ReplayFailedBinaryTasksWithResponse(ctx context.Context, params *ReplayFailedBinaryTasksParams, reqEditors ...RequestEditorFn) (*ReplayFailedBinaryTasksResponse, error)
 
+	// GetFederationInternalBinaryTasksWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/federation/binaries/rtfs (the `GetFederationInternalBinaryTasks` operationId).
+	GetFederationInternalBinaryTasksWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetFederationInternalBinaryTasksResponse, error)
+
+	// PutFederationInternalBinaryTasksWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/federation/binaries/rtfs (the `PutFederationInternalBinaryTasks` operationId).
+	PutFederationInternalBinaryTasksWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*PutFederationInternalBinaryTasksResponse, error)
+
 	// GetFederatedBinaryTasksWithResponse Get federated binary task counts
 	//
 	// Returns failed content-fetch counts for a federated repository. Administrators only. The closed-source DTO shape is inferred.
@@ -38468,6 +41178,15 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /api/federation/binaries/tasks/{repoKey} (the `GetFederatedBinaryTasks` operationId).
 	GetFederatedBinaryTasksWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*GetFederatedBinaryTasksResponse, error)
+
+	// CheckFederationInternalBinaryWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/federation/binary/provider/v2/check (the `CheckFederationInternalBinary` operationId).
+	CheckFederationInternalBinaryWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*CheckFederationInternalBinaryResponse, error)
 
 	// SynchronizeFederatedMemberConfigurationWithResponse Push federated repository configuration to members
 	//
@@ -38496,6 +41215,51 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /api/federation/convertToLocal (the `ConvertFederatedRepositoryToLocal` operationId).
 	ConvertFederatedRepositoryToLocalWithResponse(ctx context.Context, body ConvertFederatedRepositoryToLocalJSONRequestBody, reqEditors ...RequestEditorFn) (*ConvertFederatedRepositoryToLocalResponse, error)
 
+	// DisableFederationRemoteMemberWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/federation/disableRemoteMember (the `DisableFederationRemoteMember` operationId).
+	DisableFederationRemoteMemberWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DisableFederationRemoteMemberResponse, error)
+
+	// PostFederationDryFullSyncFileWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/federation/dryfullsync/repo/{fileName} (the `PostFederationDryFullSyncFile` operationId).
+	PostFederationDryFullSyncFileWithResponse(ctx context.Context, fileName string, reqEditors ...RequestEditorFn) (*PostFederationDryFullSyncFileResponse, error)
+
+	// GetFederationExtendedInfoWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/federation/extendedInfo/{repoKey} (the `GetFederationExtendedInfo` operationId).
+	GetFederationExtendedInfoWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*GetFederationExtendedInfoResponse, error)
+
+	// GetFederationConfigInfoWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/federation/federatedConfigInfo/{repoKey} (the `GetFederationConfigInfo` operationId).
+	GetFederationConfigInfoWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*GetFederationConfigInfoResponse, error)
+
+	// GetFederationRepositoryConfigInfoWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/federation/federatedRepoConfigInfo (the `GetFederationRepositoryConfigInfo` operationId).
+	GetFederationRepositoryConfigInfoWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetFederationRepositoryConfigInfoResponse, error)
+
 	// FederatedRepositoryForceFullSyncWithResponse Force a full sync of a federated repository
 	//
 	// Starts a full synchronization of a federated repository, interrupting one already in progress. Use it when a full sync appears stuck.
@@ -38514,6 +41278,51 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /api/federation/fullSync/{repoKey} (the `FederatedRepositoryFullSync` operationId).
 	FederatedRepositoryFullSyncWithResponse(ctx context.Context, repoKey string, params *FederatedRepositoryFullSyncParams, reqEditors ...RequestEditorFn) (*FederatedRepositoryFullSyncResponse, error)
 
+	// DeleteFederationFullSyncFileWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /api/federation/fullsync/repo/{fileName} (the `DeleteFederationFullSyncFile` operationId).
+	DeleteFederationFullSyncFileWithResponse(ctx context.Context, fileName string, reqEditors ...RequestEditorFn) (*DeleteFederationFullSyncFileResponse, error)
+
+	// GetFederationFullSyncFileWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/federation/fullsync/repo/{fileName} (the `GetFederationFullSyncFile` operationId).
+	GetFederationFullSyncFileWithResponse(ctx context.Context, fileName string, reqEditors ...RequestEditorFn) (*GetFederationFullSyncFileResponse, error)
+
+	// PostFederationFullSyncFileWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/federation/fullsync/repo/{fileName} (the `PostFederationFullSyncFile` operationId).
+	PostFederationFullSyncFileWithResponse(ctx context.Context, fileName string, reqEditors ...RequestEditorFn) (*PostFederationFullSyncFileResponse, error)
+
+	// PostFederationFullSyncSystemRepositoryWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/federation/fullsync/systemRepo (the `PostFederationFullSyncSystemRepository` operationId).
+	PostFederationFullSyncSystemRepositoryWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*PostFederationFullSyncSystemRepositoryResponse, error)
+
+	// PostFederationGridTopologyEventsWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/federation/grid/topology/events (the `PostFederationGridTopologyEvents` operationId).
+	PostFederationGridTopologyEventsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*PostFederationGridTopologyEventsResponse, error)
+
 	// GetListOfInconsistentFederatedRepositoriesWithResponse List federated repositories with configuration drift
 	//
 	// Lists federated repositories whose shared configuration differs from at least one member's. Repair them with the configuration sync operation.
@@ -38523,6 +41332,51 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /api/federation/inconsistentRepos (the `GetListOfInconsistentFederatedRepositories` operationId).
 	GetListOfInconsistentFederatedRepositoriesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetListOfInconsistentFederatedRepositoriesResponse, error)
 
+	// GetFederationLastIdInSystemWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/federation/lastIdInSystem (the `GetFederationLastIdInSystem` operationId).
+	GetFederationLastIdInSystemWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetFederationLastIdInSystemResponse, error)
+
+	// EnableFederationInternalMemberWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/federation/member/enable (the `EnableFederationInternalMember` operationId).
+	EnableFederationInternalMemberWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*EnableFederationInternalMemberResponse, error)
+
+	// PostFederationInternalMetadataWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/federation/metadata (the `PostFederationInternalMetadata` operationId).
+	PostFederationInternalMetadataWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*PostFederationInternalMetadataResponse, error)
+
+	// PutFederationInternalMetadataWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/federation/metadata (the `PutFederationInternalMetadata` operationId).
+	PutFederationInternalMetadataWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*PutFederationInternalMetadataResponse, error)
+
+	// InvalidateFederationInternalMetadataWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/federation/metadata/invalidate (the `InvalidateFederationInternalMetadata` operationId).
+	InvalidateFederationInternalMetadataWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*InvalidateFederationInternalMetadataResponse, error)
+
 	// ConvertLocalRepositoryToFederatedWithResponse Convert a local repository to federated
 	//
 	// Converts a local repository into a federated repository with this instance as its only member, keeping content and metadata. Add members afterwards by updating the repository's `members`. Inside a project, every member of a federation must carry the same project key. A package type that cannot be federated (terraformbackend), a repository that is not local and one with push replication configured answer 400. Administrators only.
@@ -38531,6 +41385,51 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /api/federation/migrate/{repoKey} (the `ConvertLocalRepositoryToFederated` operationId).
 	ConvertLocalRepositoryToFederatedWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*ConvertLocalRepositoryToFederatedResponse, error)
+
+	// PutFederationMigrationWithResponse Refuses the migration-tool-only write for every caller.
+	//
+	// Refuses the migration-tool-only write for every caller. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/federation/migration (the `PutFederationMigration` operationId).
+	PutFederationMigrationWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*PutFederationMigrationResponse, error)
+
+	// GetFederationMigrationStatusWithResponse Reports the integrated federation service state; administrators only.
+	//
+	// Reports the integrated federation service state; administrators only. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/federation/migration/status (the `GetFederationMigrationStatus` operationId).
+	GetFederationMigrationStatusWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetFederationMigrationStatusResponse, error)
+
+	// GetFederationVerboseMigrationStatusWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/federation/migration/status/verbose (the `GetFederationVerboseMigrationStatus` operationId).
+	GetFederationVerboseMigrationStatusWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetFederationVerboseMigrationStatusResponse, error)
+
+	// PutFederationVerboseMigrationStatusWithResponse Refuses the migration-tool-only write for every caller.
+	//
+	// Refuses the migration-tool-only write for every caller. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/federation/migration/status/verbose (the `PutFederationVerboseMigrationStatus` operationId).
+	PutFederationVerboseMigrationStatusWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*PutFederationVerboseMigrationStatusResponse, error)
+
+	// DisableFederationNegotiationWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/federation/negotiation/disable (the `DisableFederationNegotiation` operationId).
+	DisableFederationNegotiationWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DisableFederationNegotiationResponse, error)
 
 	// PrioritizeFederatedRepositoryWithResponse Set federated repository sync priority
 	//
@@ -38549,6 +41448,87 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with PUT /api/federation/propagateCreatedTime (the `PropagateCreationTimeMetadataDuringFullSync` operationId).
 	PropagateCreationTimeMetadataDuringFullSyncWithResponse(ctx context.Context, params *PropagateCreationTimeMetadataDuringFullSyncParams, reqEditors ...RequestEditorFn) (*PropagateCreationTimeMetadataDuringFullSyncResponse, error)
+
+	// GetFederationInternalPropertiesWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/federation/properties/{repoKey} (the `GetFederationInternalProperties` operationId).
+	GetFederationInternalPropertiesWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*GetFederationInternalPropertiesResponse, error)
+
+	// GetFederationInternalPropertyWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/federation/property/{repoKey}/{fileName} (the `GetFederationInternalProperty` operationId).
+	GetFederationInternalPropertyWithResponse(ctx context.Context, repoKey string, fileName string, reqEditors ...RequestEditorFn) (*GetFederationInternalPropertyResponse, error)
+
+	// DeregisterFederationQueueWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/federation/queue/deregister (the `DeregisterFederationQueue` operationId).
+	DeregisterFederationQueueWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DeregisterFederationQueueResponse, error)
+
+	// GetFederationQueueRemainingWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/federation/queue/remaining (the `GetFederationQueueRemaining` operationId).
+	GetFederationQueueRemainingWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetFederationQueueRemainingResponse, error)
+
+	// ResetFederationQueueWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/federation/queue/reset (the `ResetFederationQueue` operationId).
+	ResetFederationQueueWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ResetFederationQueueResponse, error)
+
+	// GetFederationQueueStateWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/federation/queue/state (the `GetFederationQueueState` operationId).
+	GetFederationQueueStateWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetFederationQueueStateResponse, error)
+
+	// PutFederationQueueStateWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/federation/queue/state/{state} (the `PutFederationQueueState` operationId).
+	PutFederationQueueStateWithResponse(ctx context.Context, state string, reqEditors ...RequestEditorFn) (*PutFederationQueueStateResponse, error)
+
+	// StopFederationQueueWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/federation/queue/stop (the `StopFederationQueue` operationId).
+	StopFederationQueueWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*StopFederationQueueResponse, error)
+
+	// GetFederationRepositoryReadyWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/federation/ready/{repoKey} (the `GetFederationRepositoryReady` operationId).
+	GetFederationRepositoryReadyWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*GetFederationRepositoryReadyResponse, error)
 
 	// ReconnectToFederationClientWithResponse Reconnect the federation sync worker
 	//
@@ -38604,6 +41584,60 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /api/federation/replaceUrl (the `ReplaceFederatedMemberBaseUrl` operationId).
 	ReplaceFederatedMemberBaseUrlWithResponse(ctx context.Context, body ReplaceFederatedMemberBaseUrlJSONRequestBody, reqEditors ...RequestEditorFn) (*ReplaceFederatedMemberBaseUrlResponse, error)
 
+	// GetFederationRepositoryExistsWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/federation/repoExists/{repoKey} (the `GetFederationRepositoryExists` operationId).
+	GetFederationRepositoryExistsWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*GetFederationRepositoryExistsResponse, error)
+
+	// GetFederationInternalRepositoriesWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/federation/repos (the `GetFederationInternalRepositories` operationId).
+	GetFederationInternalRepositoriesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetFederationInternalRepositoriesResponse, error)
+
+	// EnableFederationInternalRepositoriesWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/federation/repos/enable (the `EnableFederationInternalRepositories` operationId).
+	EnableFederationInternalRepositoriesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*EnableFederationInternalRepositoriesResponse, error)
+
+	// GetFederationServiceConnectionWithResponse Reports the integrated federation service state; administrators only.
+	//
+	// Reports the integrated federation service state; administrators only. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/federation/rtfs (the `GetFederationServiceConnection` operationId).
+	GetFederationServiceConnectionWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetFederationServiceConnectionResponse, error)
+
+	// PutFederationServiceConnectionWithResponse Refuses the migration-tool-only write for every caller.
+	//
+	// Refuses the migration-tool-only write for every caller. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/federation/rtfs (the `PutFederationServiceConnection` operationId).
+	PutFederationServiceConnectionWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*PutFederationServiceConnectionResponse, error)
+
+	// SnapshotFederationRepositoriesWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/federation/snapshotFederatedRepos (the `SnapshotFederationRepositories` operationId).
+	SnapshotFederationRepositoriesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*SnapshotFederationRepositoriesResponse, error)
+
 	// GetFederationSyncStateWithResponse List federated repository sync state
 	//
 	// Lists every federated repository on this instance with its members and sync state.
@@ -38614,6 +41648,15 @@ type ClientWithResponsesInterface interface {
 	//
 	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	GetFederationSyncStateWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetFederationSyncStateResponse, error)
+
+	// GetFederationInternalStatusWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/federation/status (the `GetFederationInternalStatus` operationId).
+	GetFederationInternalStatusWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetFederationInternalStatusResponse, error)
 
 	// GetFederationConnectionDetailsWithResponse Get federated repository connection state
 	//
@@ -38645,6 +41688,17 @@ type ClientWithResponsesInterface interface {
 	//
 	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	GetFederatedRepositoryStatusWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*GetFederatedRepositoryStatusResponse, error)
+
+	// GetFederatedRepositoryStatusProjectionWithResponse Get federated repository sync status
+	//
+	// Detailed sync status of one federated repository: binary transfer tasks, event delivery per member and artifact counts. Expensive on large repositories; use the connection state operation for routine monitoring.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/federation/status/repo/{repoKey}/{federatedKey} (the `GetFederatedRepositoryStatusProjection` operationId).
+	//
+	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+	GetFederatedRepositoryStatusProjectionWithResponse(ctx context.Context, repoKey string, federatedKey string, reqEditors ...RequestEditorFn) (*GetFederatedRepositoryStatusProjectionResponse, error)
 
 	// GetFederatedRepositoryBinaryStateWithResponse Get read-authorized repository binary state
 	//
@@ -38684,6 +41738,24 @@ type ClientWithResponsesInterface interface {
 	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	GetUnavailableMirrorsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetUnavailableMirrorsResponse, error)
 
+	// SubmitFederationInternalTaskWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/federation/task/submit (the `SubmitFederationInternalTask` operationId).
+	SubmitFederationInternalTaskWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*SubmitFederationInternalTaskResponse, error)
+
+	// GetFederationTenantMoveStatusWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/federation/tenant/move/status (the `GetFederationTenantMoveStatus` operationId).
+	GetFederationTenantMoveStatusWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetFederationTenantMoveStatusResponse, error)
+
 	// UpdateFederatedMemberUrlWithBodyWithResponse Update a federated member's URL
 	//
 	// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource) with the same body and effect as replaceUrl. Administrators only.
@@ -38701,6 +41773,15 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /api/federation/updateMemberUrl (the `UpdateFederatedMemberUrl` operationId).
 	UpdateFederatedMemberUrlWithResponse(ctx context.Context, body UpdateFederatedMemberUrlJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateFederatedMemberUrlResponse, error)
+
+	// ValidateFederationRepositoryWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+	//
+	// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/federation/validate/{repoKey} (the `ValidateFederationRepository` operationId).
+	ValidateFederationRepositoryWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*ValidateFederationRepositoryResponse, error)
 
 	// CalculateRubyGemsIndexWithResponse performs a POST /api/gems/{repoKey}/reindex (the `CalculateRubyGemsIndex` operationId) request.
 	//
@@ -40903,6 +43984,17 @@ type ClientWithResponsesInterface interface {
 	//
 	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	GetFederatedRepositoryStatusV2WithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*GetFederatedRepositoryStatusV2Response, error)
+
+	// GetFederatedRepositoryStatusProjectionV2WithResponse Get federated repository sync status (version 2)
+	//
+	// Version 2 of the repository sync status, which reports a wider set of member states. The fields are those of version 1.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v2/federation/status/repo/{repoKey}/{federatedKey} (the `GetFederatedRepositoryStatusProjectionV2` operationId).
+	//
+	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+	GetFederatedRepositoryStatusProjectionV2WithResponse(ctx context.Context, repoKey string, federatedKey string, reqEditors ...RequestEditorFn) (*GetFederatedRepositoryStatusProjectionV2Response, error)
 
 	// DeleteRepositoriesWithBodyWithResponse Delete several repositories
 	//
@@ -49545,6 +52637,79 @@ func (r ExportSystemResponse) ContentType() string {
 	return ""
 }
 
+// GetFederationBaseUrlAndRepositoriesResponse429Headers the declared response headers of an HTTP 429 response for GetFederationBaseUrlAndRepositories
+type GetFederationBaseUrlAndRepositoriesResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// GetFederationBaseUrlAndRepositoriesResponse503Headers the declared response headers of an HTTP 503 response for GetFederationBaseUrlAndRepositories
+type GetFederationBaseUrlAndRepositoriesResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type GetFederationBaseUrlAndRepositoriesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *GetFederationBaseUrlAndRepositoriesResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *GetFederationBaseUrlAndRepositoriesResponse503Headers
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetFederationBaseUrlAndRepositoriesResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r GetFederationBaseUrlAndRepositoriesResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetFederationBaseUrlAndRepositoriesResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r GetFederationBaseUrlAndRepositoriesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetFederationBaseUrlAndRepositoriesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetFederationBaseUrlAndRepositoriesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetFederationBaseUrlAndRepositoriesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // DeleteFailedBinaryTasksResponse429Headers the declared response headers of an HTTP 429 response for DeleteFailedBinaryTasks
 type DeleteFailedBinaryTasksResponse429Headers struct {
 	RateLimit       *string
@@ -49888,6 +53053,152 @@ func (r ReplayFailedBinaryTasksResponse) ContentType() string {
 	return ""
 }
 
+// GetFederationInternalBinaryTasksResponse429Headers the declared response headers of an HTTP 429 response for GetFederationInternalBinaryTasks
+type GetFederationInternalBinaryTasksResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// GetFederationInternalBinaryTasksResponse503Headers the declared response headers of an HTTP 503 response for GetFederationInternalBinaryTasks
+type GetFederationInternalBinaryTasksResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type GetFederationInternalBinaryTasksResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *GetFederationInternalBinaryTasksResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *GetFederationInternalBinaryTasksResponse503Headers
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetFederationInternalBinaryTasksResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r GetFederationInternalBinaryTasksResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetFederationInternalBinaryTasksResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r GetFederationInternalBinaryTasksResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetFederationInternalBinaryTasksResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetFederationInternalBinaryTasksResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetFederationInternalBinaryTasksResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// PutFederationInternalBinaryTasksResponse429Headers the declared response headers of an HTTP 429 response for PutFederationInternalBinaryTasks
+type PutFederationInternalBinaryTasksResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// PutFederationInternalBinaryTasksResponse503Headers the declared response headers of an HTTP 503 response for PutFederationInternalBinaryTasks
+type PutFederationInternalBinaryTasksResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type PutFederationInternalBinaryTasksResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *PutFederationInternalBinaryTasksResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *PutFederationInternalBinaryTasksResponse503Headers
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r PutFederationInternalBinaryTasksResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r PutFederationInternalBinaryTasksResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PutFederationInternalBinaryTasksResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r PutFederationInternalBinaryTasksResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PutFederationInternalBinaryTasksResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PutFederationInternalBinaryTasksResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PutFederationInternalBinaryTasksResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // GetFederatedBinaryTasksResponse429Headers the declared response headers of an HTTP 429 response for GetFederatedBinaryTasks
 type GetFederatedBinaryTasksResponse429Headers struct {
 	RateLimit       *string
@@ -49990,6 +53301,79 @@ func (r GetFederatedBinaryTasksResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r GetFederatedBinaryTasksResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// CheckFederationInternalBinaryResponse429Headers the declared response headers of an HTTP 429 response for CheckFederationInternalBinary
+type CheckFederationInternalBinaryResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// CheckFederationInternalBinaryResponse503Headers the declared response headers of an HTTP 503 response for CheckFederationInternalBinary
+type CheckFederationInternalBinaryResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type CheckFederationInternalBinaryResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *CheckFederationInternalBinaryResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *CheckFederationInternalBinaryResponse503Headers
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r CheckFederationInternalBinaryResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r CheckFederationInternalBinaryResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r CheckFederationInternalBinaryResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r CheckFederationInternalBinaryResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CheckFederationInternalBinaryResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CheckFederationInternalBinaryResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CheckFederationInternalBinaryResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -50212,6 +53596,371 @@ func (r ConvertFederatedRepositoryToLocalResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r ConvertFederatedRepositoryToLocalResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// DisableFederationRemoteMemberResponse429Headers the declared response headers of an HTTP 429 response for DisableFederationRemoteMember
+type DisableFederationRemoteMemberResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// DisableFederationRemoteMemberResponse503Headers the declared response headers of an HTTP 503 response for DisableFederationRemoteMember
+type DisableFederationRemoteMemberResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type DisableFederationRemoteMemberResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *DisableFederationRemoteMemberResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *DisableFederationRemoteMemberResponse503Headers
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r DisableFederationRemoteMemberResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r DisableFederationRemoteMemberResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r DisableFederationRemoteMemberResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r DisableFederationRemoteMemberResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DisableFederationRemoteMemberResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DisableFederationRemoteMemberResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DisableFederationRemoteMemberResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// PostFederationDryFullSyncFileResponse429Headers the declared response headers of an HTTP 429 response for PostFederationDryFullSyncFile
+type PostFederationDryFullSyncFileResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// PostFederationDryFullSyncFileResponse503Headers the declared response headers of an HTTP 503 response for PostFederationDryFullSyncFile
+type PostFederationDryFullSyncFileResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type PostFederationDryFullSyncFileResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *PostFederationDryFullSyncFileResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *PostFederationDryFullSyncFileResponse503Headers
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r PostFederationDryFullSyncFileResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r PostFederationDryFullSyncFileResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PostFederationDryFullSyncFileResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r PostFederationDryFullSyncFileResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PostFederationDryFullSyncFileResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostFederationDryFullSyncFileResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostFederationDryFullSyncFileResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetFederationExtendedInfoResponse429Headers the declared response headers of an HTTP 429 response for GetFederationExtendedInfo
+type GetFederationExtendedInfoResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// GetFederationExtendedInfoResponse503Headers the declared response headers of an HTTP 503 response for GetFederationExtendedInfo
+type GetFederationExtendedInfoResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type GetFederationExtendedInfoResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *GetFederationExtendedInfoResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *GetFederationExtendedInfoResponse503Headers
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetFederationExtendedInfoResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r GetFederationExtendedInfoResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetFederationExtendedInfoResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r GetFederationExtendedInfoResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetFederationExtendedInfoResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetFederationExtendedInfoResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetFederationExtendedInfoResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetFederationConfigInfoResponse429Headers the declared response headers of an HTTP 429 response for GetFederationConfigInfo
+type GetFederationConfigInfoResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// GetFederationConfigInfoResponse503Headers the declared response headers of an HTTP 503 response for GetFederationConfigInfo
+type GetFederationConfigInfoResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type GetFederationConfigInfoResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *GetFederationConfigInfoResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *GetFederationConfigInfoResponse503Headers
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetFederationConfigInfoResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r GetFederationConfigInfoResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetFederationConfigInfoResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r GetFederationConfigInfoResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetFederationConfigInfoResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetFederationConfigInfoResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetFederationConfigInfoResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetFederationRepositoryConfigInfoResponse429Headers the declared response headers of an HTTP 429 response for GetFederationRepositoryConfigInfo
+type GetFederationRepositoryConfigInfoResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// GetFederationRepositoryConfigInfoResponse503Headers the declared response headers of an HTTP 503 response for GetFederationRepositoryConfigInfo
+type GetFederationRepositoryConfigInfoResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type GetFederationRepositoryConfigInfoResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *GetFederationRepositoryConfigInfoResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *GetFederationRepositoryConfigInfoResponse503Headers
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetFederationRepositoryConfigInfoResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r GetFederationRepositoryConfigInfoResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetFederationRepositoryConfigInfoResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r GetFederationRepositoryConfigInfoResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetFederationRepositoryConfigInfoResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetFederationRepositoryConfigInfoResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetFederationRepositoryConfigInfoResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -50444,6 +54193,371 @@ func (r FederatedRepositoryFullSyncResponse) ContentType() string {
 	return ""
 }
 
+// DeleteFederationFullSyncFileResponse429Headers the declared response headers of an HTTP 429 response for DeleteFederationFullSyncFile
+type DeleteFederationFullSyncFileResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// DeleteFederationFullSyncFileResponse503Headers the declared response headers of an HTTP 503 response for DeleteFederationFullSyncFile
+type DeleteFederationFullSyncFileResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type DeleteFederationFullSyncFileResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *DeleteFederationFullSyncFileResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *DeleteFederationFullSyncFileResponse503Headers
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r DeleteFederationFullSyncFileResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r DeleteFederationFullSyncFileResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r DeleteFederationFullSyncFileResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteFederationFullSyncFileResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteFederationFullSyncFileResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteFederationFullSyncFileResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteFederationFullSyncFileResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetFederationFullSyncFileResponse429Headers the declared response headers of an HTTP 429 response for GetFederationFullSyncFile
+type GetFederationFullSyncFileResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// GetFederationFullSyncFileResponse503Headers the declared response headers of an HTTP 503 response for GetFederationFullSyncFile
+type GetFederationFullSyncFileResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type GetFederationFullSyncFileResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *GetFederationFullSyncFileResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *GetFederationFullSyncFileResponse503Headers
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetFederationFullSyncFileResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r GetFederationFullSyncFileResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetFederationFullSyncFileResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r GetFederationFullSyncFileResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetFederationFullSyncFileResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetFederationFullSyncFileResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetFederationFullSyncFileResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// PostFederationFullSyncFileResponse429Headers the declared response headers of an HTTP 429 response for PostFederationFullSyncFile
+type PostFederationFullSyncFileResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// PostFederationFullSyncFileResponse503Headers the declared response headers of an HTTP 503 response for PostFederationFullSyncFile
+type PostFederationFullSyncFileResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type PostFederationFullSyncFileResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *PostFederationFullSyncFileResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *PostFederationFullSyncFileResponse503Headers
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r PostFederationFullSyncFileResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r PostFederationFullSyncFileResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PostFederationFullSyncFileResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r PostFederationFullSyncFileResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PostFederationFullSyncFileResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostFederationFullSyncFileResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostFederationFullSyncFileResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// PostFederationFullSyncSystemRepositoryResponse429Headers the declared response headers of an HTTP 429 response for PostFederationFullSyncSystemRepository
+type PostFederationFullSyncSystemRepositoryResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// PostFederationFullSyncSystemRepositoryResponse503Headers the declared response headers of an HTTP 503 response for PostFederationFullSyncSystemRepository
+type PostFederationFullSyncSystemRepositoryResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type PostFederationFullSyncSystemRepositoryResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *PostFederationFullSyncSystemRepositoryResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *PostFederationFullSyncSystemRepositoryResponse503Headers
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r PostFederationFullSyncSystemRepositoryResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r PostFederationFullSyncSystemRepositoryResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PostFederationFullSyncSystemRepositoryResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r PostFederationFullSyncSystemRepositoryResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PostFederationFullSyncSystemRepositoryResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostFederationFullSyncSystemRepositoryResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostFederationFullSyncSystemRepositoryResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// PostFederationGridTopologyEventsResponse429Headers the declared response headers of an HTTP 429 response for PostFederationGridTopologyEvents
+type PostFederationGridTopologyEventsResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// PostFederationGridTopologyEventsResponse503Headers the declared response headers of an HTTP 503 response for PostFederationGridTopologyEvents
+type PostFederationGridTopologyEventsResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type PostFederationGridTopologyEventsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *PostFederationGridTopologyEventsResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *PostFederationGridTopologyEventsResponse503Headers
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r PostFederationGridTopologyEventsResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r PostFederationGridTopologyEventsResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PostFederationGridTopologyEventsResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r PostFederationGridTopologyEventsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PostFederationGridTopologyEventsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostFederationGridTopologyEventsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostFederationGridTopologyEventsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // GetListOfInconsistentFederatedRepositoriesResponse429Headers the declared response headers of an HTTP 429 response for GetListOfInconsistentFederatedRepositories
 type GetListOfInconsistentFederatedRepositoriesResponse429Headers struct {
 	RateLimit       *string
@@ -50538,6 +54652,371 @@ func (r GetListOfInconsistentFederatedRepositoriesResponse) ContentType() string
 	return ""
 }
 
+// GetFederationLastIdInSystemResponse429Headers the declared response headers of an HTTP 429 response for GetFederationLastIdInSystem
+type GetFederationLastIdInSystemResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// GetFederationLastIdInSystemResponse503Headers the declared response headers of an HTTP 503 response for GetFederationLastIdInSystem
+type GetFederationLastIdInSystemResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type GetFederationLastIdInSystemResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *GetFederationLastIdInSystemResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *GetFederationLastIdInSystemResponse503Headers
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetFederationLastIdInSystemResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r GetFederationLastIdInSystemResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetFederationLastIdInSystemResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r GetFederationLastIdInSystemResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetFederationLastIdInSystemResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetFederationLastIdInSystemResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetFederationLastIdInSystemResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// EnableFederationInternalMemberResponse429Headers the declared response headers of an HTTP 429 response for EnableFederationInternalMember
+type EnableFederationInternalMemberResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// EnableFederationInternalMemberResponse503Headers the declared response headers of an HTTP 503 response for EnableFederationInternalMember
+type EnableFederationInternalMemberResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type EnableFederationInternalMemberResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *EnableFederationInternalMemberResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *EnableFederationInternalMemberResponse503Headers
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r EnableFederationInternalMemberResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r EnableFederationInternalMemberResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r EnableFederationInternalMemberResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r EnableFederationInternalMemberResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r EnableFederationInternalMemberResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r EnableFederationInternalMemberResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r EnableFederationInternalMemberResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// PostFederationInternalMetadataResponse429Headers the declared response headers of an HTTP 429 response for PostFederationInternalMetadata
+type PostFederationInternalMetadataResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// PostFederationInternalMetadataResponse503Headers the declared response headers of an HTTP 503 response for PostFederationInternalMetadata
+type PostFederationInternalMetadataResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type PostFederationInternalMetadataResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *PostFederationInternalMetadataResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *PostFederationInternalMetadataResponse503Headers
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r PostFederationInternalMetadataResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r PostFederationInternalMetadataResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PostFederationInternalMetadataResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r PostFederationInternalMetadataResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PostFederationInternalMetadataResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostFederationInternalMetadataResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostFederationInternalMetadataResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// PutFederationInternalMetadataResponse429Headers the declared response headers of an HTTP 429 response for PutFederationInternalMetadata
+type PutFederationInternalMetadataResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// PutFederationInternalMetadataResponse503Headers the declared response headers of an HTTP 503 response for PutFederationInternalMetadata
+type PutFederationInternalMetadataResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type PutFederationInternalMetadataResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *PutFederationInternalMetadataResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *PutFederationInternalMetadataResponse503Headers
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r PutFederationInternalMetadataResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r PutFederationInternalMetadataResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PutFederationInternalMetadataResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r PutFederationInternalMetadataResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PutFederationInternalMetadataResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PutFederationInternalMetadataResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PutFederationInternalMetadataResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// InvalidateFederationInternalMetadataResponse429Headers the declared response headers of an HTTP 429 response for InvalidateFederationInternalMetadata
+type InvalidateFederationInternalMetadataResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// InvalidateFederationInternalMetadataResponse503Headers the declared response headers of an HTTP 503 response for InvalidateFederationInternalMetadata
+type InvalidateFederationInternalMetadataResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type InvalidateFederationInternalMetadataResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *InvalidateFederationInternalMetadataResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *InvalidateFederationInternalMetadataResponse503Headers
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r InvalidateFederationInternalMetadataResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r InvalidateFederationInternalMetadataResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r InvalidateFederationInternalMetadataResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r InvalidateFederationInternalMetadataResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r InvalidateFederationInternalMetadataResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r InvalidateFederationInternalMetadataResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r InvalidateFederationInternalMetadataResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // ConvertLocalRepositoryToFederatedResponse429Headers the declared response headers of an HTTP 429 response for ConvertLocalRepositoryToFederated
 type ConvertLocalRepositoryToFederatedResponse429Headers struct {
 	RateLimit       *string
@@ -50626,6 +55105,385 @@ func (r ConvertLocalRepositoryToFederatedResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r ConvertLocalRepositoryToFederatedResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// PutFederationMigrationResponse429Headers the declared response headers of an HTTP 429 response for PutFederationMigration
+type PutFederationMigrationResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// PutFederationMigrationResponse503Headers the declared response headers of an HTTP 503 response for PutFederationMigration
+type PutFederationMigrationResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type PutFederationMigrationResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *PutFederationMigrationResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *PutFederationMigrationResponse503Headers
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r PutFederationMigrationResponse) GetJSON400() *ErrorResponse {
+	return r.JSON400
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r PutFederationMigrationResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PutFederationMigrationResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r PutFederationMigrationResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PutFederationMigrationResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PutFederationMigrationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PutFederationMigrationResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetFederationMigrationStatusResponse429Headers the declared response headers of an HTTP 429 response for GetFederationMigrationStatus
+type GetFederationMigrationStatusResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// GetFederationMigrationStatusResponse503Headers the declared response headers of an HTTP 503 response for GetFederationMigrationStatus
+type GetFederationMigrationStatusResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type GetFederationMigrationStatusResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *ErrorResponse
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *ErrorResponse
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *GetFederationMigrationStatusResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *GetFederationMigrationStatusResponse503Headers
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetFederationMigrationStatusResponse) GetJSON401() *ErrorResponse {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetFederationMigrationStatusResponse) GetJSON403() *ErrorResponse {
+	return r.JSON403
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r GetFederationMigrationStatusResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r GetFederationMigrationStatusResponse) GetJSON500() *ErrorResponse {
+	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetFederationMigrationStatusResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r GetFederationMigrationStatusResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetFederationMigrationStatusResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetFederationMigrationStatusResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetFederationMigrationStatusResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetFederationVerboseMigrationStatusResponse429Headers the declared response headers of an HTTP 429 response for GetFederationVerboseMigrationStatus
+type GetFederationVerboseMigrationStatusResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// GetFederationVerboseMigrationStatusResponse503Headers the declared response headers of an HTTP 503 response for GetFederationVerboseMigrationStatus
+type GetFederationVerboseMigrationStatusResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type GetFederationVerboseMigrationStatusResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *GetFederationVerboseMigrationStatusResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *GetFederationVerboseMigrationStatusResponse503Headers
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetFederationVerboseMigrationStatusResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r GetFederationVerboseMigrationStatusResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetFederationVerboseMigrationStatusResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r GetFederationVerboseMigrationStatusResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetFederationVerboseMigrationStatusResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetFederationVerboseMigrationStatusResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetFederationVerboseMigrationStatusResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// PutFederationVerboseMigrationStatusResponse429Headers the declared response headers of an HTTP 429 response for PutFederationVerboseMigrationStatus
+type PutFederationVerboseMigrationStatusResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// PutFederationVerboseMigrationStatusResponse503Headers the declared response headers of an HTTP 503 response for PutFederationVerboseMigrationStatus
+type PutFederationVerboseMigrationStatusResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type PutFederationVerboseMigrationStatusResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *PutFederationVerboseMigrationStatusResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *PutFederationVerboseMigrationStatusResponse503Headers
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r PutFederationVerboseMigrationStatusResponse) GetJSON400() *ErrorResponse {
+	return r.JSON400
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r PutFederationVerboseMigrationStatusResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PutFederationVerboseMigrationStatusResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r PutFederationVerboseMigrationStatusResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PutFederationVerboseMigrationStatusResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PutFederationVerboseMigrationStatusResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PutFederationVerboseMigrationStatusResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// DisableFederationNegotiationResponse429Headers the declared response headers of an HTTP 429 response for DisableFederationNegotiation
+type DisableFederationNegotiationResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// DisableFederationNegotiationResponse503Headers the declared response headers of an HTTP 503 response for DisableFederationNegotiation
+type DisableFederationNegotiationResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type DisableFederationNegotiationResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *DisableFederationNegotiationResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *DisableFederationNegotiationResponse503Headers
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r DisableFederationNegotiationResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r DisableFederationNegotiationResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r DisableFederationNegotiationResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r DisableFederationNegotiationResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DisableFederationNegotiationResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DisableFederationNegotiationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DisableFederationNegotiationResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -50828,6 +55686,663 @@ func (r PropagateCreationTimeMetadataDuringFullSyncResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r PropagateCreationTimeMetadataDuringFullSyncResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetFederationInternalPropertiesResponse429Headers the declared response headers of an HTTP 429 response for GetFederationInternalProperties
+type GetFederationInternalPropertiesResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// GetFederationInternalPropertiesResponse503Headers the declared response headers of an HTTP 503 response for GetFederationInternalProperties
+type GetFederationInternalPropertiesResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type GetFederationInternalPropertiesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *GetFederationInternalPropertiesResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *GetFederationInternalPropertiesResponse503Headers
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetFederationInternalPropertiesResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r GetFederationInternalPropertiesResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetFederationInternalPropertiesResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r GetFederationInternalPropertiesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetFederationInternalPropertiesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetFederationInternalPropertiesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetFederationInternalPropertiesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetFederationInternalPropertyResponse429Headers the declared response headers of an HTTP 429 response for GetFederationInternalProperty
+type GetFederationInternalPropertyResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// GetFederationInternalPropertyResponse503Headers the declared response headers of an HTTP 503 response for GetFederationInternalProperty
+type GetFederationInternalPropertyResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type GetFederationInternalPropertyResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *GetFederationInternalPropertyResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *GetFederationInternalPropertyResponse503Headers
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetFederationInternalPropertyResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r GetFederationInternalPropertyResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetFederationInternalPropertyResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r GetFederationInternalPropertyResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetFederationInternalPropertyResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetFederationInternalPropertyResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetFederationInternalPropertyResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// DeregisterFederationQueueResponse429Headers the declared response headers of an HTTP 429 response for DeregisterFederationQueue
+type DeregisterFederationQueueResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// DeregisterFederationQueueResponse503Headers the declared response headers of an HTTP 503 response for DeregisterFederationQueue
+type DeregisterFederationQueueResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type DeregisterFederationQueueResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *DeregisterFederationQueueResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *DeregisterFederationQueueResponse503Headers
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r DeregisterFederationQueueResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r DeregisterFederationQueueResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r DeregisterFederationQueueResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r DeregisterFederationQueueResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeregisterFederationQueueResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeregisterFederationQueueResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeregisterFederationQueueResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetFederationQueueRemainingResponse429Headers the declared response headers of an HTTP 429 response for GetFederationQueueRemaining
+type GetFederationQueueRemainingResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// GetFederationQueueRemainingResponse503Headers the declared response headers of an HTTP 503 response for GetFederationQueueRemaining
+type GetFederationQueueRemainingResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type GetFederationQueueRemainingResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *GetFederationQueueRemainingResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *GetFederationQueueRemainingResponse503Headers
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetFederationQueueRemainingResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r GetFederationQueueRemainingResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetFederationQueueRemainingResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r GetFederationQueueRemainingResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetFederationQueueRemainingResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetFederationQueueRemainingResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetFederationQueueRemainingResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ResetFederationQueueResponse429Headers the declared response headers of an HTTP 429 response for ResetFederationQueue
+type ResetFederationQueueResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// ResetFederationQueueResponse503Headers the declared response headers of an HTTP 503 response for ResetFederationQueue
+type ResetFederationQueueResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type ResetFederationQueueResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *ResetFederationQueueResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *ResetFederationQueueResponse503Headers
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r ResetFederationQueueResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r ResetFederationQueueResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r ResetFederationQueueResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r ResetFederationQueueResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ResetFederationQueueResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ResetFederationQueueResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ResetFederationQueueResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetFederationQueueStateResponse429Headers the declared response headers of an HTTP 429 response for GetFederationQueueState
+type GetFederationQueueStateResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// GetFederationQueueStateResponse503Headers the declared response headers of an HTTP 503 response for GetFederationQueueState
+type GetFederationQueueStateResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type GetFederationQueueStateResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *GetFederationQueueStateResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *GetFederationQueueStateResponse503Headers
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetFederationQueueStateResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r GetFederationQueueStateResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetFederationQueueStateResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r GetFederationQueueStateResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetFederationQueueStateResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetFederationQueueStateResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetFederationQueueStateResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// PutFederationQueueStateResponse429Headers the declared response headers of an HTTP 429 response for PutFederationQueueState
+type PutFederationQueueStateResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// PutFederationQueueStateResponse503Headers the declared response headers of an HTTP 503 response for PutFederationQueueState
+type PutFederationQueueStateResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type PutFederationQueueStateResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *PutFederationQueueStateResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *PutFederationQueueStateResponse503Headers
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r PutFederationQueueStateResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r PutFederationQueueStateResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PutFederationQueueStateResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r PutFederationQueueStateResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PutFederationQueueStateResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PutFederationQueueStateResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PutFederationQueueStateResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// StopFederationQueueResponse429Headers the declared response headers of an HTTP 429 response for StopFederationQueue
+type StopFederationQueueResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// StopFederationQueueResponse503Headers the declared response headers of an HTTP 503 response for StopFederationQueue
+type StopFederationQueueResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type StopFederationQueueResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *StopFederationQueueResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *StopFederationQueueResponse503Headers
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r StopFederationQueueResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r StopFederationQueueResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r StopFederationQueueResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r StopFederationQueueResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r StopFederationQueueResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r StopFederationQueueResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r StopFederationQueueResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetFederationRepositoryReadyResponse429Headers the declared response headers of an HTTP 429 response for GetFederationRepositoryReady
+type GetFederationRepositoryReadyResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// GetFederationRepositoryReadyResponse503Headers the declared response headers of an HTTP 503 response for GetFederationRepositoryReady
+type GetFederationRepositoryReadyResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type GetFederationRepositoryReadyResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *GetFederationRepositoryReadyResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *GetFederationRepositoryReadyResponse503Headers
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetFederationRepositoryReadyResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r GetFederationRepositoryReadyResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetFederationRepositoryReadyResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r GetFederationRepositoryReadyResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetFederationRepositoryReadyResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetFederationRepositoryReadyResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetFederationRepositoryReadyResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -51224,6 +56739,458 @@ func (r ReplaceFederatedMemberBaseUrlResponse) ContentType() string {
 	return ""
 }
 
+// GetFederationRepositoryExistsResponse429Headers the declared response headers of an HTTP 429 response for GetFederationRepositoryExists
+type GetFederationRepositoryExistsResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// GetFederationRepositoryExistsResponse503Headers the declared response headers of an HTTP 503 response for GetFederationRepositoryExists
+type GetFederationRepositoryExistsResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type GetFederationRepositoryExistsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *GetFederationRepositoryExistsResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *GetFederationRepositoryExistsResponse503Headers
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetFederationRepositoryExistsResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r GetFederationRepositoryExistsResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetFederationRepositoryExistsResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r GetFederationRepositoryExistsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetFederationRepositoryExistsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetFederationRepositoryExistsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetFederationRepositoryExistsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetFederationInternalRepositoriesResponse429Headers the declared response headers of an HTTP 429 response for GetFederationInternalRepositories
+type GetFederationInternalRepositoriesResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// GetFederationInternalRepositoriesResponse503Headers the declared response headers of an HTTP 503 response for GetFederationInternalRepositories
+type GetFederationInternalRepositoriesResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type GetFederationInternalRepositoriesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *GetFederationInternalRepositoriesResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *GetFederationInternalRepositoriesResponse503Headers
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetFederationInternalRepositoriesResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r GetFederationInternalRepositoriesResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetFederationInternalRepositoriesResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r GetFederationInternalRepositoriesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetFederationInternalRepositoriesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetFederationInternalRepositoriesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetFederationInternalRepositoriesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// EnableFederationInternalRepositoriesResponse429Headers the declared response headers of an HTTP 429 response for EnableFederationInternalRepositories
+type EnableFederationInternalRepositoriesResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// EnableFederationInternalRepositoriesResponse503Headers the declared response headers of an HTTP 503 response for EnableFederationInternalRepositories
+type EnableFederationInternalRepositoriesResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type EnableFederationInternalRepositoriesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *EnableFederationInternalRepositoriesResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *EnableFederationInternalRepositoriesResponse503Headers
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r EnableFederationInternalRepositoriesResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r EnableFederationInternalRepositoriesResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r EnableFederationInternalRepositoriesResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r EnableFederationInternalRepositoriesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r EnableFederationInternalRepositoriesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r EnableFederationInternalRepositoriesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r EnableFederationInternalRepositoriesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetFederationServiceConnectionResponse429Headers the declared response headers of an HTTP 429 response for GetFederationServiceConnection
+type GetFederationServiceConnectionResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// GetFederationServiceConnectionResponse503Headers the declared response headers of an HTTP 503 response for GetFederationServiceConnection
+type GetFederationServiceConnectionResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type GetFederationServiceConnectionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *ErrorResponse
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *ErrorResponse
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *GetFederationServiceConnectionResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *GetFederationServiceConnectionResponse503Headers
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetFederationServiceConnectionResponse) GetJSON401() *ErrorResponse {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetFederationServiceConnectionResponse) GetJSON403() *ErrorResponse {
+	return r.JSON403
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r GetFederationServiceConnectionResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r GetFederationServiceConnectionResponse) GetJSON500() *ErrorResponse {
+	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetFederationServiceConnectionResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r GetFederationServiceConnectionResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetFederationServiceConnectionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetFederationServiceConnectionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetFederationServiceConnectionResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// PutFederationServiceConnectionResponse429Headers the declared response headers of an HTTP 429 response for PutFederationServiceConnection
+type PutFederationServiceConnectionResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// PutFederationServiceConnectionResponse503Headers the declared response headers of an HTTP 503 response for PutFederationServiceConnection
+type PutFederationServiceConnectionResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type PutFederationServiceConnectionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *PutFederationServiceConnectionResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *PutFederationServiceConnectionResponse503Headers
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r PutFederationServiceConnectionResponse) GetJSON400() *ErrorResponse {
+	return r.JSON400
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r PutFederationServiceConnectionResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PutFederationServiceConnectionResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r PutFederationServiceConnectionResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PutFederationServiceConnectionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PutFederationServiceConnectionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PutFederationServiceConnectionResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// SnapshotFederationRepositoriesResponse429Headers the declared response headers of an HTTP 429 response for SnapshotFederationRepositories
+type SnapshotFederationRepositoriesResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// SnapshotFederationRepositoriesResponse503Headers the declared response headers of an HTTP 503 response for SnapshotFederationRepositories
+type SnapshotFederationRepositoriesResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type SnapshotFederationRepositoriesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *SnapshotFederationRepositoriesResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *SnapshotFederationRepositoriesResponse503Headers
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r SnapshotFederationRepositoriesResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r SnapshotFederationRepositoriesResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r SnapshotFederationRepositoriesResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r SnapshotFederationRepositoriesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SnapshotFederationRepositoriesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SnapshotFederationRepositoriesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SnapshotFederationRepositoriesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // GetFederationSyncStateResponse429Headers the declared response headers of an HTTP 429 response for GetFederationSyncState
 type GetFederationSyncStateResponse429Headers struct {
 	RateLimit       *string
@@ -51349,6 +57316,79 @@ func (r GetFederationSyncStateResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r GetFederationSyncStateResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetFederationInternalStatusResponse429Headers the declared response headers of an HTTP 429 response for GetFederationInternalStatus
+type GetFederationInternalStatusResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// GetFederationInternalStatusResponse503Headers the declared response headers of an HTTP 503 response for GetFederationInternalStatus
+type GetFederationInternalStatusResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type GetFederationInternalStatusResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *GetFederationInternalStatusResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *GetFederationInternalStatusResponse503Headers
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetFederationInternalStatusResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r GetFederationInternalStatusResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetFederationInternalStatusResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r GetFederationInternalStatusResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetFederationInternalStatusResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetFederationInternalStatusResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetFederationInternalStatusResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -51624,61 +57664,7 @@ type GetFederatedRepositoryStatusResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *struct {
-		// BinariesTasksInfo Optional within this object. Binary transfer tasks for the repository.
-		BinariesTasksInfo *struct {
-			// FailingTasks Optional within this object. Tasks that exhausted their retries (ten by default).
-			FailingTasks *int `json:"failingTasks,omitempty"`
-
-			// InProgressTasks Optional within this object. Tasks in flight or waiting to be retried.
-			InProgressTasks *int `json:"inProgressTasks,omitempty"`
-		} `json:"binariesTasksInfo,omitempty"`
-
-		// FederatedArtifactStatus Optional within this object. Artifact replication counts on this instance: artifacts replicated with metadata and binary, and artifacts whose metadata arrived but whose binary has not.
-		FederatedArtifactStatus *struct {
-			// FullyReplicatedArtifacts Optional within this object. Artifacts with both metadata and binary present.
-			FullyReplicatedArtifacts *int64 `json:"fullyReplicatedArtifacts,omitempty"`
-
-			// MetadataOnlyArtifacts Optional within this object. Artifacts whose binary is still being fetched.
-			MetadataOnlyArtifacts *int64 `json:"metadataOnlyArtifacts,omitempty"`
-		} `json:"federatedArtifactStatus,omitempty"`
-
-		// LocalKey Optional within this object. Repository key on this instance.
-		LocalKey *string `json:"localKey,omitempty"`
-
-		// MirrorEventsStatusInfo Optional within this object. Event delivery state per target mirror.
-		MirrorEventsStatusInfo *[]struct {
-			// CreateEvents Optional within this object. Create events waiting to be sent.
-			CreateEvents *int64 `json:"createEvents,omitempty"`
-
-			// DeleteEvents Optional within this object. Delete events waiting to be sent.
-			DeleteEvents *int64 `json:"deleteEvents,omitempty"`
-
-			// ErrorEvents Optional within this object. Events that failed during sync.
-			ErrorEvents *int64 `json:"errorEvents,omitempty"`
-
-			// EventRegistrationTimeStamp Optional within this object. When the mirror next registers with its target, in epoch milliseconds. Same name as the mirror lag operation.
-			EventRegistrationTimeStamp *int64 `json:"eventRegistrationTimeStamp,omitempty"`
-
-			// LagInMS Optional within this object. Mirror latency: now minus the time of the oldest event not yet handled, in milliseconds. Same name and meaning as the mirror lag operation.
-			LagInMS *int64 `json:"lagInMS,omitempty"`
-
-			// PropertiesEvents Optional within this object. Property change events waiting to be sent.
-			PropertiesEvents *int64 `json:"propertiesEvents,omitempty"`
-
-			// RemoteRepoKey Optional within this object. Repository key on the target mirror.
-			RemoteRepoKey *string `json:"remoteRepoKey,omitempty"`
-
-			// RemoteUrl Optional within this object. Base URL of the target mirror's instance.
-			RemoteUrl *string `json:"remoteUrl,omitempty"`
-
-			// Status Optional within this object. Whether the mirror is in sync. Version 1 reports SYNCED or OUT_OF_SYNC; version 2 reports the member states (HEALTHY, PENDING_FS, FULL_SYNC_RUNNING, ERROR_GENERIC, ERROR_INACTIVE, ERROR_OUT_OF_SYNC, READ_ONLY, IMPORT_IN_PROGRESS).
-			Status *string `json:"status,omitempty"`
-
-			// UpdateEvents Optional within this object. Update events waiting to be sent.
-			UpdateEvents *int64 `json:"updateEvents,omitempty"`
-		} `json:"mirrorEventsStatusInfo,omitempty"`
-	}
+	JSON200 *FederatedRepositoryStatus
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *ErrorResponse
 	// JSON403 the response for an HTTP 403 `application/json` response
@@ -51700,61 +57686,7 @@ type GetFederatedRepositoryStatusResponse struct {
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r GetFederatedRepositoryStatusResponse) GetJSON200() *struct {
-	// BinariesTasksInfo Optional within this object. Binary transfer tasks for the repository.
-	BinariesTasksInfo *struct {
-		// FailingTasks Optional within this object. Tasks that exhausted their retries (ten by default).
-		FailingTasks *int `json:"failingTasks,omitempty"`
-
-		// InProgressTasks Optional within this object. Tasks in flight or waiting to be retried.
-		InProgressTasks *int `json:"inProgressTasks,omitempty"`
-	} `json:"binariesTasksInfo,omitempty"`
-
-	// FederatedArtifactStatus Optional within this object. Artifact replication counts on this instance: artifacts replicated with metadata and binary, and artifacts whose metadata arrived but whose binary has not.
-	FederatedArtifactStatus *struct {
-		// FullyReplicatedArtifacts Optional within this object. Artifacts with both metadata and binary present.
-		FullyReplicatedArtifacts *int64 `json:"fullyReplicatedArtifacts,omitempty"`
-
-		// MetadataOnlyArtifacts Optional within this object. Artifacts whose binary is still being fetched.
-		MetadataOnlyArtifacts *int64 `json:"metadataOnlyArtifacts,omitempty"`
-	} `json:"federatedArtifactStatus,omitempty"`
-
-	// LocalKey Optional within this object. Repository key on this instance.
-	LocalKey *string `json:"localKey,omitempty"`
-
-	// MirrorEventsStatusInfo Optional within this object. Event delivery state per target mirror.
-	MirrorEventsStatusInfo *[]struct {
-		// CreateEvents Optional within this object. Create events waiting to be sent.
-		CreateEvents *int64 `json:"createEvents,omitempty"`
-
-		// DeleteEvents Optional within this object. Delete events waiting to be sent.
-		DeleteEvents *int64 `json:"deleteEvents,omitempty"`
-
-		// ErrorEvents Optional within this object. Events that failed during sync.
-		ErrorEvents *int64 `json:"errorEvents,omitempty"`
-
-		// EventRegistrationTimeStamp Optional within this object. When the mirror next registers with its target, in epoch milliseconds. Same name as the mirror lag operation.
-		EventRegistrationTimeStamp *int64 `json:"eventRegistrationTimeStamp,omitempty"`
-
-		// LagInMS Optional within this object. Mirror latency: now minus the time of the oldest event not yet handled, in milliseconds. Same name and meaning as the mirror lag operation.
-		LagInMS *int64 `json:"lagInMS,omitempty"`
-
-		// PropertiesEvents Optional within this object. Property change events waiting to be sent.
-		PropertiesEvents *int64 `json:"propertiesEvents,omitempty"`
-
-		// RemoteRepoKey Optional within this object. Repository key on the target mirror.
-		RemoteRepoKey *string `json:"remoteRepoKey,omitempty"`
-
-		// RemoteUrl Optional within this object. Base URL of the target mirror's instance.
-		RemoteUrl *string `json:"remoteUrl,omitempty"`
-
-		// Status Optional within this object. Whether the mirror is in sync. Version 1 reports SYNCED or OUT_OF_SYNC; version 2 reports the member states (HEALTHY, PENDING_FS, FULL_SYNC_RUNNING, ERROR_GENERIC, ERROR_INACTIVE, ERROR_OUT_OF_SYNC, READ_ONLY, IMPORT_IN_PROGRESS).
-		Status *string `json:"status,omitempty"`
-
-		// UpdateEvents Optional within this object. Update events waiting to be sent.
-		UpdateEvents *int64 `json:"updateEvents,omitempty"`
-	} `json:"mirrorEventsStatusInfo,omitempty"`
-} {
+func (r GetFederatedRepositoryStatusResponse) GetJSON200() *FederatedRepositoryStatus {
 	return r.JSON200
 }
 
@@ -51816,6 +57748,121 @@ func (r GetFederatedRepositoryStatusResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r GetFederatedRepositoryStatusResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetFederatedRepositoryStatusProjectionResponse429Headers the declared response headers of an HTTP 429 response for GetFederatedRepositoryStatusProjection
+type GetFederatedRepositoryStatusProjectionResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// GetFederatedRepositoryStatusProjectionResponse503Headers the declared response headers of an HTTP 503 response for GetFederatedRepositoryStatusProjection
+type GetFederatedRepositoryStatusProjectionResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type GetFederatedRepositoryStatusProjectionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *FederatedRepositoryStatus
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ErrorResponse
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *ErrorResponse
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *ErrorResponse
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON405 the response for an HTTP 405 `application/json` response
+	JSON405 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *ErrorResponse
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *GetFederatedRepositoryStatusProjectionResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *GetFederatedRepositoryStatusProjectionResponse503Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetFederatedRepositoryStatusProjectionResponse) GetJSON200() *FederatedRepositoryStatus {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r GetFederatedRepositoryStatusProjectionResponse) GetJSON400() *ErrorResponse {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetFederatedRepositoryStatusProjectionResponse) GetJSON401() *ErrorResponse {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetFederatedRepositoryStatusProjectionResponse) GetJSON403() *ErrorResponse {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetFederatedRepositoryStatusProjectionResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON405 returns the response for an HTTP 405 `application/json` response
+func (r GetFederatedRepositoryStatusProjectionResponse) GetJSON405() *ErrorResponse {
+	return r.JSON405
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r GetFederatedRepositoryStatusProjectionResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r GetFederatedRepositoryStatusProjectionResponse) GetJSON500() *ErrorResponse {
+	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetFederatedRepositoryStatusProjectionResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r GetFederatedRepositoryStatusProjectionResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetFederatedRepositoryStatusProjectionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetFederatedRepositoryStatusProjectionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetFederatedRepositoryStatusProjectionResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -51948,39 +57995,9 @@ type GetFederationStateDetailsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *struct {
-		// Federations Optional within this object. One entry per federated repository.
-		Federations *[]struct {
-			// LocalRepoKey Optional within this object. Repository key on this instance.
-			LocalRepoKey *string `json:"localRepoKey,omitempty"`
-
-			// MemberInfoList Optional within this object. The members and their state.
-			MemberInfoList *[]struct {
-				// AggregatedStatus Optional within this object. The member's state, one of those counted by the state summary operation.
-				AggregatedStatus *string `json:"aggregatedStatus,omitempty"`
-
-				// IsDisabled Optional within this object. True when sync to this member is turned off.
-				IsDisabled *bool `json:"isDisabled,omitempty"`
-
-				// IsInLag Optional within this object. True when the member's oldest undelivered event is older than the lag threshold.
-				IsInLag *bool `json:"isInLag,omitempty"`
-
-				// IsSupported Optional within this object. False when the member's sync protocol version is incompatible.
-				IsSupported *bool `json:"isSupported,omitempty"`
-
-				// RepoKey Optional within this object. Repository key on the member.
-				RepoKey *string `json:"repoKey,omitempty"`
-
-				// Url Optional within this object. Base URL of the member instance.
-				Url *string `json:"url,omitempty"`
-			} `json:"memberInfoList,omitempty"`
-
-			// Priority Optional within this object. Queue priority of the repository, `HIGH` or `STANDARD`.
-			Priority *GetFederationStateDetails200JSONResponseBodyFederationsPriority `json:"priority,omitempty"`
-		} `json:"federations,omitempty"`
-	}
+	JSON200 *FederationStateList
 	// JSON400 the response for an HTTP 400 `application/json` response
-	JSON400 *ErrorResponse
+	JSON400 *GetFederationStateDetails400JSONResponseBody
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *ErrorResponse
 	// JSON403 the response for an HTTP 403 `application/json` response
@@ -52000,42 +58017,12 @@ type GetFederationStateDetailsResponse struct {
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r GetFederationStateDetailsResponse) GetJSON200() *struct {
-	// Federations Optional within this object. One entry per federated repository.
-	Federations *[]struct {
-		// LocalRepoKey Optional within this object. Repository key on this instance.
-		LocalRepoKey *string `json:"localRepoKey,omitempty"`
-
-		// MemberInfoList Optional within this object. The members and their state.
-		MemberInfoList *[]struct {
-			// AggregatedStatus Optional within this object. The member's state, one of those counted by the state summary operation.
-			AggregatedStatus *string `json:"aggregatedStatus,omitempty"`
-
-			// IsDisabled Optional within this object. True when sync to this member is turned off.
-			IsDisabled *bool `json:"isDisabled,omitempty"`
-
-			// IsInLag Optional within this object. True when the member's oldest undelivered event is older than the lag threshold.
-			IsInLag *bool `json:"isInLag,omitempty"`
-
-			// IsSupported Optional within this object. False when the member's sync protocol version is incompatible.
-			IsSupported *bool `json:"isSupported,omitempty"`
-
-			// RepoKey Optional within this object. Repository key on the member.
-			RepoKey *string `json:"repoKey,omitempty"`
-
-			// Url Optional within this object. Base URL of the member instance.
-			Url *string `json:"url,omitempty"`
-		} `json:"memberInfoList,omitempty"`
-
-		// Priority Optional within this object. Queue priority of the repository, `HIGH` or `STANDARD`.
-		Priority *GetFederationStateDetails200JSONResponseBodyFederationsPriority `json:"priority,omitempty"`
-	} `json:"federations,omitempty"`
-} {
+func (r GetFederationStateDetailsResponse) GetJSON200() *FederationStateList {
 	return r.JSON200
 }
 
 // GetJSON400 returns the response for an HTTP 400 `application/json` response
-func (r GetFederationStateDetailsResponse) GetJSON400() *ErrorResponse {
+func (r GetFederationStateDetailsResponse) GetJSON400() *GetFederationStateDetails400JSONResponseBody {
 	return r.JSON400
 }
 
@@ -52116,33 +58103,9 @@ type GetFederationStateSummariesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *struct {
-		// FederationStates Optional within this object. Number of members in each state.
-		FederationStates *struct {
-			// DELAYED Optional within this object. Members whose events wait longer than the lag threshold.
-			DELAYED *int64 `json:"DELAYED,omitempty"`
-
-			// DISABLED Optional within this object. Members with sync turned off.
-			DISABLED *int64 `json:"DISABLED,omitempty"`
-
-			// ERROR Optional within this object. Members whose events fail after every retry.
-			ERROR *int64 `json:"ERROR,omitempty"`
-
-			// FULLSYNCRUNNING Optional within this object. Members in a full sync.
-			FULLSYNCRUNNING *int64 `json:"FULL_SYNC_RUNNING,omitempty"`
-
-			// HEALTHY Optional within this object. Members receiving events promptly.
-			HEALTHY *int64 `json:"HEALTHY,omitempty"`
-
-			// NOTAVAILABLE Optional within this object. Members that cannot be reached.
-			NOTAVAILABLE *int64 `json:"NOT_AVAILABLE,omitempty"`
-
-			// PENDINGFS Optional within this object. Members waiting for a full sync, for example right after joining.
-			PENDINGFS *int64 `json:"PENDING_FS,omitempty"`
-		} `json:"federationStates,omitempty"`
-	}
+	JSON200 *FederationStateSummary
 	// JSON400 the response for an HTTP 400 `application/json` response
-	JSON400 *ErrorResponse
+	JSON400 *GetFederationStateSummaries400JSONResponseBody
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *ErrorResponse
 	// JSON403 the response for an HTTP 403 `application/json` response
@@ -52162,36 +58125,12 @@ type GetFederationStateSummariesResponse struct {
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r GetFederationStateSummariesResponse) GetJSON200() *struct {
-	// FederationStates Optional within this object. Number of members in each state.
-	FederationStates *struct {
-		// DELAYED Optional within this object. Members whose events wait longer than the lag threshold.
-		DELAYED *int64 `json:"DELAYED,omitempty"`
-
-		// DISABLED Optional within this object. Members with sync turned off.
-		DISABLED *int64 `json:"DISABLED,omitempty"`
-
-		// ERROR Optional within this object. Members whose events fail after every retry.
-		ERROR *int64 `json:"ERROR,omitempty"`
-
-		// FULLSYNCRUNNING Optional within this object. Members in a full sync.
-		FULLSYNCRUNNING *int64 `json:"FULL_SYNC_RUNNING,omitempty"`
-
-		// HEALTHY Optional within this object. Members receiving events promptly.
-		HEALTHY *int64 `json:"HEALTHY,omitempty"`
-
-		// NOTAVAILABLE Optional within this object. Members that cannot be reached.
-		NOTAVAILABLE *int64 `json:"NOT_AVAILABLE,omitempty"`
-
-		// PENDINGFS Optional within this object. Members waiting for a full sync, for example right after joining.
-		PENDINGFS *int64 `json:"PENDING_FS,omitempty"`
-	} `json:"federationStates,omitempty"`
-} {
+func (r GetFederationStateSummariesResponse) GetJSON200() *FederationStateSummary {
 	return r.JSON200
 }
 
 // GetJSON400 returns the response for an HTTP 400 `application/json` response
-func (r GetFederationStateSummariesResponse) GetJSON400() *ErrorResponse {
+func (r GetFederationStateSummariesResponse) GetJSON400() *GetFederationStateSummaries400JSONResponseBody {
 	return r.JSON400
 }
 
@@ -52379,6 +58318,152 @@ func (r GetUnavailableMirrorsResponse) ContentType() string {
 	return ""
 }
 
+// SubmitFederationInternalTaskResponse429Headers the declared response headers of an HTTP 429 response for SubmitFederationInternalTask
+type SubmitFederationInternalTaskResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// SubmitFederationInternalTaskResponse503Headers the declared response headers of an HTTP 503 response for SubmitFederationInternalTask
+type SubmitFederationInternalTaskResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type SubmitFederationInternalTaskResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *SubmitFederationInternalTaskResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *SubmitFederationInternalTaskResponse503Headers
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r SubmitFederationInternalTaskResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r SubmitFederationInternalTaskResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r SubmitFederationInternalTaskResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r SubmitFederationInternalTaskResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SubmitFederationInternalTaskResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SubmitFederationInternalTaskResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SubmitFederationInternalTaskResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetFederationTenantMoveStatusResponse429Headers the declared response headers of an HTTP 429 response for GetFederationTenantMoveStatus
+type GetFederationTenantMoveStatusResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// GetFederationTenantMoveStatusResponse503Headers the declared response headers of an HTTP 503 response for GetFederationTenantMoveStatus
+type GetFederationTenantMoveStatusResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type GetFederationTenantMoveStatusResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *GetFederationTenantMoveStatusResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *GetFederationTenantMoveStatusResponse503Headers
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetFederationTenantMoveStatusResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r GetFederationTenantMoveStatusResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetFederationTenantMoveStatusResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r GetFederationTenantMoveStatusResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetFederationTenantMoveStatusResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetFederationTenantMoveStatusResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetFederationTenantMoveStatusResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // UpdateFederatedMemberUrlResponse429Headers the declared response headers of an HTTP 429 response for UpdateFederatedMemberUrl
 type UpdateFederatedMemberUrlResponse429Headers struct {
 	RateLimit       *string
@@ -52467,6 +58552,79 @@ func (r UpdateFederatedMemberUrlResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r UpdateFederatedMemberUrlResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ValidateFederationRepositoryResponse429Headers the declared response headers of an HTTP 429 response for ValidateFederationRepository
+type ValidateFederationRepositoryResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// ValidateFederationRepositoryResponse503Headers the declared response headers of an HTTP 503 response for ValidateFederationRepository
+type ValidateFederationRepositoryResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type ValidateFederationRepositoryResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *ValidateFederationRepositoryResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *ValidateFederationRepositoryResponse503Headers
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r ValidateFederationRepositoryResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r ValidateFederationRepositoryResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r ValidateFederationRepositoryResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r ValidateFederationRepositoryResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ValidateFederationRepositoryResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ValidateFederationRepositoryResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ValidateFederationRepositoryResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -70365,61 +76523,7 @@ type GetFederatedRepositoryStatusV2Response struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *struct {
-		// BinariesTasksInfo Optional within this object. Binary transfer tasks for the repository.
-		BinariesTasksInfo *struct {
-			// FailingTasks Optional within this object. Tasks that exhausted their retries (ten by default).
-			FailingTasks *int `json:"failingTasks,omitempty"`
-
-			// InProgressTasks Optional within this object. Tasks in flight or waiting to be retried.
-			InProgressTasks *int `json:"inProgressTasks,omitempty"`
-		} `json:"binariesTasksInfo,omitempty"`
-
-		// FederatedArtifactStatus Optional within this object. Artifact replication counts on this instance: artifacts replicated with metadata and binary, and artifacts whose metadata arrived but whose binary has not.
-		FederatedArtifactStatus *struct {
-			// FullyReplicatedArtifacts Optional within this object. Artifacts with both metadata and binary present.
-			FullyReplicatedArtifacts *int64 `json:"fullyReplicatedArtifacts,omitempty"`
-
-			// MetadataOnlyArtifacts Optional within this object. Artifacts whose binary is still being fetched.
-			MetadataOnlyArtifacts *int64 `json:"metadataOnlyArtifacts,omitempty"`
-		} `json:"federatedArtifactStatus,omitempty"`
-
-		// LocalKey Optional within this object. Repository key on this instance.
-		LocalKey *string `json:"localKey,omitempty"`
-
-		// MirrorEventsStatusInfo Optional within this object. Event delivery state per target mirror.
-		MirrorEventsStatusInfo *[]struct {
-			// CreateEvents Optional within this object. Create events waiting to be sent.
-			CreateEvents *int64 `json:"createEvents,omitempty"`
-
-			// DeleteEvents Optional within this object. Delete events waiting to be sent.
-			DeleteEvents *int64 `json:"deleteEvents,omitempty"`
-
-			// ErrorEvents Optional within this object. Events that failed during sync.
-			ErrorEvents *int64 `json:"errorEvents,omitempty"`
-
-			// EventRegistrationTimeStamp Optional within this object. When the mirror next registers with its target, in epoch milliseconds. Same name as the mirror lag operation.
-			EventRegistrationTimeStamp *int64 `json:"eventRegistrationTimeStamp,omitempty"`
-
-			// LagInMS Optional within this object. Mirror latency: now minus the time of the oldest event not yet handled, in milliseconds. Same name and meaning as the mirror lag operation.
-			LagInMS *int64 `json:"lagInMS,omitempty"`
-
-			// PropertiesEvents Optional within this object. Property change events waiting to be sent.
-			PropertiesEvents *int64 `json:"propertiesEvents,omitempty"`
-
-			// RemoteRepoKey Optional within this object. Repository key on the target mirror.
-			RemoteRepoKey *string `json:"remoteRepoKey,omitempty"`
-
-			// RemoteUrl Optional within this object. Base URL of the target mirror's instance.
-			RemoteUrl *string `json:"remoteUrl,omitempty"`
-
-			// Status Optional within this object. Whether the mirror is in sync. Version 1 reports SYNCED or OUT_OF_SYNC; version 2 reports the member states (HEALTHY, PENDING_FS, FULL_SYNC_RUNNING, ERROR_GENERIC, ERROR_INACTIVE, ERROR_OUT_OF_SYNC, READ_ONLY, IMPORT_IN_PROGRESS).
-			Status *string `json:"status,omitempty"`
-
-			// UpdateEvents Optional within this object. Update events waiting to be sent.
-			UpdateEvents *int64 `json:"updateEvents,omitempty"`
-		} `json:"mirrorEventsStatusInfo,omitempty"`
-	}
+	JSON200 *FederatedRepositoryStatus
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *ErrorResponse
 	// JSON403 the response for an HTTP 403 `application/json` response
@@ -70441,61 +76545,7 @@ type GetFederatedRepositoryStatusV2Response struct {
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r GetFederatedRepositoryStatusV2Response) GetJSON200() *struct {
-	// BinariesTasksInfo Optional within this object. Binary transfer tasks for the repository.
-	BinariesTasksInfo *struct {
-		// FailingTasks Optional within this object. Tasks that exhausted their retries (ten by default).
-		FailingTasks *int `json:"failingTasks,omitempty"`
-
-		// InProgressTasks Optional within this object. Tasks in flight or waiting to be retried.
-		InProgressTasks *int `json:"inProgressTasks,omitempty"`
-	} `json:"binariesTasksInfo,omitempty"`
-
-	// FederatedArtifactStatus Optional within this object. Artifact replication counts on this instance: artifacts replicated with metadata and binary, and artifacts whose metadata arrived but whose binary has not.
-	FederatedArtifactStatus *struct {
-		// FullyReplicatedArtifacts Optional within this object. Artifacts with both metadata and binary present.
-		FullyReplicatedArtifacts *int64 `json:"fullyReplicatedArtifacts,omitempty"`
-
-		// MetadataOnlyArtifacts Optional within this object. Artifacts whose binary is still being fetched.
-		MetadataOnlyArtifacts *int64 `json:"metadataOnlyArtifacts,omitempty"`
-	} `json:"federatedArtifactStatus,omitempty"`
-
-	// LocalKey Optional within this object. Repository key on this instance.
-	LocalKey *string `json:"localKey,omitempty"`
-
-	// MirrorEventsStatusInfo Optional within this object. Event delivery state per target mirror.
-	MirrorEventsStatusInfo *[]struct {
-		// CreateEvents Optional within this object. Create events waiting to be sent.
-		CreateEvents *int64 `json:"createEvents,omitempty"`
-
-		// DeleteEvents Optional within this object. Delete events waiting to be sent.
-		DeleteEvents *int64 `json:"deleteEvents,omitempty"`
-
-		// ErrorEvents Optional within this object. Events that failed during sync.
-		ErrorEvents *int64 `json:"errorEvents,omitempty"`
-
-		// EventRegistrationTimeStamp Optional within this object. When the mirror next registers with its target, in epoch milliseconds. Same name as the mirror lag operation.
-		EventRegistrationTimeStamp *int64 `json:"eventRegistrationTimeStamp,omitempty"`
-
-		// LagInMS Optional within this object. Mirror latency: now minus the time of the oldest event not yet handled, in milliseconds. Same name and meaning as the mirror lag operation.
-		LagInMS *int64 `json:"lagInMS,omitempty"`
-
-		// PropertiesEvents Optional within this object. Property change events waiting to be sent.
-		PropertiesEvents *int64 `json:"propertiesEvents,omitempty"`
-
-		// RemoteRepoKey Optional within this object. Repository key on the target mirror.
-		RemoteRepoKey *string `json:"remoteRepoKey,omitempty"`
-
-		// RemoteUrl Optional within this object. Base URL of the target mirror's instance.
-		RemoteUrl *string `json:"remoteUrl,omitempty"`
-
-		// Status Optional within this object. Whether the mirror is in sync. Version 1 reports SYNCED or OUT_OF_SYNC; version 2 reports the member states (HEALTHY, PENDING_FS, FULL_SYNC_RUNNING, ERROR_GENERIC, ERROR_INACTIVE, ERROR_OUT_OF_SYNC, READ_ONLY, IMPORT_IN_PROGRESS).
-		Status *string `json:"status,omitempty"`
-
-		// UpdateEvents Optional within this object. Update events waiting to be sent.
-		UpdateEvents *int64 `json:"updateEvents,omitempty"`
-	} `json:"mirrorEventsStatusInfo,omitempty"`
-} {
+func (r GetFederatedRepositoryStatusV2Response) GetJSON200() *FederatedRepositoryStatus {
 	return r.JSON200
 }
 
@@ -70557,6 +76607,121 @@ func (r GetFederatedRepositoryStatusV2Response) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r GetFederatedRepositoryStatusV2Response) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetFederatedRepositoryStatusProjectionV2Response429Headers the declared response headers of an HTTP 429 response for GetFederatedRepositoryStatusProjectionV2
+type GetFederatedRepositoryStatusProjectionV2Response429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// GetFederatedRepositoryStatusProjectionV2Response503Headers the declared response headers of an HTTP 503 response for GetFederatedRepositoryStatusProjectionV2
+type GetFederatedRepositoryStatusProjectionV2Response503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type GetFederatedRepositoryStatusProjectionV2Response struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *FederatedRepositoryStatus
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ErrorResponse
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *ErrorResponse
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *ErrorResponse
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON405 the response for an HTTP 405 `application/json` response
+	JSON405 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *ErrorResponse
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *GetFederatedRepositoryStatusProjectionV2Response429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *GetFederatedRepositoryStatusProjectionV2Response503Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetFederatedRepositoryStatusProjectionV2Response) GetJSON200() *FederatedRepositoryStatus {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r GetFederatedRepositoryStatusProjectionV2Response) GetJSON400() *ErrorResponse {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetFederatedRepositoryStatusProjectionV2Response) GetJSON401() *ErrorResponse {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetFederatedRepositoryStatusProjectionV2Response) GetJSON403() *ErrorResponse {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetFederatedRepositoryStatusProjectionV2Response) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON405 returns the response for an HTTP 405 `application/json` response
+func (r GetFederatedRepositoryStatusProjectionV2Response) GetJSON405() *ErrorResponse {
+	return r.JSON405
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r GetFederatedRepositoryStatusProjectionV2Response) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r GetFederatedRepositoryStatusProjectionV2Response) GetJSON500() *ErrorResponse {
+	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetFederatedRepositoryStatusProjectionV2Response) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r GetFederatedRepositoryStatusProjectionV2Response) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetFederatedRepositoryStatusProjectionV2Response) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetFederatedRepositoryStatusProjectionV2Response) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetFederatedRepositoryStatusProjectionV2Response) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -76684,6 +82849,21 @@ func (c *ClientWithResponses) ExportSystemWithApplicationVndOrgJfrogArtifactoryS
 	return ParseExportSystemResponse(rsp)
 }
 
+// GetFederationBaseUrlAndRepositoriesWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/federation/baseUrlAndRepos (the `GetFederationBaseUrlAndRepositories` operationId).
+func (c *ClientWithResponses) GetFederationBaseUrlAndRepositoriesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetFederationBaseUrlAndRepositoriesResponse, error) {
+	rsp, err := c.GetFederationBaseUrlAndRepositories(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetFederationBaseUrlAndRepositoriesResponse(rsp)
+}
+
 // DeleteFailedBinaryTasksWithResponse Delete failed binary transfer tasks
 //
 // Deletes recorded failed content-fetch tasks of a federated repository, all of them or only the tasks for one SHA-1. Cancellation prevents their queued or in-flight retries from publishing; a newer event or full sync can supply the content later.
@@ -76729,6 +82909,36 @@ func (c *ClientWithResponses) ReplayFailedBinaryTasksWithResponse(ctx context.Co
 	return ParseReplayFailedBinaryTasksResponse(rsp)
 }
 
+// GetFederationInternalBinaryTasksWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/federation/binaries/rtfs (the `GetFederationInternalBinaryTasks` operationId).
+func (c *ClientWithResponses) GetFederationInternalBinaryTasksWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetFederationInternalBinaryTasksResponse, error) {
+	rsp, err := c.GetFederationInternalBinaryTasks(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetFederationInternalBinaryTasksResponse(rsp)
+}
+
+// PutFederationInternalBinaryTasksWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/federation/binaries/rtfs (the `PutFederationInternalBinaryTasks` operationId).
+func (c *ClientWithResponses) PutFederationInternalBinaryTasksWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*PutFederationInternalBinaryTasksResponse, error) {
+	rsp, err := c.PutFederationInternalBinaryTasks(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutFederationInternalBinaryTasksResponse(rsp)
+}
+
 // GetFederatedBinaryTasksWithResponse Get federated binary task counts
 //
 // Returns failed content-fetch counts for a federated repository. Administrators only. The closed-source DTO shape is inferred.
@@ -76742,6 +82952,21 @@ func (c *ClientWithResponses) GetFederatedBinaryTasksWithResponse(ctx context.Co
 		return nil, err
 	}
 	return ParseGetFederatedBinaryTasksResponse(rsp)
+}
+
+// CheckFederationInternalBinaryWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/federation/binary/provider/v2/check (the `CheckFederationInternalBinary` operationId).
+func (c *ClientWithResponses) CheckFederationInternalBinaryWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*CheckFederationInternalBinaryResponse, error) {
+	rsp, err := c.CheckFederationInternalBinary(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCheckFederationInternalBinaryResponse(rsp)
 }
 
 // SynchronizeFederatedMemberConfigurationWithResponse Push federated repository configuration to members
@@ -76789,6 +83014,81 @@ func (c *ClientWithResponses) ConvertFederatedRepositoryToLocalWithResponse(ctx 
 	return ParseConvertFederatedRepositoryToLocalResponse(rsp)
 }
 
+// DisableFederationRemoteMemberWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/federation/disableRemoteMember (the `DisableFederationRemoteMember` operationId).
+func (c *ClientWithResponses) DisableFederationRemoteMemberWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DisableFederationRemoteMemberResponse, error) {
+	rsp, err := c.DisableFederationRemoteMember(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDisableFederationRemoteMemberResponse(rsp)
+}
+
+// PostFederationDryFullSyncFileWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/federation/dryfullsync/repo/{fileName} (the `PostFederationDryFullSyncFile` operationId).
+func (c *ClientWithResponses) PostFederationDryFullSyncFileWithResponse(ctx context.Context, fileName string, reqEditors ...RequestEditorFn) (*PostFederationDryFullSyncFileResponse, error) {
+	rsp, err := c.PostFederationDryFullSyncFile(ctx, fileName, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostFederationDryFullSyncFileResponse(rsp)
+}
+
+// GetFederationExtendedInfoWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/federation/extendedInfo/{repoKey} (the `GetFederationExtendedInfo` operationId).
+func (c *ClientWithResponses) GetFederationExtendedInfoWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*GetFederationExtendedInfoResponse, error) {
+	rsp, err := c.GetFederationExtendedInfo(ctx, repoKey, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetFederationExtendedInfoResponse(rsp)
+}
+
+// GetFederationConfigInfoWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/federation/federatedConfigInfo/{repoKey} (the `GetFederationConfigInfo` operationId).
+func (c *ClientWithResponses) GetFederationConfigInfoWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*GetFederationConfigInfoResponse, error) {
+	rsp, err := c.GetFederationConfigInfo(ctx, repoKey, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetFederationConfigInfoResponse(rsp)
+}
+
+// GetFederationRepositoryConfigInfoWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/federation/federatedRepoConfigInfo (the `GetFederationRepositoryConfigInfo` operationId).
+func (c *ClientWithResponses) GetFederationRepositoryConfigInfoWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetFederationRepositoryConfigInfoResponse, error) {
+	rsp, err := c.GetFederationRepositoryConfigInfo(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetFederationRepositoryConfigInfoResponse(rsp)
+}
+
 // FederatedRepositoryForceFullSyncWithResponse Force a full sync of a federated repository
 //
 // Starts a full synchronization of a federated repository, interrupting one already in progress. Use it when a full sync appears stuck.
@@ -76819,6 +83119,81 @@ func (c *ClientWithResponses) FederatedRepositoryFullSyncWithResponse(ctx contex
 	return ParseFederatedRepositoryFullSyncResponse(rsp)
 }
 
+// DeleteFederationFullSyncFileWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /api/federation/fullsync/repo/{fileName} (the `DeleteFederationFullSyncFile` operationId).
+func (c *ClientWithResponses) DeleteFederationFullSyncFileWithResponse(ctx context.Context, fileName string, reqEditors ...RequestEditorFn) (*DeleteFederationFullSyncFileResponse, error) {
+	rsp, err := c.DeleteFederationFullSyncFile(ctx, fileName, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteFederationFullSyncFileResponse(rsp)
+}
+
+// GetFederationFullSyncFileWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/federation/fullsync/repo/{fileName} (the `GetFederationFullSyncFile` operationId).
+func (c *ClientWithResponses) GetFederationFullSyncFileWithResponse(ctx context.Context, fileName string, reqEditors ...RequestEditorFn) (*GetFederationFullSyncFileResponse, error) {
+	rsp, err := c.GetFederationFullSyncFile(ctx, fileName, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetFederationFullSyncFileResponse(rsp)
+}
+
+// PostFederationFullSyncFileWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/federation/fullsync/repo/{fileName} (the `PostFederationFullSyncFile` operationId).
+func (c *ClientWithResponses) PostFederationFullSyncFileWithResponse(ctx context.Context, fileName string, reqEditors ...RequestEditorFn) (*PostFederationFullSyncFileResponse, error) {
+	rsp, err := c.PostFederationFullSyncFile(ctx, fileName, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostFederationFullSyncFileResponse(rsp)
+}
+
+// PostFederationFullSyncSystemRepositoryWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/federation/fullsync/systemRepo (the `PostFederationFullSyncSystemRepository` operationId).
+func (c *ClientWithResponses) PostFederationFullSyncSystemRepositoryWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*PostFederationFullSyncSystemRepositoryResponse, error) {
+	rsp, err := c.PostFederationFullSyncSystemRepository(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostFederationFullSyncSystemRepositoryResponse(rsp)
+}
+
+// PostFederationGridTopologyEventsWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/federation/grid/topology/events (the `PostFederationGridTopologyEvents` operationId).
+func (c *ClientWithResponses) PostFederationGridTopologyEventsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*PostFederationGridTopologyEventsResponse, error) {
+	rsp, err := c.PostFederationGridTopologyEvents(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostFederationGridTopologyEventsResponse(rsp)
+}
+
 // GetListOfInconsistentFederatedRepositoriesWithResponse List federated repositories with configuration drift
 //
 // Lists federated repositories whose shared configuration differs from at least one member's. Repair them with the configuration sync operation.
@@ -76834,6 +83209,81 @@ func (c *ClientWithResponses) GetListOfInconsistentFederatedRepositoriesWithResp
 	return ParseGetListOfInconsistentFederatedRepositoriesResponse(rsp)
 }
 
+// GetFederationLastIdInSystemWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/federation/lastIdInSystem (the `GetFederationLastIdInSystem` operationId).
+func (c *ClientWithResponses) GetFederationLastIdInSystemWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetFederationLastIdInSystemResponse, error) {
+	rsp, err := c.GetFederationLastIdInSystem(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetFederationLastIdInSystemResponse(rsp)
+}
+
+// EnableFederationInternalMemberWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/federation/member/enable (the `EnableFederationInternalMember` operationId).
+func (c *ClientWithResponses) EnableFederationInternalMemberWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*EnableFederationInternalMemberResponse, error) {
+	rsp, err := c.EnableFederationInternalMember(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseEnableFederationInternalMemberResponse(rsp)
+}
+
+// PostFederationInternalMetadataWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/federation/metadata (the `PostFederationInternalMetadata` operationId).
+func (c *ClientWithResponses) PostFederationInternalMetadataWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*PostFederationInternalMetadataResponse, error) {
+	rsp, err := c.PostFederationInternalMetadata(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostFederationInternalMetadataResponse(rsp)
+}
+
+// PutFederationInternalMetadataWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/federation/metadata (the `PutFederationInternalMetadata` operationId).
+func (c *ClientWithResponses) PutFederationInternalMetadataWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*PutFederationInternalMetadataResponse, error) {
+	rsp, err := c.PutFederationInternalMetadata(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutFederationInternalMetadataResponse(rsp)
+}
+
+// InvalidateFederationInternalMetadataWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/federation/metadata/invalidate (the `InvalidateFederationInternalMetadata` operationId).
+func (c *ClientWithResponses) InvalidateFederationInternalMetadataWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*InvalidateFederationInternalMetadataResponse, error) {
+	rsp, err := c.InvalidateFederationInternalMetadata(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseInvalidateFederationInternalMetadataResponse(rsp)
+}
+
 // ConvertLocalRepositoryToFederatedWithResponse Convert a local repository to federated
 //
 // Converts a local repository into a federated repository with this instance as its only member, keeping content and metadata. Add members afterwards by updating the repository's `members`. Inside a project, every member of a federation must carry the same project key. A package type that cannot be federated (terraformbackend), a repository that is not local and one with push replication configured answer 400. Administrators only.
@@ -76847,6 +83297,81 @@ func (c *ClientWithResponses) ConvertLocalRepositoryToFederatedWithResponse(ctx 
 		return nil, err
 	}
 	return ParseConvertLocalRepositoryToFederatedResponse(rsp)
+}
+
+// PutFederationMigrationWithResponse Refuses the migration-tool-only write for every caller.
+//
+// Refuses the migration-tool-only write for every caller. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/federation/migration (the `PutFederationMigration` operationId).
+func (c *ClientWithResponses) PutFederationMigrationWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*PutFederationMigrationResponse, error) {
+	rsp, err := c.PutFederationMigration(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutFederationMigrationResponse(rsp)
+}
+
+// GetFederationMigrationStatusWithResponse Reports the integrated federation service state; administrators only.
+//
+// Reports the integrated federation service state; administrators only. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/federation/migration/status (the `GetFederationMigrationStatus` operationId).
+func (c *ClientWithResponses) GetFederationMigrationStatusWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetFederationMigrationStatusResponse, error) {
+	rsp, err := c.GetFederationMigrationStatus(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetFederationMigrationStatusResponse(rsp)
+}
+
+// GetFederationVerboseMigrationStatusWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/federation/migration/status/verbose (the `GetFederationVerboseMigrationStatus` operationId).
+func (c *ClientWithResponses) GetFederationVerboseMigrationStatusWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetFederationVerboseMigrationStatusResponse, error) {
+	rsp, err := c.GetFederationVerboseMigrationStatus(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetFederationVerboseMigrationStatusResponse(rsp)
+}
+
+// PutFederationVerboseMigrationStatusWithResponse Refuses the migration-tool-only write for every caller.
+//
+// Refuses the migration-tool-only write for every caller. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/federation/migration/status/verbose (the `PutFederationVerboseMigrationStatus` operationId).
+func (c *ClientWithResponses) PutFederationVerboseMigrationStatusWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*PutFederationVerboseMigrationStatusResponse, error) {
+	rsp, err := c.PutFederationVerboseMigrationStatus(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutFederationVerboseMigrationStatusResponse(rsp)
+}
+
+// DisableFederationNegotiationWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/federation/negotiation/disable (the `DisableFederationNegotiation` operationId).
+func (c *ClientWithResponses) DisableFederationNegotiationWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DisableFederationNegotiationResponse, error) {
+	rsp, err := c.DisableFederationNegotiation(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDisableFederationNegotiationResponse(rsp)
 }
 
 // PrioritizeFederatedRepositoryWithResponse Set federated repository sync priority
@@ -76877,6 +83402,141 @@ func (c *ClientWithResponses) PropagateCreationTimeMetadataDuringFullSyncWithRes
 		return nil, err
 	}
 	return ParsePropagateCreationTimeMetadataDuringFullSyncResponse(rsp)
+}
+
+// GetFederationInternalPropertiesWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/federation/properties/{repoKey} (the `GetFederationInternalProperties` operationId).
+func (c *ClientWithResponses) GetFederationInternalPropertiesWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*GetFederationInternalPropertiesResponse, error) {
+	rsp, err := c.GetFederationInternalProperties(ctx, repoKey, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetFederationInternalPropertiesResponse(rsp)
+}
+
+// GetFederationInternalPropertyWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/federation/property/{repoKey}/{fileName} (the `GetFederationInternalProperty` operationId).
+func (c *ClientWithResponses) GetFederationInternalPropertyWithResponse(ctx context.Context, repoKey string, fileName string, reqEditors ...RequestEditorFn) (*GetFederationInternalPropertyResponse, error) {
+	rsp, err := c.GetFederationInternalProperty(ctx, repoKey, fileName, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetFederationInternalPropertyResponse(rsp)
+}
+
+// DeregisterFederationQueueWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/federation/queue/deregister (the `DeregisterFederationQueue` operationId).
+func (c *ClientWithResponses) DeregisterFederationQueueWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DeregisterFederationQueueResponse, error) {
+	rsp, err := c.DeregisterFederationQueue(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeregisterFederationQueueResponse(rsp)
+}
+
+// GetFederationQueueRemainingWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/federation/queue/remaining (the `GetFederationQueueRemaining` operationId).
+func (c *ClientWithResponses) GetFederationQueueRemainingWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetFederationQueueRemainingResponse, error) {
+	rsp, err := c.GetFederationQueueRemaining(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetFederationQueueRemainingResponse(rsp)
+}
+
+// ResetFederationQueueWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/federation/queue/reset (the `ResetFederationQueue` operationId).
+func (c *ClientWithResponses) ResetFederationQueueWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ResetFederationQueueResponse, error) {
+	rsp, err := c.ResetFederationQueue(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseResetFederationQueueResponse(rsp)
+}
+
+// GetFederationQueueStateWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/federation/queue/state (the `GetFederationQueueState` operationId).
+func (c *ClientWithResponses) GetFederationQueueStateWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetFederationQueueStateResponse, error) {
+	rsp, err := c.GetFederationQueueState(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetFederationQueueStateResponse(rsp)
+}
+
+// PutFederationQueueStateWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/federation/queue/state/{state} (the `PutFederationQueueState` operationId).
+func (c *ClientWithResponses) PutFederationQueueStateWithResponse(ctx context.Context, state string, reqEditors ...RequestEditorFn) (*PutFederationQueueStateResponse, error) {
+	rsp, err := c.PutFederationQueueState(ctx, state, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutFederationQueueStateResponse(rsp)
+}
+
+// StopFederationQueueWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/federation/queue/stop (the `StopFederationQueue` operationId).
+func (c *ClientWithResponses) StopFederationQueueWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*StopFederationQueueResponse, error) {
+	rsp, err := c.StopFederationQueue(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseStopFederationQueueResponse(rsp)
+}
+
+// GetFederationRepositoryReadyWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/federation/ready/{repoKey} (the `GetFederationRepositoryReady` operationId).
+func (c *ClientWithResponses) GetFederationRepositoryReadyWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*GetFederationRepositoryReadyResponse, error) {
+	rsp, err := c.GetFederationRepositoryReady(ctx, repoKey, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetFederationRepositoryReadyResponse(rsp)
 }
 
 // ReconnectToFederationClientWithResponse Reconnect the federation sync worker
@@ -76969,6 +83629,96 @@ func (c *ClientWithResponses) ReplaceFederatedMemberBaseUrlWithResponse(ctx cont
 	return ParseReplaceFederatedMemberBaseUrlResponse(rsp)
 }
 
+// GetFederationRepositoryExistsWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/federation/repoExists/{repoKey} (the `GetFederationRepositoryExists` operationId).
+func (c *ClientWithResponses) GetFederationRepositoryExistsWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*GetFederationRepositoryExistsResponse, error) {
+	rsp, err := c.GetFederationRepositoryExists(ctx, repoKey, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetFederationRepositoryExistsResponse(rsp)
+}
+
+// GetFederationInternalRepositoriesWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/federation/repos (the `GetFederationInternalRepositories` operationId).
+func (c *ClientWithResponses) GetFederationInternalRepositoriesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetFederationInternalRepositoriesResponse, error) {
+	rsp, err := c.GetFederationInternalRepositories(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetFederationInternalRepositoriesResponse(rsp)
+}
+
+// EnableFederationInternalRepositoriesWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/federation/repos/enable (the `EnableFederationInternalRepositories` operationId).
+func (c *ClientWithResponses) EnableFederationInternalRepositoriesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*EnableFederationInternalRepositoriesResponse, error) {
+	rsp, err := c.EnableFederationInternalRepositories(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseEnableFederationInternalRepositoriesResponse(rsp)
+}
+
+// GetFederationServiceConnectionWithResponse Reports the integrated federation service state; administrators only.
+//
+// Reports the integrated federation service state; administrators only. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/federation/rtfs (the `GetFederationServiceConnection` operationId).
+func (c *ClientWithResponses) GetFederationServiceConnectionWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetFederationServiceConnectionResponse, error) {
+	rsp, err := c.GetFederationServiceConnection(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetFederationServiceConnectionResponse(rsp)
+}
+
+// PutFederationServiceConnectionWithResponse Refuses the migration-tool-only write for every caller.
+//
+// Refuses the migration-tool-only write for every caller. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/federation/rtfs (the `PutFederationServiceConnection` operationId).
+func (c *ClientWithResponses) PutFederationServiceConnectionWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*PutFederationServiceConnectionResponse, error) {
+	rsp, err := c.PutFederationServiceConnection(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutFederationServiceConnectionResponse(rsp)
+}
+
+// SnapshotFederationRepositoriesWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/federation/snapshotFederatedRepos (the `SnapshotFederationRepositories` operationId).
+func (c *ClientWithResponses) SnapshotFederationRepositoriesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*SnapshotFederationRepositoriesResponse, error) {
+	rsp, err := c.SnapshotFederationRepositories(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSnapshotFederationRepositoriesResponse(rsp)
+}
+
 // GetFederationSyncStateWithResponse List federated repository sync state
 //
 // Lists every federated repository on this instance with its members and sync state.
@@ -76984,6 +83734,21 @@ func (c *ClientWithResponses) GetFederationSyncStateWithResponse(ctx context.Con
 		return nil, err
 	}
 	return ParseGetFederationSyncStateResponse(rsp)
+}
+
+// GetFederationInternalStatusWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/federation/status (the `GetFederationInternalStatus` operationId).
+func (c *ClientWithResponses) GetFederationInternalStatusWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetFederationInternalStatusResponse, error) {
+	rsp, err := c.GetFederationInternalStatus(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetFederationInternalStatusResponse(rsp)
 }
 
 // GetFederationConnectionDetailsWithResponse Get federated repository connection state
@@ -77033,6 +83798,23 @@ func (c *ClientWithResponses) GetFederatedRepositoryStatusWithResponse(ctx conte
 		return nil, err
 	}
 	return ParseGetFederatedRepositoryStatusResponse(rsp)
+}
+
+// GetFederatedRepositoryStatusProjectionWithResponse Get federated repository sync status
+//
+// Detailed sync status of one federated repository: binary transfer tasks, event delivery per member and artifact counts. Expensive on large repositories; use the connection state operation for routine monitoring.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/federation/status/repo/{repoKey}/{federatedKey} (the `GetFederatedRepositoryStatusProjection` operationId).
+//
+// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+func (c *ClientWithResponses) GetFederatedRepositoryStatusProjectionWithResponse(ctx context.Context, repoKey string, federatedKey string, reqEditors ...RequestEditorFn) (*GetFederatedRepositoryStatusProjectionResponse, error) {
+	rsp, err := c.GetFederatedRepositoryStatusProjection(ctx, repoKey, federatedKey, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetFederatedRepositoryStatusProjectionResponse(rsp)
 }
 
 // GetFederatedRepositoryBinaryStateWithResponse Get read-authorized repository binary state
@@ -77097,6 +83879,36 @@ func (c *ClientWithResponses) GetUnavailableMirrorsWithResponse(ctx context.Cont
 	return ParseGetUnavailableMirrorsResponse(rsp)
 }
 
+// SubmitFederationInternalTaskWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/federation/task/submit (the `SubmitFederationInternalTask` operationId).
+func (c *ClientWithResponses) SubmitFederationInternalTaskWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*SubmitFederationInternalTaskResponse, error) {
+	rsp, err := c.SubmitFederationInternalTask(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSubmitFederationInternalTaskResponse(rsp)
+}
+
+// GetFederationTenantMoveStatusWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/federation/tenant/move/status (the `GetFederationTenantMoveStatus` operationId).
+func (c *ClientWithResponses) GetFederationTenantMoveStatusWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetFederationTenantMoveStatusResponse, error) {
+	rsp, err := c.GetFederationTenantMoveStatus(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetFederationTenantMoveStatusResponse(rsp)
+}
+
 // UpdateFederatedMemberUrlWithBodyWithResponse Update a federated member's URL
 //
 // Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource) with the same body and effect as replaceUrl. Administrators only.
@@ -77125,6 +83937,21 @@ func (c *ClientWithResponses) UpdateFederatedMemberUrlWithResponse(ctx context.C
 		return nil, err
 	}
 	return ParseUpdateFederatedMemberUrlResponse(rsp)
+}
+
+// ValidateFederationRepositoryWithResponse The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+//
+// The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/federation/validate/{repoKey} (the `ValidateFederationRepository` operationId).
+func (c *ClientWithResponses) ValidateFederationRepositoryWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*ValidateFederationRepositoryResponse, error) {
+	rsp, err := c.ValidateFederationRepository(ctx, repoKey, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseValidateFederationRepositoryResponse(rsp)
 }
 
 // CalculateRubyGemsIndexWithResponse performs a POST /api/gems/{repoKey}/reindex (the `CalculateRubyGemsIndex` operationId) request.
@@ -80797,6 +87624,23 @@ func (c *ClientWithResponses) GetFederatedRepositoryStatusV2WithResponse(ctx con
 		return nil, err
 	}
 	return ParseGetFederatedRepositoryStatusV2Response(rsp)
+}
+
+// GetFederatedRepositoryStatusProjectionV2WithResponse Get federated repository sync status (version 2)
+//
+// Version 2 of the repository sync status, which reports a wider set of member states. The fields are those of version 1.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v2/federation/status/repo/{repoKey}/{federatedKey} (the `GetFederatedRepositoryStatusProjectionV2` operationId).
+//
+// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+func (c *ClientWithResponses) GetFederatedRepositoryStatusProjectionV2WithResponse(ctx context.Context, repoKey string, federatedKey string, reqEditors ...RequestEditorFn) (*GetFederatedRepositoryStatusProjectionV2Response, error) {
+	rsp, err := c.GetFederatedRepositoryStatusProjectionV2(ctx, repoKey, federatedKey, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetFederatedRepositoryStatusProjectionV2Response(rsp)
 }
 
 // DeleteRepositoriesWithBodyWithResponse Delete several repositories
@@ -91392,6 +98236,97 @@ func ParseExportSystemResponse(rsp *http.Response) (*ExportSystemResponse, error
 	return response, nil
 }
 
+// ParseGetFederationBaseUrlAndRepositoriesResponse parses an HTTP response from a GetFederationBaseUrlAndRepositoriesWithResponse call
+func ParseGetFederationBaseUrlAndRepositoriesResponse(rsp *http.Response) (*GetFederationBaseUrlAndRepositoriesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetFederationBaseUrlAndRepositoriesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers GetFederationBaseUrlAndRepositoriesResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers GetFederationBaseUrlAndRepositoriesResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseDeleteFailedBinaryTasksResponse parses an HTTP response from a DeleteFailedBinaryTasksWithResponse call
 func ParseDeleteFailedBinaryTasksResponse(rsp *http.Response) (*DeleteFailedBinaryTasksResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -91786,6 +98721,188 @@ func ParseReplayFailedBinaryTasksResponse(rsp *http.Response) (*ReplayFailedBina
 	return response, nil
 }
 
+// ParseGetFederationInternalBinaryTasksResponse parses an HTTP response from a GetFederationInternalBinaryTasksWithResponse call
+func ParseGetFederationInternalBinaryTasksResponse(rsp *http.Response) (*GetFederationInternalBinaryTasksResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetFederationInternalBinaryTasksResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers GetFederationInternalBinaryTasksResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers GetFederationInternalBinaryTasksResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParsePutFederationInternalBinaryTasksResponse parses an HTTP response from a PutFederationInternalBinaryTasksWithResponse call
+func ParsePutFederationInternalBinaryTasksResponse(rsp *http.Response) (*PutFederationInternalBinaryTasksResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PutFederationInternalBinaryTasksResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers PutFederationInternalBinaryTasksResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers PutFederationInternalBinaryTasksResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseGetFederatedBinaryTasksResponse parses an HTTP response from a GetFederatedBinaryTasksWithResponse call
 func ParseGetFederatedBinaryTasksResponse(rsp *http.Response) (*GetFederatedBinaryTasksResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -91885,6 +99002,97 @@ func ParseGetFederatedBinaryTasksResponse(rsp *http.Response) (*GetFederatedBina
 		response.Headers429 = &headers
 	case rsp.StatusCode == 503:
 		var headers GetFederatedBinaryTasksResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseCheckFederationInternalBinaryResponse parses an HTTP response from a CheckFederationInternalBinaryWithResponse call
+func ParseCheckFederationInternalBinaryResponse(rsp *http.Response) (*CheckFederationInternalBinaryResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CheckFederationInternalBinaryResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers CheckFederationInternalBinaryResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers CheckFederationInternalBinaryResponse503Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -92170,6 +99378,461 @@ func ParseConvertFederatedRepositoryToLocalResponse(rsp *http.Response) (*Conver
 	return response, nil
 }
 
+// ParseDisableFederationRemoteMemberResponse parses an HTTP response from a DisableFederationRemoteMemberWithResponse call
+func ParseDisableFederationRemoteMemberResponse(rsp *http.Response) (*DisableFederationRemoteMemberResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DisableFederationRemoteMemberResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers DisableFederationRemoteMemberResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers DisableFederationRemoteMemberResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParsePostFederationDryFullSyncFileResponse parses an HTTP response from a PostFederationDryFullSyncFileWithResponse call
+func ParsePostFederationDryFullSyncFileResponse(rsp *http.Response) (*PostFederationDryFullSyncFileResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostFederationDryFullSyncFileResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers PostFederationDryFullSyncFileResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers PostFederationDryFullSyncFileResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetFederationExtendedInfoResponse parses an HTTP response from a GetFederationExtendedInfoWithResponse call
+func ParseGetFederationExtendedInfoResponse(rsp *http.Response) (*GetFederationExtendedInfoResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetFederationExtendedInfoResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers GetFederationExtendedInfoResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers GetFederationExtendedInfoResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetFederationConfigInfoResponse parses an HTTP response from a GetFederationConfigInfoWithResponse call
+func ParseGetFederationConfigInfoResponse(rsp *http.Response) (*GetFederationConfigInfoResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetFederationConfigInfoResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers GetFederationConfigInfoResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers GetFederationConfigInfoResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetFederationRepositoryConfigInfoResponse parses an HTTP response from a GetFederationRepositoryConfigInfoWithResponse call
+func ParseGetFederationRepositoryConfigInfoResponse(rsp *http.Response) (*GetFederationRepositoryConfigInfoResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetFederationRepositoryConfigInfoResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers GetFederationRepositoryConfigInfoResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers GetFederationRepositoryConfigInfoResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseFederatedRepositoryForceFullSyncResponse parses an HTTP response from a FederatedRepositoryForceFullSyncWithResponse call
 func ParseFederatedRepositoryForceFullSyncResponse(rsp *http.Response) (*FederatedRepositoryForceFullSyncResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -92420,6 +100083,461 @@ func ParseFederatedRepositoryFullSyncResponse(rsp *http.Response) (*FederatedRep
 	return response, nil
 }
 
+// ParseDeleteFederationFullSyncFileResponse parses an HTTP response from a DeleteFederationFullSyncFileWithResponse call
+func ParseDeleteFederationFullSyncFileResponse(rsp *http.Response) (*DeleteFederationFullSyncFileResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteFederationFullSyncFileResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers DeleteFederationFullSyncFileResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers DeleteFederationFullSyncFileResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetFederationFullSyncFileResponse parses an HTTP response from a GetFederationFullSyncFileWithResponse call
+func ParseGetFederationFullSyncFileResponse(rsp *http.Response) (*GetFederationFullSyncFileResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetFederationFullSyncFileResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers GetFederationFullSyncFileResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers GetFederationFullSyncFileResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParsePostFederationFullSyncFileResponse parses an HTTP response from a PostFederationFullSyncFileWithResponse call
+func ParsePostFederationFullSyncFileResponse(rsp *http.Response) (*PostFederationFullSyncFileResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostFederationFullSyncFileResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers PostFederationFullSyncFileResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers PostFederationFullSyncFileResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParsePostFederationFullSyncSystemRepositoryResponse parses an HTTP response from a PostFederationFullSyncSystemRepositoryWithResponse call
+func ParsePostFederationFullSyncSystemRepositoryResponse(rsp *http.Response) (*PostFederationFullSyncSystemRepositoryResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostFederationFullSyncSystemRepositoryResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers PostFederationFullSyncSystemRepositoryResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers PostFederationFullSyncSystemRepositoryResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParsePostFederationGridTopologyEventsResponse parses an HTTP response from a PostFederationGridTopologyEventsWithResponse call
+func ParsePostFederationGridTopologyEventsResponse(rsp *http.Response) (*PostFederationGridTopologyEventsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostFederationGridTopologyEventsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers PostFederationGridTopologyEventsResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers PostFederationGridTopologyEventsResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseGetListOfInconsistentFederatedRepositoriesResponse parses an HTTP response from a GetListOfInconsistentFederatedRepositoriesWithResponse call
 func ParseGetListOfInconsistentFederatedRepositoriesResponse(rsp *http.Response) (*GetListOfInconsistentFederatedRepositoriesResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -92532,6 +100650,461 @@ func ParseGetListOfInconsistentFederatedRepositoriesResponse(rsp *http.Response)
 	return response, nil
 }
 
+// ParseGetFederationLastIdInSystemResponse parses an HTTP response from a GetFederationLastIdInSystemWithResponse call
+func ParseGetFederationLastIdInSystemResponse(rsp *http.Response) (*GetFederationLastIdInSystemResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetFederationLastIdInSystemResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers GetFederationLastIdInSystemResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers GetFederationLastIdInSystemResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseEnableFederationInternalMemberResponse parses an HTTP response from a EnableFederationInternalMemberWithResponse call
+func ParseEnableFederationInternalMemberResponse(rsp *http.Response) (*EnableFederationInternalMemberResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &EnableFederationInternalMemberResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers EnableFederationInternalMemberResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers EnableFederationInternalMemberResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParsePostFederationInternalMetadataResponse parses an HTTP response from a PostFederationInternalMetadataWithResponse call
+func ParsePostFederationInternalMetadataResponse(rsp *http.Response) (*PostFederationInternalMetadataResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostFederationInternalMetadataResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers PostFederationInternalMetadataResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers PostFederationInternalMetadataResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParsePutFederationInternalMetadataResponse parses an HTTP response from a PutFederationInternalMetadataWithResponse call
+func ParsePutFederationInternalMetadataResponse(rsp *http.Response) (*PutFederationInternalMetadataResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PutFederationInternalMetadataResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers PutFederationInternalMetadataResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers PutFederationInternalMetadataResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseInvalidateFederationInternalMetadataResponse parses an HTTP response from a InvalidateFederationInternalMetadataWithResponse call
+func ParseInvalidateFederationInternalMetadataResponse(rsp *http.Response) (*InvalidateFederationInternalMetadataResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &InvalidateFederationInternalMetadataResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers InvalidateFederationInternalMetadataResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers InvalidateFederationInternalMetadataResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseConvertLocalRepositoryToFederatedResponse parses an HTTP response from a ConvertLocalRepositoryToFederatedWithResponse call
 func ParseConvertLocalRepositoryToFederatedResponse(rsp *http.Response) (*ConvertLocalRepositoryToFederatedResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -92617,6 +101190,475 @@ func ParseConvertLocalRepositoryToFederatedResponse(rsp *http.Response) (*Conver
 		response.Headers429 = &headers
 	case rsp.StatusCode == 503:
 		var headers ConvertLocalRepositoryToFederatedResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParsePutFederationMigrationResponse parses an HTTP response from a PutFederationMigrationWithResponse call
+func ParsePutFederationMigrationResponse(rsp *http.Response) (*PutFederationMigrationResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PutFederationMigrationResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers PutFederationMigrationResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers PutFederationMigrationResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetFederationMigrationStatusResponse parses an HTTP response from a GetFederationMigrationStatusWithResponse call
+func ParseGetFederationMigrationStatusResponse(rsp *http.Response) (*GetFederationMigrationStatusResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetFederationMigrationStatusResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers GetFederationMigrationStatusResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers GetFederationMigrationStatusResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetFederationVerboseMigrationStatusResponse parses an HTTP response from a GetFederationVerboseMigrationStatusWithResponse call
+func ParseGetFederationVerboseMigrationStatusResponse(rsp *http.Response) (*GetFederationVerboseMigrationStatusResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetFederationVerboseMigrationStatusResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers GetFederationVerboseMigrationStatusResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers GetFederationVerboseMigrationStatusResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParsePutFederationVerboseMigrationStatusResponse parses an HTTP response from a PutFederationVerboseMigrationStatusWithResponse call
+func ParsePutFederationVerboseMigrationStatusResponse(rsp *http.Response) (*PutFederationVerboseMigrationStatusResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PutFederationVerboseMigrationStatusResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers PutFederationVerboseMigrationStatusResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers PutFederationVerboseMigrationStatusResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseDisableFederationNegotiationResponse parses an HTTP response from a DisableFederationNegotiationWithResponse call
+func ParseDisableFederationNegotiationResponse(rsp *http.Response) (*DisableFederationNegotiationResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DisableFederationNegotiationResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers DisableFederationNegotiationResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers DisableFederationNegotiationResponse503Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -92855,6 +101897,825 @@ func ParsePropagateCreationTimeMetadataDuringFullSyncResponse(rsp *http.Response
 		response.Headers429 = &headers
 	case rsp.StatusCode == 503:
 		var headers PropagateCreationTimeMetadataDuringFullSyncResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetFederationInternalPropertiesResponse parses an HTTP response from a GetFederationInternalPropertiesWithResponse call
+func ParseGetFederationInternalPropertiesResponse(rsp *http.Response) (*GetFederationInternalPropertiesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetFederationInternalPropertiesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers GetFederationInternalPropertiesResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers GetFederationInternalPropertiesResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetFederationInternalPropertyResponse parses an HTTP response from a GetFederationInternalPropertyWithResponse call
+func ParseGetFederationInternalPropertyResponse(rsp *http.Response) (*GetFederationInternalPropertyResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetFederationInternalPropertyResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers GetFederationInternalPropertyResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers GetFederationInternalPropertyResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseDeregisterFederationQueueResponse parses an HTTP response from a DeregisterFederationQueueWithResponse call
+func ParseDeregisterFederationQueueResponse(rsp *http.Response) (*DeregisterFederationQueueResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeregisterFederationQueueResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers DeregisterFederationQueueResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers DeregisterFederationQueueResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetFederationQueueRemainingResponse parses an HTTP response from a GetFederationQueueRemainingWithResponse call
+func ParseGetFederationQueueRemainingResponse(rsp *http.Response) (*GetFederationQueueRemainingResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetFederationQueueRemainingResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers GetFederationQueueRemainingResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers GetFederationQueueRemainingResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseResetFederationQueueResponse parses an HTTP response from a ResetFederationQueueWithResponse call
+func ParseResetFederationQueueResponse(rsp *http.Response) (*ResetFederationQueueResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ResetFederationQueueResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers ResetFederationQueueResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers ResetFederationQueueResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetFederationQueueStateResponse parses an HTTP response from a GetFederationQueueStateWithResponse call
+func ParseGetFederationQueueStateResponse(rsp *http.Response) (*GetFederationQueueStateResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetFederationQueueStateResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers GetFederationQueueStateResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers GetFederationQueueStateResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParsePutFederationQueueStateResponse parses an HTTP response from a PutFederationQueueStateWithResponse call
+func ParsePutFederationQueueStateResponse(rsp *http.Response) (*PutFederationQueueStateResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PutFederationQueueStateResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers PutFederationQueueStateResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers PutFederationQueueStateResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseStopFederationQueueResponse parses an HTTP response from a StopFederationQueueWithResponse call
+func ParseStopFederationQueueResponse(rsp *http.Response) (*StopFederationQueueResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &StopFederationQueueResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers StopFederationQueueResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers StopFederationQueueResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetFederationRepositoryReadyResponse parses an HTTP response from a GetFederationRepositoryReadyWithResponse call
+func ParseGetFederationRepositoryReadyResponse(rsp *http.Response) (*GetFederationRepositoryReadyResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetFederationRepositoryReadyResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers GetFederationRepositoryReadyResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers GetFederationRepositoryReadyResponse503Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -93344,6 +103205,566 @@ func ParseReplaceFederatedMemberBaseUrlResponse(rsp *http.Response) (*ReplaceFed
 	return response, nil
 }
 
+// ParseGetFederationRepositoryExistsResponse parses an HTTP response from a GetFederationRepositoryExistsWithResponse call
+func ParseGetFederationRepositoryExistsResponse(rsp *http.Response) (*GetFederationRepositoryExistsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetFederationRepositoryExistsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers GetFederationRepositoryExistsResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers GetFederationRepositoryExistsResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetFederationInternalRepositoriesResponse parses an HTTP response from a GetFederationInternalRepositoriesWithResponse call
+func ParseGetFederationInternalRepositoriesResponse(rsp *http.Response) (*GetFederationInternalRepositoriesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetFederationInternalRepositoriesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers GetFederationInternalRepositoriesResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers GetFederationInternalRepositoriesResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseEnableFederationInternalRepositoriesResponse parses an HTTP response from a EnableFederationInternalRepositoriesWithResponse call
+func ParseEnableFederationInternalRepositoriesResponse(rsp *http.Response) (*EnableFederationInternalRepositoriesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &EnableFederationInternalRepositoriesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers EnableFederationInternalRepositoriesResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers EnableFederationInternalRepositoriesResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetFederationServiceConnectionResponse parses an HTTP response from a GetFederationServiceConnectionWithResponse call
+func ParseGetFederationServiceConnectionResponse(rsp *http.Response) (*GetFederationServiceConnectionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetFederationServiceConnectionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers GetFederationServiceConnectionResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers GetFederationServiceConnectionResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParsePutFederationServiceConnectionResponse parses an HTTP response from a PutFederationServiceConnectionWithResponse call
+func ParsePutFederationServiceConnectionResponse(rsp *http.Response) (*PutFederationServiceConnectionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PutFederationServiceConnectionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers PutFederationServiceConnectionResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers PutFederationServiceConnectionResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseSnapshotFederationRepositoriesResponse parses an HTTP response from a SnapshotFederationRepositoriesWithResponse call
+func ParseSnapshotFederationRepositoriesResponse(rsp *http.Response) (*SnapshotFederationRepositoriesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SnapshotFederationRepositoriesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers SnapshotFederationRepositoriesResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers SnapshotFederationRepositoriesResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseGetFederationSyncStateResponse parses an HTTP response from a GetFederationSyncStateWithResponse call
 func ParseGetFederationSyncStateResponse(rsp *http.Response) (*GetFederationSyncStateResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -93451,6 +103872,97 @@ func ParseGetFederationSyncStateResponse(rsp *http.Response) (*GetFederationSync
 		response.Headers429 = &headers
 	case rsp.StatusCode == 503:
 		var headers GetFederationSyncStateResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetFederationInternalStatusResponse parses an HTTP response from a GetFederationInternalStatusWithResponse call
+func ParseGetFederationInternalStatusResponse(rsp *http.Response) (*GetFederationInternalStatusResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetFederationInternalStatusResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers GetFederationInternalStatusResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers GetFederationInternalStatusResponse503Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -93759,61 +104271,7 @@ func ParseGetFederatedRepositoryStatusResponse(rsp *http.Response) (*GetFederate
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			// BinariesTasksInfo Optional within this object. Binary transfer tasks for the repository.
-			BinariesTasksInfo *struct {
-				// FailingTasks Optional within this object. Tasks that exhausted their retries (ten by default).
-				FailingTasks *int `json:"failingTasks,omitempty"`
-
-				// InProgressTasks Optional within this object. Tasks in flight or waiting to be retried.
-				InProgressTasks *int `json:"inProgressTasks,omitempty"`
-			} `json:"binariesTasksInfo,omitempty"`
-
-			// FederatedArtifactStatus Optional within this object. Artifact replication counts on this instance: artifacts replicated with metadata and binary, and artifacts whose metadata arrived but whose binary has not.
-			FederatedArtifactStatus *struct {
-				// FullyReplicatedArtifacts Optional within this object. Artifacts with both metadata and binary present.
-				FullyReplicatedArtifacts *int64 `json:"fullyReplicatedArtifacts,omitempty"`
-
-				// MetadataOnlyArtifacts Optional within this object. Artifacts whose binary is still being fetched.
-				MetadataOnlyArtifacts *int64 `json:"metadataOnlyArtifacts,omitempty"`
-			} `json:"federatedArtifactStatus,omitempty"`
-
-			// LocalKey Optional within this object. Repository key on this instance.
-			LocalKey *string `json:"localKey,omitempty"`
-
-			// MirrorEventsStatusInfo Optional within this object. Event delivery state per target mirror.
-			MirrorEventsStatusInfo *[]struct {
-				// CreateEvents Optional within this object. Create events waiting to be sent.
-				CreateEvents *int64 `json:"createEvents,omitempty"`
-
-				// DeleteEvents Optional within this object. Delete events waiting to be sent.
-				DeleteEvents *int64 `json:"deleteEvents,omitempty"`
-
-				// ErrorEvents Optional within this object. Events that failed during sync.
-				ErrorEvents *int64 `json:"errorEvents,omitempty"`
-
-				// EventRegistrationTimeStamp Optional within this object. When the mirror next registers with its target, in epoch milliseconds. Same name as the mirror lag operation.
-				EventRegistrationTimeStamp *int64 `json:"eventRegistrationTimeStamp,omitempty"`
-
-				// LagInMS Optional within this object. Mirror latency: now minus the time of the oldest event not yet handled, in milliseconds. Same name and meaning as the mirror lag operation.
-				LagInMS *int64 `json:"lagInMS,omitempty"`
-
-				// PropertiesEvents Optional within this object. Property change events waiting to be sent.
-				PropertiesEvents *int64 `json:"propertiesEvents,omitempty"`
-
-				// RemoteRepoKey Optional within this object. Repository key on the target mirror.
-				RemoteRepoKey *string `json:"remoteRepoKey,omitempty"`
-
-				// RemoteUrl Optional within this object. Base URL of the target mirror's instance.
-				RemoteUrl *string `json:"remoteUrl,omitempty"`
-
-				// Status Optional within this object. Whether the mirror is in sync. Version 1 reports SYNCED or OUT_OF_SYNC; version 2 reports the member states (HEALTHY, PENDING_FS, FULL_SYNC_RUNNING, ERROR_GENERIC, ERROR_INACTIVE, ERROR_OUT_OF_SYNC, READ_ONLY, IMPORT_IN_PROGRESS).
-				Status *string `json:"status,omitempty"`
-
-				// UpdateEvents Optional within this object. Update events waiting to be sent.
-				UpdateEvents *int64 `json:"updateEvents,omitempty"`
-			} `json:"mirrorEventsStatusInfo,omitempty"`
-		}
+		var dest FederatedRepositoryStatus
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -93897,6 +104355,139 @@ func ParseGetFederatedRepositoryStatusResponse(rsp *http.Response) (*GetFederate
 		response.Headers429 = &headers
 	case rsp.StatusCode == 503:
 		var headers GetFederatedRepositoryStatusResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetFederatedRepositoryStatusProjectionResponse parses an HTTP response from a GetFederatedRepositoryStatusProjectionWithResponse call
+func ParseGetFederatedRepositoryStatusProjectionResponse(rsp *http.Response) (*GetFederatedRepositoryStatusProjectionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetFederatedRepositoryStatusProjectionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest FederatedRepositoryStatus
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 405:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON405 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers GetFederatedRepositoryStatusProjectionResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers GetFederatedRepositoryStatusProjectionResponse503Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -94065,44 +104656,14 @@ func ParseGetFederationStateDetailsResponse(rsp *http.Response) (*GetFederationS
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			// Federations Optional within this object. One entry per federated repository.
-			Federations *[]struct {
-				// LocalRepoKey Optional within this object. Repository key on this instance.
-				LocalRepoKey *string `json:"localRepoKey,omitempty"`
-
-				// MemberInfoList Optional within this object. The members and their state.
-				MemberInfoList *[]struct {
-					// AggregatedStatus Optional within this object. The member's state, one of those counted by the state summary operation.
-					AggregatedStatus *string `json:"aggregatedStatus,omitempty"`
-
-					// IsDisabled Optional within this object. True when sync to this member is turned off.
-					IsDisabled *bool `json:"isDisabled,omitempty"`
-
-					// IsInLag Optional within this object. True when the member's oldest undelivered event is older than the lag threshold.
-					IsInLag *bool `json:"isInLag,omitempty"`
-
-					// IsSupported Optional within this object. False when the member's sync protocol version is incompatible.
-					IsSupported *bool `json:"isSupported,omitempty"`
-
-					// RepoKey Optional within this object. Repository key on the member.
-					RepoKey *string `json:"repoKey,omitempty"`
-
-					// Url Optional within this object. Base URL of the member instance.
-					Url *string `json:"url,omitempty"`
-				} `json:"memberInfoList,omitempty"`
-
-				// Priority Optional within this object. Queue priority of the repository, `HIGH` or `STANDARD`.
-				Priority *GetFederationStateDetails200JSONResponseBodyFederationsPriority `json:"priority,omitempty"`
-			} `json:"federations,omitempty"`
-		}
+		var dest FederationStateList
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest ErrorResponse
+		var dest GetFederationStateDetails400JSONResponseBody
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -94221,38 +104782,14 @@ func ParseGetFederationStateSummariesResponse(rsp *http.Response) (*GetFederatio
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			// FederationStates Optional within this object. Number of members in each state.
-			FederationStates *struct {
-				// DELAYED Optional within this object. Members whose events wait longer than the lag threshold.
-				DELAYED *int64 `json:"DELAYED,omitempty"`
-
-				// DISABLED Optional within this object. Members with sync turned off.
-				DISABLED *int64 `json:"DISABLED,omitempty"`
-
-				// ERROR Optional within this object. Members whose events fail after every retry.
-				ERROR *int64 `json:"ERROR,omitempty"`
-
-				// FULLSYNCRUNNING Optional within this object. Members in a full sync.
-				FULLSYNCRUNNING *int64 `json:"FULL_SYNC_RUNNING,omitempty"`
-
-				// HEALTHY Optional within this object. Members receiving events promptly.
-				HEALTHY *int64 `json:"HEALTHY,omitempty"`
-
-				// NOTAVAILABLE Optional within this object. Members that cannot be reached.
-				NOTAVAILABLE *int64 `json:"NOT_AVAILABLE,omitempty"`
-
-				// PENDINGFS Optional within this object. Members waiting for a full sync, for example right after joining.
-				PENDINGFS *int64 `json:"PENDING_FS,omitempty"`
-			} `json:"federationStates,omitempty"`
-		}
+		var dest FederationStateSummary
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest ErrorResponse
+		var dest GetFederationStateSummaries400JSONResponseBody
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -94487,6 +105024,188 @@ func ParseGetUnavailableMirrorsResponse(rsp *http.Response) (*GetUnavailableMirr
 	return response, nil
 }
 
+// ParseSubmitFederationInternalTaskResponse parses an HTTP response from a SubmitFederationInternalTaskWithResponse call
+func ParseSubmitFederationInternalTaskResponse(rsp *http.Response) (*SubmitFederationInternalTaskResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SubmitFederationInternalTaskResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers SubmitFederationInternalTaskResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers SubmitFederationInternalTaskResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetFederationTenantMoveStatusResponse parses an HTTP response from a GetFederationTenantMoveStatusWithResponse call
+func ParseGetFederationTenantMoveStatusResponse(rsp *http.Response) (*GetFederationTenantMoveStatusResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetFederationTenantMoveStatusResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers GetFederationTenantMoveStatusResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers GetFederationTenantMoveStatusResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseUpdateFederatedMemberUrlResponse parses an HTTP response from a UpdateFederatedMemberUrlWithResponse call
 func ParseUpdateFederatedMemberUrlResponse(rsp *http.Response) (*UpdateFederatedMemberUrlResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -94572,6 +105291,97 @@ func ParseUpdateFederatedMemberUrlResponse(rsp *http.Response) (*UpdateFederated
 		response.Headers429 = &headers
 	case rsp.StatusCode == 503:
 		var headers UpdateFederatedMemberUrlResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseValidateFederationRepositoryResponse parses an HTTP response from a ValidateFederationRepositoryWithResponse call
+func ParseValidateFederationRepositoryResponse(rsp *http.Response) (*ValidateFederationRepositoryResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ValidateFederationRepositoryResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers ValidateFederationRepositoryResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers ValidateFederationRepositoryResponse503Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -115689,61 +126499,7 @@ func ParseGetFederatedRepositoryStatusV2Response(rsp *http.Response) (*GetFedera
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			// BinariesTasksInfo Optional within this object. Binary transfer tasks for the repository.
-			BinariesTasksInfo *struct {
-				// FailingTasks Optional within this object. Tasks that exhausted their retries (ten by default).
-				FailingTasks *int `json:"failingTasks,omitempty"`
-
-				// InProgressTasks Optional within this object. Tasks in flight or waiting to be retried.
-				InProgressTasks *int `json:"inProgressTasks,omitempty"`
-			} `json:"binariesTasksInfo,omitempty"`
-
-			// FederatedArtifactStatus Optional within this object. Artifact replication counts on this instance: artifacts replicated with metadata and binary, and artifacts whose metadata arrived but whose binary has not.
-			FederatedArtifactStatus *struct {
-				// FullyReplicatedArtifacts Optional within this object. Artifacts with both metadata and binary present.
-				FullyReplicatedArtifacts *int64 `json:"fullyReplicatedArtifacts,omitempty"`
-
-				// MetadataOnlyArtifacts Optional within this object. Artifacts whose binary is still being fetched.
-				MetadataOnlyArtifacts *int64 `json:"metadataOnlyArtifacts,omitempty"`
-			} `json:"federatedArtifactStatus,omitempty"`
-
-			// LocalKey Optional within this object. Repository key on this instance.
-			LocalKey *string `json:"localKey,omitempty"`
-
-			// MirrorEventsStatusInfo Optional within this object. Event delivery state per target mirror.
-			MirrorEventsStatusInfo *[]struct {
-				// CreateEvents Optional within this object. Create events waiting to be sent.
-				CreateEvents *int64 `json:"createEvents,omitempty"`
-
-				// DeleteEvents Optional within this object. Delete events waiting to be sent.
-				DeleteEvents *int64 `json:"deleteEvents,omitempty"`
-
-				// ErrorEvents Optional within this object. Events that failed during sync.
-				ErrorEvents *int64 `json:"errorEvents,omitempty"`
-
-				// EventRegistrationTimeStamp Optional within this object. When the mirror next registers with its target, in epoch milliseconds. Same name as the mirror lag operation.
-				EventRegistrationTimeStamp *int64 `json:"eventRegistrationTimeStamp,omitempty"`
-
-				// LagInMS Optional within this object. Mirror latency: now minus the time of the oldest event not yet handled, in milliseconds. Same name and meaning as the mirror lag operation.
-				LagInMS *int64 `json:"lagInMS,omitempty"`
-
-				// PropertiesEvents Optional within this object. Property change events waiting to be sent.
-				PropertiesEvents *int64 `json:"propertiesEvents,omitempty"`
-
-				// RemoteRepoKey Optional within this object. Repository key on the target mirror.
-				RemoteRepoKey *string `json:"remoteRepoKey,omitempty"`
-
-				// RemoteUrl Optional within this object. Base URL of the target mirror's instance.
-				RemoteUrl *string `json:"remoteUrl,omitempty"`
-
-				// Status Optional within this object. Whether the mirror is in sync. Version 1 reports SYNCED or OUT_OF_SYNC; version 2 reports the member states (HEALTHY, PENDING_FS, FULL_SYNC_RUNNING, ERROR_GENERIC, ERROR_INACTIVE, ERROR_OUT_OF_SYNC, READ_ONLY, IMPORT_IN_PROGRESS).
-				Status *string `json:"status,omitempty"`
-
-				// UpdateEvents Optional within this object. Update events waiting to be sent.
-				UpdateEvents *int64 `json:"updateEvents,omitempty"`
-			} `json:"mirrorEventsStatusInfo,omitempty"`
-		}
+		var dest FederatedRepositoryStatus
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -115827,6 +126583,139 @@ func ParseGetFederatedRepositoryStatusV2Response(rsp *http.Response) (*GetFedera
 		response.Headers429 = &headers
 	case rsp.StatusCode == 503:
 		var headers GetFederatedRepositoryStatusV2Response503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetFederatedRepositoryStatusProjectionV2Response parses an HTTP response from a GetFederatedRepositoryStatusProjectionV2WithResponse call
+func ParseGetFederatedRepositoryStatusProjectionV2Response(rsp *http.Response) (*GetFederatedRepositoryStatusProjectionV2Response, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetFederatedRepositoryStatusProjectionV2Response{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest FederatedRepositoryStatus
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 405:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON405 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers GetFederatedRepositoryStatusProjectionV2Response429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers GetFederatedRepositoryStatusProjectionV2Response503Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
