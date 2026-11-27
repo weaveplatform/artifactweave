@@ -8,8 +8,8 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -312,51 +312,44 @@ func qualifyDockerClients(t *testing.T, all []*peers.Instance, origin *peers.Ins
 		if in != origin {
 			cleanup(ref(in))
 		}
-		// crane has no daemon image cache. Each fresh archive therefore
+		// crane has no daemon image cache. Each fresh OCI layout therefore
 		// requires this member's actual config and layer blobs, even when
 		// the Docker daemon already holds the image used by the publisher.
-		archive := filepath.Join(t.TempDir(), "cold-image.tar")
+		layout := filepath.Join(t.TempDir(), "cold-image")
 		run(clienttest.Registry(t.Context(), dir, config, os.Getenv("ARTIFACTWEAVE_CRANE_BIN"),
-			[]string{"pull", "--format", "oci", ref(in), archive}), true)
-		verifyColdImage(t, archive, manifest.Config.Digest, diffID)
+			[]string{"pull", "--format", "oci", ref(in), layout}), true)
+		verifyColdImage(t, layout, manifest.Config.Digest, diffID)
 	}
 }
 
-func verifyColdImage(t *testing.T, archive, configDigest, diffID string) {
+func verifyColdImage(t *testing.T, layout, configDigest, diffID string) {
 	t.Helper()
-	file, err := os.Open(archive)
-	if err != nil {
+	if err := checkColdImageConfig(layout, configDigest, diffID); err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = file.Close() }()
-	reader := tar.NewReader(file)
-	for {
-		head, err := reader.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			t.Fatal(err)
-		}
-		if strings.TrimPrefix(head.Name, "./") == "blobs/sha256/"+strings.TrimPrefix(configDigest, "sha256:") {
-			data, err := io.ReadAll(reader)
-			if err != nil {
-				t.Fatal(err)
-			}
-			sum := sha256.Sum256(data)
-			if "sha256:"+hex.EncodeToString(sum[:]) != configDigest {
-				t.Fatal("cold image config digest differs")
-			}
-			var config struct {
-				RootFS struct {
-					DiffIDs []string `json:"diff_ids"`
-				} `json:"rootfs"`
-			}
-			if json.Unmarshal(data, &config) != nil || !slices.Equal(config.RootFS.DiffIDs, []string{diffID}) {
-				t.Fatal("cold image config describes different rootfs content")
-			}
-			return
-		}
+}
+
+func checkColdImageConfig(layout, configDigest, diffID string) error {
+	// crane --format=oci writes an OCI layout directory, including every
+	// referenced blob. Read the config by its published content address.
+	data, err := os.ReadFile(filepath.Join(layout, "blobs", "sha256", strings.TrimPrefix(configDigest, "sha256:")))
+	if err != nil {
+		return fmt.Errorf("read cold image config: %w", err)
 	}
-	t.Fatal("cold registry download omitted the image config")
+	sum := sha256.Sum256(data)
+	if "sha256:"+hex.EncodeToString(sum[:]) != configDigest {
+		return errors.New("cold image config digest differs")
+	}
+	var config struct {
+		RootFS struct {
+			DiffIDs []string `json:"diff_ids"`
+		} `json:"rootfs"`
+	}
+	if err := json.Unmarshal(data, &config); err != nil {
+		return fmt.Errorf("decode cold image config: %w", err)
+	}
+	if !slices.Equal(config.RootFS.DiffIDs, []string{diffID}) {
+		return errors.New("cold image config describes different rootfs content")
+	}
+	return nil
 }
