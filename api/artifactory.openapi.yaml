@@ -26267,7 +26267,7 @@ components:
       type: object
     FederatedArtifactStatus:
       type: object
-      description: Optional within this object. The artifact counts named by the 7.161.26 source DTO.
+      description: Optional within this object. Counts of replicated files and files awaiting content.
       x-unverified: true
       properties:
         countFullyReplicateArtifacts:
@@ -26314,7 +26314,7 @@ components:
       type: object
     FederatedMirrorEvents:
       type: object
-      description: The event fields named by the 7.161.26 source DTO.
+      description: Pending events and delivery state for one outbound member.
       x-unverified: true
       properties:
         remoteUrl:
@@ -26646,7 +26646,7 @@ components:
         path: github.com/weaveplatform/artifactweave/internal/artifacts/api/repo
     FederatedRepositoryStatus:
       type: object
-      description: The 7.161.26 repository status DTO. JSON field names follow source fields and remain inferred.
+      description: Repository key, outbound member event state, binary tasks and artifact counts.
       x-unverified: true
       properties:
         localKey:

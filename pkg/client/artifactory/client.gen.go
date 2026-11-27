@@ -4454,7 +4454,7 @@ type ExportSettings struct {
 	Verbose *bool `json:"verbose,omitempty"`
 }
 
-// FederatedArtifactStatus Optional within this object. The artifact counts named by the 7.161.26 source DTO.
+// FederatedArtifactStatus Optional within this object. Counts of replicated files and files awaiting content.
 type FederatedArtifactStatus struct {
 	// CountArtificiallyReplicatedArtifacts Optional within this object. File paths whose winning metadata is still awaiting content.
 	CountArtificiallyReplicatedArtifacts *int64 `json:"countArtificiallyReplicatedArtifacts,omitempty"`
@@ -4487,7 +4487,7 @@ type FederatedFailedBinary struct {
 	Sha1 *string `json:"sha1,omitempty"`
 }
 
-// FederatedMirrorEvents The event fields named by the 7.161.26 source DTO.
+// FederatedMirrorEvents Pending events and delivery state for one outbound member.
 type FederatedMirrorEvents struct {
 	// CreateEvents Optional within this object. Undelivered creates.
 	CreateEvents *int64 `json:"createEvents,omitempty"`
@@ -4532,12 +4532,12 @@ type FederatedReplaceUrl struct {
 // FederatedRepositoryConfiguration Configuration of a federated repository: a local repository whose content and metadata are kept in sync with copies on other instances of this server (decision 0022). Members are instances of this server that trust each other through pairing (decision 0021). Deploys, deletes, moves, copies and property changes on any member are sent to the others as ordered events; where two members change the same item, the change with the later event time wins and the originating instance id breaks ties. A full sync repairs members that missed events.
 type FederatedRepositoryConfiguration = repo.Config
 
-// FederatedRepositoryStatus The 7.161.26 repository status DTO. JSON field names follow source fields and remain inferred.
+// FederatedRepositoryStatus Repository key, outbound member event state, binary tasks and artifact counts.
 type FederatedRepositoryStatus struct {
 	// BinariesTasksInfo Optional within this object. Binary task counts from current pending changes and failed-fetch records.
 	BinariesTasksInfo *FederatedStatusBinaryTasks `json:"binariesTasksInfo,omitempty"`
 
-	// FederatedArtifactStatus Optional within this object. The artifact counts named by the 7.161.26 source DTO.
+	// FederatedArtifactStatus Optional within this object. Counts of replicated files and files awaiting content.
 	FederatedArtifactStatus *FederatedArtifactStatus `json:"federatedArtifactStatus,omitempty"`
 
 	// LocalKey Optional within this object. The repository key on this instance.
