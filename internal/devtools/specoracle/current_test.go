@@ -87,10 +87,16 @@ func currentGroupsSite(t *testing.T, definition string) *docsSite {
 		"- [Storage]({URL}/administration/reference/storage.md)\n")
 	props := map[string]any{
 		"oasPublicUrl": "@administration/v1.0#currentgroups",
-		"document": map[string]any{"parent": map[string]string{"uri": "/branches/1.0/reference/groups"},
-			"api": map[string]any{"uri": "/branches/1.0/apis/groups-openapi.yml", "method": "get", "path": "/access/api/v2/groups/{name}",
-				"schema": map[string]any{"openapi": "3.1.0", "info": map[string]string{"title": "JFrog Platform - Groups API"},
-					"paths": map[string]any{"/access/api/v2/groups/{name}": map[string]any{"get": map[string]string{"operationId": "getGroupDetails"}}}}}},
+		"document": map[string]any{
+			"parent": map[string]string{"uri": "/branches/1.0/reference/groups"},
+			"api": map[string]any{
+				"uri": "/branches/1.0/apis/groups-openapi.yml", "method": "get", "path": "/access/api/v2/groups/{name}",
+				"schema": map[string]any{
+					"openapi": "3.1.0", "info": map[string]string{"title": "JFrog Platform - Groups API"},
+					"paths": map[string]any{"/access/api/v2/groups/{name}": map[string]any{"get": map[string]string{"operationId": "getGroupDetails"}}},
+				},
+			},
+		},
 		"sidebar": []any{map[string]any{"pages": []any{map[string]any{"slug": "groups", "pages": children}}}},
 	}
 	raw, err := json.Marshal(props)
@@ -121,8 +127,10 @@ func TestAccFetchCurrentGroupsUsesCompletePublishedDefinition(t *testing.T) {
 			}
 			groups := site.url("/administration/reference/jfrog-platform-groups-api/llms.txt")
 			m, err := Fetch(context.Background(), FetchOptions{
-				Indexes: []string{site.url("/administration/reference/jfrog-platform-rest-apis/llms.txt"), groups,
-					site.url("/administration/reference/storage-and-archive/llms.txt")},
+				Indexes: []string{
+					site.url("/administration/reference/jfrog-platform-rest-apis/llms.txt"), groups,
+					site.url("/administration/reference/storage-and-archive/llms.txt"),
+				},
 				CacheDir: dir, Client: &http.Client{Transport: currentRegistryTransport{base: base}},
 				Delay: time.Millisecond, Known: map[string][]string{family: {site.url("/administration/reference/replacegroup.md")}},
 			})
@@ -194,7 +202,11 @@ func TestAccFetchCurrentGroupsRejectsUnverifiedSources(t *testing.T) {
 		{"wrong family", strings.Replace(currentGroupsDefinition, "JFrog Platform - Groups API", "JFrog Platform - Workers API", 1), ""},
 		{"malformed definition", "{bad", ""},
 		{"no operations", `{"openapi":"3.1.0","info":{"title":"JFrog Platform - Groups API"},"paths":{}}`, ""},
-		{"missing advertised operation", strings.Replace(currentGroupsDefinition, `"post":{"operationId":"createGroup","responses":{"201":{"description":"test"}}}`, `"parameters":[]`, 1), ""},
+		{
+			"missing advertised operation",
+			strings.Replace(currentGroupsDefinition, `"post":{"operationId":"createGroup","responses":{"201":{"description":"test"}}}`, `"parameters":[]`, 1),
+			"",
+		},
 		{"missing public handle", currentGroupsDefinition, `<script id="ssr-props">{"sidebar":[]}</script>`},
 		{"unrelated html", currentGroupsDefinition, `<h1>Groups</h1><a href="https://elsewhere.invalid">related pages</a>`},
 	}

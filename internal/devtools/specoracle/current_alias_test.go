@@ -25,12 +25,53 @@ type aliasCase struct {
 }
 
 var aliasCases = []aliasCase{
-	{"system", "artifactory-system-api", "getclusterlocks", "artifactory-system-api.yaml", "JFrog Platform - Artifactory System API", "system-1", "/artifactory/api/system/locks", "getClusterLocks", systemDefinition,
-		[]string{"getcurationinterfacesettings", "getclusterlocks", "getnodelocks", "updatecurationinterfacesettings"}, 30},
-	{"aws", "aws-iam-api", "getawsiamrole", "aws-iam-openapi.yml", "JFrog Platform - AWS IAM API", "aws-iam-role", "/access/api/v1/aws/iam_role/{username}", "getAwsIamRole", awsDefinition,
-		[]string{"deleteawsiamrole", "getawsiamrole", "putawsiamrole"}, 3},
-	{"federation", "access-federation-api", "getallaccessfederations", "federation-openapi.yml", "JFrog Platform - Access Federation API", "federation", "/access/api/v1/system/federation", "getAllAccessFederations", federationDefinition,
-		[]string{"deleteaccessfederation", "getallaccessfederations", "getaccessfederation", "updateaccessfederation", "registeraccessfederation", "validatefederationtarget", "fullbroadcastaccessfederation"}, 7},
+	{
+		"system",
+		"artifactory-system-api",
+		"getclusterlocks",
+		"artifactory-system-api.yaml",
+		"JFrog Platform - Artifactory System API",
+		"system-1",
+		"/artifactory/api/system/locks",
+		"getClusterLocks",
+		systemDefinition,
+		[]string{"getcurationinterfacesettings", "getclusterlocks", "getnodelocks", "updatecurationinterfacesettings"},
+		30,
+	},
+	{
+		"aws",
+		"aws-iam-api",
+		"getawsiamrole",
+		"aws-iam-openapi.yml",
+		"JFrog Platform - AWS IAM API",
+		"aws-iam-role",
+		"/access/api/v1/aws/iam_role/{username}",
+		"getAwsIamRole",
+		awsDefinition,
+		[]string{"deleteawsiamrole", "getawsiamrole", "putawsiamrole"},
+		3,
+	},
+	{
+		"federation",
+		"access-federation-api",
+		"getallaccessfederations",
+		"federation-openapi.yml",
+		"JFrog Platform - Access Federation API",
+		"federation",
+		"/access/api/v1/system/federation",
+		"getAllAccessFederations",
+		federationDefinition,
+		[]string{
+			"deleteaccessfederation",
+			"getallaccessfederations",
+			"getaccessfederation",
+			"updateaccessfederation",
+			"registeraccessfederation",
+			"validatefederationtarget",
+			"fullbroadcastaccessfederation",
+		},
+		7,
+	},
 }
 
 func aliasSite(t *testing.T, tc aliasCase, htmlSchema, endorsingID, method string) *docsSite {
@@ -71,8 +112,10 @@ func aliasSite(t *testing.T, tc aliasCase, htmlSchema, endorsingID, method strin
 	schema := map[string]any{"openapi": "3.1.0", "info": full["info"], "paths": map[string]any{tc.path: map[string]any{"get": map[string]any{"operationId": endorsingID}}}}
 	props := map[string]any{
 		"oasPublicUrl": "@administration/v1.0#" + tc.name,
-		"document": map[string]any{"parent": map[string]string{"uri": "/branches/1.0/reference/" + tc.parent},
-			"api": map[string]any{"uri": "/branches/1.0/apis/" + htmlSchema, "method": method, "path": tc.path, "schema": schema}},
+		"document": map[string]any{
+			"parent": map[string]string{"uri": "/branches/1.0/reference/" + tc.parent},
+			"api":    map[string]any{"uri": "/branches/1.0/apis/" + htmlSchema, "method": method, "path": tc.path, "schema": schema},
+		},
 		// System's current parent includes a different definition's endpoint.
 		// Full-definition ownership must not pull that unrelated sidebar child in.
 		"sidebar": []any{map[string]any{"pages": []any{map[string]any{"slug": tc.parent, "pages": []any{
