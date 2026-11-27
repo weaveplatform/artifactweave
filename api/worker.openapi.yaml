@@ -489,6 +489,8 @@ paths:
           $ref: '#/components/responses/WorkerForbidden'
         '404':
           $ref: '#/components/responses/WorkerNotFound'
+        '409':
+          description: The worker belongs to a chain.
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '503':
@@ -695,6 +697,9 @@ components:
         mandatoryFilter:
           description: Optional within this object. When true the action requires the filterCriteria member named by filterType; when absent or false the action rejects a filter.
           type: boolean
+        module:
+          description: Optional within this object. Event module within its application; empty for an event without a separate module.
+          type: string
         requestSchema:
           description: Optional within this object. JSON schema of the input as text, when available.
           type: string
@@ -741,6 +746,9 @@ components:
       properties:
         action:
           description: Optional within this object. The event that runs the worker. BEFORE_ actions run synchronously inside the operation and can veto or alter it; AFTER_ actions run after it has committed; GENERIC_EVENT workers run only when called through the execute operation. The server accepts only the actions it can trigger, which GET /api/v2/actions lists; any other value is rejected with 400.
+          type: string
+        chainKey:
+          description: Optional within this object. Identifier of the chain containing this worker, when it belongs to a chain.
           type: string
         debug:
           description: Optional within this object. When true every run is recorded in the execution history; when false, the default, only failed runs are.

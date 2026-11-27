@@ -1413,8 +1413,8 @@ jobs:
   # status codes. It is a required check from P1 on: the baseline lists only
   # out-of-scope products, so any new gap or divergence in the authored specs
   # fails the gate. docs.jfrog.com is contacted only on a cache miss: the
-  # first run of each ISO week, a change to tools/specoracle/main.go or a
-  # bumped key. If that fetch fails, rerun the job rather than removing it
+  # first run of each ISO week, a change to discovery code or its committed
+  # inventory, or a bumped key. If that fetch fails, rerun the job rather than removing it
   # from the gate.
   parity:
     name: 'Spec parity (JFrog oracle)'
@@ -1444,11 +1444,10 @@ jobs:
       # made only of the index list never fetched them again (#419). The ISO
       # week in the key makes the first run of each week crawl afresh, so a
       # changed page reaches the parity check within a week. The key also
-      # changes with the index list in tools/specoracle, so a new API family
-      # is crawled at once; bump the version to force a crawl mid-week. There
-      # are no restore-keys on purpose: the loader reads every file in the
-      # cache directory, so a restored older crawl would keep the pages JFrog
-      # has since removed.
+      # changes with discovery code and the committed inventory, so changed
+      # source selection cannot restore a snapshot from the former discovery
+      # rules (#1988). There are no restore-keys: a cache hit must restore the
+      # same validated manifest snapshot; the ISO week still bounds refresh.
       - name: Oracle cache week
         id: week
         run: echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
@@ -1458,7 +1457,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .specoracle
-          key: specoracle-${{ hashFiles('tools/specoracle/main.go') }}-v1-${{ steps.week.outputs.week }}
+          key: specoracle-${{ hashFiles('tools/specoracle/*.go', 'internal/devtools/specoracle/*.go', 'api/oracle-inventory.json') }}-v2-${{ steps.week.outputs.week }}
 
       - name: Fetch JFrog definitions (cache miss only)
         if: steps.oracle.outputs.cache-hit != 'true'

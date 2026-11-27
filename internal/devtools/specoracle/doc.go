@@ -21,7 +21,9 @@
 //     this project. When a family's index fails, the parent llms.txt one
 //     directory up, in the section that lists the most pages an earlier
 //     fetch found for the family (FetchOptions.Known, which tools/specoracle
-//     reads from api/oracle-inventory.json).
+//     reads from api/oracle-inventory.json). The four evidenced administration
+//     aliases follow current pages to their endorsed full definitions (#1988);
+//     historical page URLs are discovery anchors, not perpetual membership.
 //   - The cache directory, .specoracle by convention: one
 //     <family>/<page>.json file per block, and manifest.json (Load,
 //     BuildInventory, Scaffold).
@@ -61,9 +63,10 @@
 //     declaring one never moves the baseline. A whole document whose info
 //     is so marked, the peer API's (decision 0021), is ours alone: LoadOurs
 //     leaves out all of it, so it is neither extra nor a family.
-//   - One bad page never hides the rest: Fetch records a page that fails or
-//     has no block in the manifest, and Load records a block that does not
-//     parse in the oracle's Errors.
+//   - Fetch records a page that fails or has no block in the manifest.
+//     Manifest-backed reads reject any damaged declared block and ignore
+//     orphan files. Standalone legacy fixtures without a manifest retain
+//     parse failures in the oracle's Errors.
 //   - A whole family is never dropped without a failure: CheckFamilies names
 //     every family the cache holds no block of, with its index URL, and the
 //     parity test, the baseline and the inventory refuse such a cache
@@ -105,6 +108,15 @@
 //     docs.jfrog.com, a family whose index answers 404 or keeps failing is
 //     fetched from its parent section, and each way the fallback can fail
 //     leaves the family missing and named by CheckFamilies.
+//     TestAccFetchCurrentGroupsUsesCompletePublishedDefinition and
+//     TestAccFetchCurrentGroupsRejectsUnverifiedSources cover current Groups
+//     discovery, full-definition ownership and rejection of unrelated sources.
+//     TestAccFetchCurrentAliasesOwnOnlyTheirFullDefinitions and
+//     TestAccFetchCurrentAliasesRejectWrongEndorsement cover System, AWS IAM
+//     and Access Federation without substituting their broad parent sections.
+//     TestUnitManifestSnapshotIgnoresOrphanFiles and
+//     TestUnitManifestSnapshotRejectsRecordedDamage cover the declared current
+//     snapshot, stale warm files, missing/corrupt blocks and safe file paths.
 //     TestUnitCheckFamiliesReadsTheManifest, TestUnitKnownPagesReadsTheInventory,
 //     TestUnitParentURLAndSections.
 //   - TestUnitLoadAndCompare, TestUnitLoadOursErrors,

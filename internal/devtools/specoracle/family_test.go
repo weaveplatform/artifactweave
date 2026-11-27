@@ -210,6 +210,61 @@ func TestAccFetchTakesAFailedFamilyIndexFromItsParent(t *testing.T) {
 	}
 }
 
+// On 2026-11-27 the Groups index and replacegroup.md both answered 404.
+// The parent retained other group operations under the broad REST family;
+// those pages cannot establish that the missing replaceGroup family was read.
+func TestAccFetchMissingGroupsKeepsSiblingAttribution(t *testing.T) {
+	const parentBody = `# Administration Documentation
+
+## API Reference: JFrog Platform REST APIs
+- Groups
+  - [Get Group Details]({URL}/administration/reference/getgroupdetails.md)
+  - [Create a Group]({URL}/administration/reference/creategroup.md)
+
+## API Reference: Storage and Archive
+  - [Get Storage Info]({URL}/administration/reference/getstorageinfo.md)
+`
+	site := newDocsSite(t, map[string]string{
+		"getgroupdetails": theirRepoPage,
+		"creategroup":     theirRepoPage,
+		"getstorageinfo":  theirRepoPage,
+	})
+	groups := site.url("/administration/reference/jfrog-platform-groups-api/llms.txt")
+	storage := site.url("/administration/reference/storage-and-archive/llms.txt")
+	site.index("/administration/reference/jfrog-platform-groups-api/llms.txt",
+		http.StatusNotFound, "")
+	site.index("/administration/reference/storage-and-archive/llms.txt",
+		http.StatusNotFound, "")
+	site.parent("/administration/reference/llms.txt", http.StatusOK, parentBody)
+	dir := t.TempDir()
+	m := site.fetch(t, dir, []string{groups, storage}, map[string][]string{
+		"administration-jfrog-platform-groups-api": {
+			site.url("/administration/reference/replacegroup.md"),
+		},
+		"administration-storage-and-archive": {
+			site.url("/administration/reference/getstorageinfo.md"),
+		},
+	})
+	if len(m.Entries) != 1 || m.Entries[0].Family != "administration-storage-and-archive" ||
+		m.Entries[0].URL != site.url("/administration/reference/getstorageinfo.md") ||
+		m.Entries[0].File == "" {
+		t.Fatalf("only the evidenced storage sibling should be cached: %+v", m.Entries)
+	}
+	if len(m.Missing()) != 1 || m.Missing()[0].Family != "administration-jfrog-platform-groups-api" {
+		t.Fatalf("the missing Groups family must remain explicit: %+v", m.Missing())
+	}
+	if m.Families[0].Source != "" || m.Families[0].Section != "" {
+		t.Errorf("the broad REST section must not be attributed to Groups: %+v", m.Families[0])
+	}
+	if m.Families[1].Section != "API Reference: Storage and Archive" {
+		t.Errorf("storage must retain its own parent section: %+v", m.Families[1])
+	}
+	err := CheckFamilies(dir)
+	if !errors.Is(err, ErrMissingFamily) || !strings.Contains(err.Error(), "no section of the parent index lists a known page") {
+		t.Fatalf("the required-family guard must reject this crawl: %v", err)
+	}
+}
+
 func TestAccFetchRecordsEachFamilyNoSourceGave(t *testing.T) {
 	site := newDocsSite(t, map[string]string{
 		"noblock":        "# nothing here\n",
@@ -379,7 +434,9 @@ func TestUnitCheckFamiliesReadsTheManifest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := CheckFamilies(write(t, string(good))); err != nil {
+	goodDir := write(t, string(good))
+	writeCache(t, goodDir, "f", "p.json", theirRepoBlock)
+	if err := CheckFamilies(goodDir); err != nil {
 		t.Fatalf("CheckFamilies = %v, want nil", err)
 	}
 }
