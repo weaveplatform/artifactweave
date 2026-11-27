@@ -7,7 +7,7 @@
 # for it keeps it below Node 25, which an entry shared with node.Dockerfile
 # would do to that image too. While they shared one, #934 moved this image
 # to Node 26 (#1119). The job builds it as artifactweave-accept-npm12.
-FROM node:24.22.3-bookworm-slim@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54
+FROM node:24.22.3-bookworm-slim@sha256:873f586f3794f52281bd039bf02c048a0be08fde619338f9941bad1eb6b34530
 RUN npm install --global npm@12.2.1 && npm cache clean --force
 
 # Retain the installed client identity in the native image build log.
