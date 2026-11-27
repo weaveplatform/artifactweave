@@ -350,11 +350,6 @@ harness they share. `peers.Start(t, peers.Options{Instances: n, Driver: d})`
 starts a cluster and these conventions hold for every scenario, and for the
 Terraform federated scenario that reuses them (QUA-02):
 
-- **Local toolchain.** For the current P13 qualification, set
-  `GOTOOLCHAIN=go1.27.4` for Go commands and `make` children and verify
-  `go version` before the gate. An older host executable must not silently
-  repeat a superseded toolchain run; keep the patch-level build and
-  vulnerability checks enabled ([#1208](https://github.com/weaveplatform/artifactweave/issues/1208)).
 - **Processes.** Each instance is the test binary itself, re-executed into
   `TestAccPeerInstance` as P11's two-process push suites do. It loads a strict
   YAML configuration with `config.Load`, without the host's environment, and
