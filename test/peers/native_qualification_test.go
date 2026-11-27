@@ -206,9 +206,13 @@ func testPeerClients(t *testing.T, driver peers.Driver) {
 				),
 				false,
 			)
-			if !strings.Contains(out, artifact) || !strings.Contains(out, "Could not find artifact") {
-				t.Fatal("Maven failed without proving the deleted artifact was unavailable")
+			coordinate := "org.artifactweave.qualification:" + artifact + ":jar:1.0.0"
+			// Resolver may report the first 404 or the same-session cached miss
+			// after consulting both the mirror and explicit repository.
+			if !strings.Contains(out, "Could not find artifact "+coordinate) && !strings.Contains(out, coordinate+" was not found in ") {
+				t.Fatalf("Maven failed without proving the deleted coordinate was unavailable:\n%s", out)
 			}
+			t.Logf("Maven refused the deleted coordinate %s:\n%s", coordinate, out)
 
 			qualifyDockerClients(t, all, origin, i, run)
 		})
@@ -258,28 +262,34 @@ func qualifyDockerClients(t *testing.T, all []*peers.Instance, origin *peers.Ins
 	run(docker("tag", image, ref(origin)), true)
 	cleanup(ref(origin))
 	run(docker("push", ref(origin)), true)
+	// Docker's local import ID names a config in the classic store and a
+	// manifest in the containerd store. Qualify the published content graph
+	// and known rootfs bytes independently of that daemon identifier.
+	manifestPath := fmt.Sprintf("/v2/native-docker/qualification/manifests/origin%d", index)
+	accept := http.Header{"Accept": []string{"application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.manifest.v1+json"}}
+	status, _, published := origin.DoHeader(t, http.MethodGet, manifestPath, "", accept)
+	var manifest struct {
+		Config struct {
+			Digest string `json:"digest"`
+		} `json:"config"`
+		Layers []struct {
+			Digest string `json:"digest"`
+		} `json:"layers"`
+	}
+	if status != http.StatusOK || json.Unmarshal([]byte(published), &manifest) != nil || manifest.Config.Digest == "" || len(manifest.Layers) != 1 {
+		t.Fatalf("published Docker manifest invalid: status %d", status)
+	}
+	digests := []string{manifest.Config.Digest, manifest.Layers[0].Digest}
+	rootfs := sha256.Sum256(layer.Bytes())
+	diffID := "sha256:" + hex.EncodeToString(rootfs[:])
 	for _, in := range all {
 		eventually(t, in, "complete Docker image graph", func() (bool, string) {
-			status, _, body := in.DoHeader(t, http.MethodGet,
-				fmt.Sprintf("/v2/native-docker/qualification/manifests/origin%d", index), "",
-				http.Header{"Accept": []string{"application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.manifest.v1+json"}})
+			status, _, body := in.DoHeader(t, http.MethodGet, manifestPath, "", accept)
 			if status == http.StatusNotFound {
 				return false, "manifest not delivered"
 			}
-			var manifest struct {
-				Config struct {
-					Digest string `json:"digest"`
-				} `json:"config"`
-				Layers []struct {
-					Digest string `json:"digest"`
-				} `json:"layers"`
-			}
-			if status != http.StatusOK || json.Unmarshal([]byte(body), &manifest) != nil || manifest.Config.Digest != image || len(manifest.Layers) == 0 {
-				t.Fatalf("Docker manifest invalid or failed: status %d", status)
-			}
-			digests := []string{manifest.Config.Digest}
-			for _, layer := range manifest.Layers {
-				digests = append(digests, layer.Digest)
+			if status != http.StatusOK || body != published {
+				t.Fatalf("Docker manifest differs or failed: status %d", status)
 			}
 			for _, digest := range digests {
 				status, _, _ = in.DoHeader(t, http.MethodHead, "/v2/native-docker/qualification/blobs/"+digest, "", nil)
@@ -294,9 +304,10 @@ func qualifyDockerClients(t *testing.T, all []*peers.Instance, origin *peers.Ins
 		})
 		login(in)
 		run(docker("pull", ref(in)), true)
-		got := strings.TrimSpace(run(docker("image", "inspect", "--format={{.Id}}", ref(in)), true))
-		if got != image {
-			t.Fatal("Docker resolved different image content")
+		out := run(docker("image", "inspect", "--format={{json .RootFS.Layers}}", ref(in)), true)
+		var layers []string
+		if json.Unmarshal([]byte(out), &layers) != nil || !slices.Equal(layers, []string{diffID}) {
+			t.Fatal("Docker resolved different rootfs content")
 		}
 		if in != origin {
 			cleanup(ref(in))
@@ -307,11 +318,11 @@ func qualifyDockerClients(t *testing.T, all []*peers.Instance, origin *peers.Ins
 		archive := filepath.Join(t.TempDir(), "cold-image.tar")
 		run(clienttest.Registry(t.Context(), dir, config, os.Getenv("ARTIFACTWEAVE_CRANE_BIN"),
 			[]string{"pull", "--format", "oci", ref(in), archive}), true)
-		verifyColdImage(t, archive, image)
+		verifyColdImage(t, archive, manifest.Config.Digest, diffID)
 	}
 }
 
-func verifyColdImage(t *testing.T, archive, image string) {
+func verifyColdImage(t *testing.T, archive, configDigest, diffID string) {
 	t.Helper()
 	file, err := os.Open(archive)
 	if err != nil {
@@ -327,14 +338,22 @@ func verifyColdImage(t *testing.T, archive, image string) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if strings.TrimPrefix(head.Name, "./") == "blobs/sha256/"+strings.TrimPrefix(image, "sha256:") {
+		if strings.TrimPrefix(head.Name, "./") == "blobs/sha256/"+strings.TrimPrefix(configDigest, "sha256:") {
 			data, err := io.ReadAll(reader)
 			if err != nil {
 				t.Fatal(err)
 			}
 			sum := sha256.Sum256(data)
-			if "sha256:"+hex.EncodeToString(sum[:]) != image {
+			if "sha256:"+hex.EncodeToString(sum[:]) != configDigest {
 				t.Fatal("cold image config digest differs")
+			}
+			var config struct {
+				RootFS struct {
+					DiffIDs []string `json:"diff_ids"`
+				} `json:"rootfs"`
+			}
+			if json.Unmarshal(data, &config) != nil || !slices.Equal(config.RootFS.DiffIDs, []string{diffID}) {
+				t.Fatal("cold image config describes different rootfs content")
 			}
 			return
 		}
