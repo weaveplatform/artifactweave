@@ -1,5 +1,10 @@
 package artifactory
 
+// GetFederationStateDetails200JSONResponseBodyFederationsPriority retains the former
+// generated inline response name after state reports became named schemas.
+// Deprecated: use FederationStateListFederationsPriority.
+type GetFederationStateDetails200JSONResponseBodyFederationsPriority = FederationStateListFederationsPriority
+
 // GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatus retains the former
 // generated inline response name after the connection row became a named schema.
 // Deprecated: use FederationConnectionStatus.

@@ -521,7 +521,7 @@ func (s *Service) putFile(
 	if err := s.emitPropertyChanges(ctx, stored, written.Before, d.By, now); err != nil {
 		return model.Item{}, err
 	}
-	if err := s.feed(ctx, stored); err != nil {
+	if err := s.feed(ctx, stored, written.Operation); err != nil {
 		return model.Item{}, err
 	}
 	return stored, nil
@@ -540,8 +540,9 @@ type fileWrite struct {
 }
 
 type writtenFile struct {
-	Item   model.Item
-	Before model.Properties
+	Operation artapi.ItemOperation
+	Item      model.Item
+	Before    model.Properties
 }
 
 // writeFile writes, inside the caller's transaction, the item for stored
@@ -644,7 +645,7 @@ func (s *Service) writeFile(
 	if err := s.settle(ctx, stored, d.Properties, fresh, fw.shouldReplace, now); err != nil {
 		return writtenFile{}, err
 	}
-	return writtenFile{Item: stored, Before: before}, nil
+	return writtenFile{Item: stored, Before: before, Operation: writeOperation(old.ID != 0)}, nil
 }
 
 // settle gives a file just written its properties and statistics. With
@@ -785,7 +786,7 @@ func (s *Service) MakeFolder(
 			// An empty folder a client made is a change of its own; the
 			// folders a deploy makes above a file are not, as every member
 			// makes them when it applies the file.
-			return s.feed(ctx, folder)
+			return s.feed(ctx, folder, artapi.ItemCreate)
 		}
 		return nil
 	})
@@ -1013,7 +1014,7 @@ func (s *Service) RecordSidecar(
 		if stored, err = s.Store.Items().Put(ctx, it); err != nil {
 			return fmt.Errorf("item: put %s: %w", w.Path, err)
 		}
-		return s.feed(ctx, stored)
+		return s.feed(ctx, stored, artapi.ItemUpdate)
 	})
 	if err != nil {
 		return model.Item{}, err //nolint:wrapcheck // the transaction returns ours

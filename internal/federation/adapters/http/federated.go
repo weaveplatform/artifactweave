@@ -60,6 +60,7 @@ const (
 // Operations each answers 501, as its stub did.
 type FederatedAPI struct {
 	Operations  FederatedOperations
+	Monitoring  FederationMonitoring
 	Binaries    FailedBinaries
 	Connections interface {
 		Connections(context.Context, string) ([]federated.Connection, error)

@@ -26,6 +26,10 @@ func (UnimplementedStrict) RedeemPairing(context.Context, RedeemPairingRequestOb
 	return nil, apierror.ErrNotImplemented
 }
 
+func (UnimplementedStrict) GetRepositoryConfiguration(context.Context, GetRepositoryConfigurationRequestObject) (GetRepositoryConfigurationResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
 func (UnimplementedStrict) PutRepositoryConfiguration(context.Context, PutRepositoryConfigurationRequestObject) (PutRepositoryConfigurationResponseObject, error) {
 	return nil, apierror.ErrNotImplemented
 }

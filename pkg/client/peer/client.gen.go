@@ -314,6 +314,21 @@ type RedeemPairingParams struct {
 	ContentDigest PeerContentDigest `json:"Content-Digest"`
 }
 
+// GetRepositoryConfigurationParams defines parameters for GetRepositoryConfiguration.
+type GetRepositoryConfigurationParams struct {
+	// ArtifactweavePeerProtocol Required header parameter. The protocol version the sender speaks, as `<major>.<minor>`, for example `1.0`. A major version other than 1 answers 400 and is recorded on the sender's peer record. The answer carries the receiver's version in the same header.
+	ArtifactweavePeerProtocol PeerProtocol `json:"Artifactweave-Peer-Protocol"`
+
+	// Date Required header parameter. The time the sender signed the request, as an HTTP date (RFC 9110, section 5.6.7), covered by the signature. More than five minutes from the receiver's clock answers 401.
+	Date PeerDate `json:"Date"`
+
+	// Signature Required header parameter. The Ed25519 signature (RFC 9421) named in `Signature-Input`, for example `sig1=:<base64>:`. One that does not verify with the key recorded for its `keyid` answers 401.
+	Signature PeerSignature `json:"Signature"`
+
+	// SignatureInput Required header parameter. The signature's covered components and parameters (RFC 9421), for example `sig1=("@method" "@target-uri" "date" "content-digest");created=1700000000;keyid="jfrt@<uuid>";alg="ed25519";nonce="<random>"`. `keyid` is the sender's instance id; `content-digest` is covered exactly when the request has a body. A `nonce` the receiver has accepted within the last five minutes answers 401.
+	SignatureInput PeerSignatureInput `json:"Signature-Input"`
+}
+
 // PutRepositoryConfigurationParams defines parameters for PutRepositoryConfiguration.
 type PutRepositoryConfigurationParams struct {
 	// ArtifactweavePeerProtocol Required header parameter. The protocol version the sender speaks, as `<major>.<minor>`, for example `1.0`. A major version other than 1 answers 400 and is recorded on the sender's peer record. The answer carries the receiver's version in the same header.
@@ -543,6 +558,13 @@ type ClientInterface interface {
 	// Corresponds with POST /pair (the `RedeemPairing` operationId).
 	RedeemPairing(ctx context.Context, params *RedeemPairingParams, body RedeemPairingJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetRepositoryConfiguration Read a member repository's shared configuration
+	//
+	// Returns the masked shared configuration of a federated repository to a current member paired for the federated repository use case. The caller's membership and grant are checked again in the read transaction. Used to detect configuration drift; no configuration is changed.
+	//
+	// Corresponds with GET /repositories/{repoKey} (the `GetRepositoryConfiguration` operationId).
+	GetRepositoryConfiguration(ctx context.Context, repoKey string, params *GetRepositoryConfigurationParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// PutRepositoryConfigurationWithBody Send a federated repository's configuration
 	//
 	// Creates or updates this instance's copy of a federated repository the caller is a member of. The configuration is validated against this instance's own peers before it is stored, and nothing is stored when it is refused. Its members must name this instance, at its own federated base URL with the key in the path, and the caller; this instance does not send the configuration on.
@@ -681,6 +703,23 @@ func (c *Client) RedeemPairingWithBody(ctx context.Context, params *RedeemPairin
 // Corresponds with POST /pair (the `RedeemPairing` operationId).
 func (c *Client) RedeemPairing(ctx context.Context, params *RedeemPairingParams, body RedeemPairingJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewRedeemPairingRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetRepositoryConfiguration Read a member repository's shared configuration
+//
+// Returns the masked shared configuration of a federated repository to a current member paired for the federated repository use case. The caller's membership and grant are checked again in the read transaction. Used to detect configuration drift; no configuration is changed.
+//
+// Corresponds with GET /repositories/{repoKey} (the `GetRepositoryConfiguration` operationId).
+func (c *Client) GetRepositoryConfiguration(ctx context.Context, repoKey string, params *GetRepositoryConfigurationParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetRepositoryConfigurationRequest(c.Server, repoKey, params)
 	if err != nil {
 		return nil, err
 	}
@@ -1103,6 +1142,80 @@ func NewRedeemPairingRequestWithBody(server string, params *RedeemPairingParams,
 		}
 
 		req.Header.Set("Content-Digest", headerParam4)
+
+	}
+
+	return req, nil
+}
+
+// NewGetRepositoryConfigurationRequest constructs an http.Request for the GetRepositoryConfiguration method
+func NewGetRepositoryConfigurationRequest(server string, repoKey string, params *GetRepositoryConfigurationParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "repoKey", repoKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/repositories/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Artifactweave-Peer-Protocol", params.ArtifactweavePeerProtocol, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("Artifactweave-Peer-Protocol", headerParam0)
+
+		var headerParam1 string
+
+		headerParam1, err = runtime.StyleParamWithOptions("simple", false, "Date", params.Date, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("Date", headerParam1)
+
+		var headerParam2 string
+
+		headerParam2, err = runtime.StyleParamWithOptions("simple", false, "Signature", params.Signature, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("Signature", headerParam2)
+
+		var headerParam3 string
+
+		headerParam3, err = runtime.StyleParamWithOptions("simple", false, "Signature-Input", params.SignatureInput, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("Signature-Input", headerParam3)
 
 	}
 
@@ -1770,6 +1883,15 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /pair (the `RedeemPairing` operationId).
 	RedeemPairingWithResponse(ctx context.Context, params *RedeemPairingParams, body RedeemPairingJSONRequestBody, reqEditors ...RequestEditorFn) (*RedeemPairingResponse, error)
 
+	// GetRepositoryConfigurationWithResponse Read a member repository's shared configuration
+	//
+	// Returns the masked shared configuration of a federated repository to a current member paired for the federated repository use case. The caller's membership and grant are checked again in the read transaction. Used to detect configuration drift; no configuration is changed.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /repositories/{repoKey} (the `GetRepositoryConfiguration` operationId).
+	GetRepositoryConfigurationWithResponse(ctx context.Context, repoKey string, params *GetRepositoryConfigurationParams, reqEditors ...RequestEditorFn) (*GetRepositoryConfigurationResponse, error)
+
 	// PutRepositoryConfigurationWithBodyWithResponse Send a federated repository's configuration
 	//
 	// Creates or updates this instance's copy of a federated repository the caller is a member of. The configuration is validated against this instance's own peers before it is stored, and nothing is stored when it is refused. Its members must name this instance, at its own federated base URL with the key in the path, and the caller; this instance does not send the configuration on.
@@ -2128,6 +2250,107 @@ func (r RedeemPairingResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r RedeemPairingResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetRepositoryConfigurationResponse429Headers the declared response headers of an HTTP 429 response for GetRepositoryConfiguration
+type GetRepositoryConfigurationResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// GetRepositoryConfigurationResponse503Headers the declared response headers of an HTTP 503 response for GetRepositoryConfiguration
+type GetRepositoryConfigurationResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type GetRepositoryConfigurationResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *RepositoryConfiguration
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ErrorResponse
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *PeerUnauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *PeerInternalError
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *GetRepositoryConfigurationResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *GetRepositoryConfigurationResponse503Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetRepositoryConfigurationResponse) GetJSON200() *RepositoryConfiguration {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r GetRepositoryConfigurationResponse) GetJSON400() *ErrorResponse {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetRepositoryConfigurationResponse) GetJSON401() *PeerUnauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetRepositoryConfigurationResponse) GetJSON403() *ErrorResponse {
+	return r.JSON403
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r GetRepositoryConfigurationResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r GetRepositoryConfigurationResponse) GetJSON500() *PeerInternalError {
+	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetRepositoryConfigurationResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r GetRepositoryConfigurationResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetRepositoryConfigurationResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetRepositoryConfigurationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetRepositoryConfigurationResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -2835,6 +3058,21 @@ func (c *ClientWithResponses) RedeemPairingWithResponse(ctx context.Context, par
 	return ParseRedeemPairingResponse(rsp)
 }
 
+// GetRepositoryConfigurationWithResponse Read a member repository's shared configuration
+//
+// Returns the masked shared configuration of a federated repository to a current member paired for the federated repository use case. The caller's membership and grant are checked again in the read transaction. Used to detect configuration drift; no configuration is changed.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /repositories/{repoKey} (the `GetRepositoryConfiguration` operationId).
+func (c *ClientWithResponses) GetRepositoryConfigurationWithResponse(ctx context.Context, repoKey string, params *GetRepositoryConfigurationParams, reqEditors ...RequestEditorFn) (*GetRepositoryConfigurationResponse, error) {
+	rsp, err := c.GetRepositoryConfiguration(ctx, repoKey, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetRepositoryConfigurationResponse(rsp)
+}
+
 // PutRepositoryConfigurationWithBodyWithResponse Send a federated repository's configuration
 //
 // Creates or updates this instance's copy of a federated repository the caller is a member of. The configuration is validated against this instance's own peers before it is stored, and nothing is stored when it is refused. Its members must name this instance, at its own federated base URL with the key in the path, and the caller; this instance does not send the configuration on.
@@ -3282,6 +3520,125 @@ func ParseRedeemPairingResponse(rsp *http.Response) (*RedeemPairingResponse, err
 		response.Headers429 = &headers
 	case rsp.StatusCode == 503:
 		var headers RedeemPairingResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetRepositoryConfigurationResponse parses an HTTP response from a GetRepositoryConfigurationWithResponse call
+func ParseGetRepositoryConfigurationResponse(rsp *http.Response) (*GetRepositoryConfigurationResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetRepositoryConfigurationResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest RepositoryConfiguration
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest PeerUnauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest PeerInternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers GetRepositoryConfigurationResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers GetRepositoryConfigurationResponse503Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {

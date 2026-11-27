@@ -4,7 +4,7 @@ Checked against: Artifactory 7.161.32 and the 7.161.26 source ([research 40](../
 
 Status: Accepted
 
-Implementation status (2026-11-24): **in progress, P13**. Members and
+Implementation status (2026-11-26): **in progress, P13**. Members and
 configuration sync are implemented (FED-01, [#1930](https://github.com/weaveplatform/artifactweave/issues/1930)):
 member checks against paired peers, `federatedRepoUrlBase`, configSync over the
 peer API, `migrate`, `convertToLocal`, `replaceUrl` and `updateMemberUrl`. Change
@@ -225,6 +225,12 @@ them against a live 7.x in P19):
   cursors and a client written against legacy federation still calls them. The repository
   status body uses 7.161.26's `mirrorEventsStatusInfo` and `federatedArtifactStatus` fields
   ([research 40 §7](../40-federated-repositories-7x.md#status-payloads)).
+  FED-05 (#1934) supplies one read model for the legacy and RTFS-era APIs. The
+  `mirrors` and `binaries` suffixes select source-declared projections, not remote
+  member identifiers. Configuration drift is a comparison of reachable members'
+  masked shared configuration over the signed peer API, outside store transactions;
+  local keys, member order and equivalent defaults do not create drift. Current
+  administrator authority is checked again before the report is disclosed.
 - The failed-binary endpoints list, replay and delete the failed blob fetches recorded by
   0021 (FED-06, #1935), from the first failed attempt while retries remain queued
   ([I]; the public page names ten default attempts but not list visibility timing).
@@ -287,7 +293,8 @@ RTFS, HA nodes and the tool answer 404, as the peer protocol carries what they c
 and `compareResult` answers 404, as no comparison file exists (FED-04,
 [DV-206 and DV-207](../../implementation/deviations.md#api-behaviour)).
 [Research 40 §7](../40-federated-repositories-7x.md#7-federation-endpoints-and-how-artifactweave-answers-them)
-classifies every path, and FED-05 registers the other deviations.
+classifies every path; FED-05 registers legacy monitoring beside RTFS (DV-208),
+the migration-tool refusals (DV-209) and internal RTFS 404s (DV-210).
 
 **Package types.** Federation is available for every package type artifactweave
 implements as a local repository, except `terraformbackend`: 7.161.26 excludes it

@@ -52,6 +52,11 @@
 // reset or class exit clears failed rows with the pending stamps and members
 // in their transaction, so a new lifetime exposes no previous failed state.
 //
+// Monitoring supplies status, lag, queued operation counts and artifact state
+// from current cursors, peers and full-sync records (FED-05). It compares reachable
+// members' masked configuration over the signed peer API outside transactions;
+// equivalent defaults, member ordering and local keys are normalized.
+//
 // Receivers accept local writes without producing stream entries. Their inbound
 // stamps are forgotten on local changes so a sender's authoritative full sync
 // reconciles divergence. Peer receiving-only grants and membership roles bind
@@ -59,8 +64,6 @@
 // independently from health. After authorization, unknown/non-federated keys
 // return an empty list; an existing federation without a base URL selects
 // the source-backed empty 400 envelope.
-//
-// Planned: broader status and lag (decision 0022; plan P13, FED-05).
 //
 // # References
 //

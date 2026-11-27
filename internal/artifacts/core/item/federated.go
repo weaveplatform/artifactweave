@@ -38,7 +38,7 @@ func isFederated(ctx context.Context) bool {
 // feed reports it, as it is after a change, to the store's ItemFeed. A
 // remote cache, a repository root and a change applied from another member
 // are not reported (artapi.ItemFeed).
-func (s *Service) feed(ctx context.Context, it model.Item) error {
+func (s *Service) feed(ctx context.Context, it model.Item, operation artapi.ItemOperation) error {
 	if s.Store == nil || it.Cached || it.IsRoot() || isFederated(ctx) {
 		return nil
 	}
@@ -51,7 +51,7 @@ func (s *Service) feed(ctx context.Context, it model.Item) error {
 		return err
 	}
 	c := change(it)
-	c.Properties = props
+	c.Properties, c.Operation = props, operation
 	if err := f.ItemChanged(ctx, c); err != nil {
 		return fmt.Errorf("item: feed %s:%s: %w", it.RepoKey, it.FullPath(), err)
 	}
@@ -84,7 +84,7 @@ func (s *Service) feedRemoved(ctx context.Context, removed []model.Item) error {
 			continue
 		}
 		c := change(it)
-		c.Deleted = true
+		c.Deleted, c.Operation = true, artapi.ItemDelete
 		if err := f.ItemChanged(ctx, c); err != nil {
 			return fmt.Errorf("item: feed removal of %s:%s: %w", it.RepoKey, it.FullPath(), err)
 		}
@@ -351,11 +351,17 @@ func (s *Service) DiscardFederated(ctx context.Context, cfg repo.Config, p strin
 func (s *Service) ListFederated(
 	ctx context.Context, cfg repo.Config, after string, limit int, properties bool,
 ) ([]artapi.ItemChange, error) {
+	return s.ListRepositoryItems(ctx, cfg, false, after, limit, properties)
+}
+
+// ListRepositoryItems is the shared item-state reader for snapshots and legacy
+// federation monitoring, which also accepts local repositories and remote caches.
+func (s *Service) ListRepositoryItems(ctx context.Context, cfg repo.Config, cached bool, after string, limit int, properties bool) ([]artapi.ItemChange, error) {
 	page := kernel.Page{Limit: limit}
 	if after != "" {
 		page.After = kernel.Cursor(after)
 	}
-	items, _, err := s.Store.Items().DescendantsByFullPath(ctx, cfg.Key, false, kernel.RootPath, page)
+	items, _, err := s.Store.Items().DescendantsByFullPath(ctx, cfg.Key, cached, kernel.RootPath, page)
 	if err != nil {
 		return nil, fmt.Errorf("item: list %s: %w", cfg.Key, err)
 	}
@@ -396,4 +402,13 @@ func (s *Service) HoldsFederated(ctx context.Context, cfg repo.Config, sha256 st
 		}
 		page.After = next
 	}
+}
+
+// writeOperation uses the actual write admission result rather than timestamps:
+// an overwrite may deliberately retain its original creation/modification time.
+func writeOperation(existed bool) artapi.ItemOperation {
+	if existed {
+		return artapi.ItemUpdate
+	}
+	return artapi.ItemCreate
 }

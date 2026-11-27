@@ -24,6 +24,9 @@ type ConfigurationReceiver interface {
 // verified the caller's signature before it gets here.
 type RepositoryServer struct {
 	Receiver ConfigurationReceiver
+	Reader   interface {
+		Configuration(context.Context, model.Peer, string) (map[string]any, error)
+	}
 }
 
 // PutRepositoryConfiguration creates or updates this instance's copy of the
@@ -55,4 +58,27 @@ func (s RepositoryServer) PutRepositoryConfiguration(
 	default:
 		return nil, err //nolint:wrapcheck // the strict error handler answers 500 and logs the cause
 	}
+}
+
+// GetRepositoryConfiguration reads only configurations the current peer's
+// membership permits; the signed response never carries unmasked secrets.
+func (s RepositoryServer) GetRepositoryConfiguration(
+	ctx context.Context,
+	req peergen.GetRepositoryConfigurationRequestObject,
+) (peergen.GetRepositoryConfigurationResponseObject, error) {
+	caller, ok := corepeer.Caller(ctx)
+	if !ok {
+		return nil, apierror.New(http.StatusUnauthorized, notSigned)
+	}
+	if s.Reader == nil {
+		return nil, apierror.ErrNotImplemented
+	}
+	cfg, err := s.Reader.Configuration(ctx, caller, req.RepoKey)
+	if errors.Is(err, kernel.ErrForbidden) {
+		return nil, apierror.New(http.StatusForbidden, "The caller is not a current federation member")
+	}
+	if err != nil {
+		return nil, err //nolint:wrapcheck // the strict handler logs the private cause
+	}
+	return peergen.GetRepositoryConfiguration200JSONResponse{Stream: model.RepositoryStream(req.RepoKey), Configuration: cfg}, nil
 }

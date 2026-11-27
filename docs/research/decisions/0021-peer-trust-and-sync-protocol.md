@@ -423,3 +423,15 @@ Alternatives considered:
 - RFC 9421, HTTP Message Signatures: <https://www.rfc-editor.org/rfc/rfc9421>
 - RFC 8032, Ed25519: <https://www.rfc-editor.org/rfc/rfc8032>
 - Hybrid logical clocks: Kulkarni et al., "Logical Physical Clocks", 2014
+
+
+### Federation status configuration reads (FED-05)
+
+`GET /repositories/{repoKey}` is an additive read on the signed v1 peer API. It
+returns the same masked `RepositoryConfiguration` that configSync sends, with the
+self member resolved. The server rechecks the current signing identity, federation
+grant and repository membership in its transaction; a removed member receives 403
+without repository disclosure. `inconsistentRepos` calls this read outside metadata
+transactions, compares normalized shared configuration and refreshes administrator
+authority before returning the report. An unavailable member is reported through
+health monitoring, rather than asserted to have different configuration.

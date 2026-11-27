@@ -1304,95 +1304,7 @@ paths:
           content:
             application/json:
               schema:
-                description: Sync status of one federated repository.
-                properties:
-                  binariesTasksInfo:
-                    description: Optional within this object. Binary transfer tasks for the repository.
-                    properties:
-                      failingTasks:
-                        description: Optional within this object. Tasks that exhausted their retries (ten by default).
-                        type: integer
-                      inProgressTasks:
-                        description: Optional within this object. Tasks in flight or waiting to be retried.
-                        type: integer
-                    type: object
-                  federatedArtifactStatus:
-                    description: 'Optional within this object. Artifact replication counts on this instance: artifacts
-                      replicated with metadata and binary, and artifacts whose metadata arrived but whose binary has
-                      not.'
-                    properties:
-                      fullyReplicatedArtifacts:
-                        description: Optional within this object. Artifacts with both metadata and binary present.
-                        format: int64
-                        type: integer
-                        x-unverified: true
-                      metadataOnlyArtifacts:
-                        description: Optional within this object. Artifacts whose binary is still being fetched.
-                        format: int64
-                        type: integer
-                        x-unverified: true
-                    type: object
-                  localKey:
-                    description: Optional within this object. Repository key on this instance.
-                    type: string
-                  mirrorEventsStatusInfo:
-                    description: Optional within this object. Event delivery state per target mirror.
-                    items:
-                      description: Event delivery state of one target mirror.
-                      properties:
-                        createEvents:
-                          description: Optional within this object. Create events waiting to be sent.
-                          format: int64
-                          type: integer
-                          x-unverified: true
-                        deleteEvents:
-                          description: Optional within this object. Delete events waiting to be sent.
-                          format: int64
-                          type: integer
-                          x-unverified: true
-                        errorEvents:
-                          description: Optional within this object. Events that failed during sync.
-                          format: int64
-                          type: integer
-                          x-unverified: true
-                        eventRegistrationTimeStamp:
-                          description: Optional within this object. When the mirror next registers with its target,
-                            in epoch milliseconds. Same name as the mirror lag operation.
-                          format: int64
-                          type: integer
-                          x-unverified: true
-                        lagInMS:
-                          description: 'Optional within this object. Mirror latency: now minus the time of the oldest
-                            event not yet handled, in milliseconds. Same name and meaning as the mirror lag operation.'
-                          format: int64
-                          type: integer
-                          x-unverified: true
-                        propertiesEvents:
-                          description: Optional within this object. Property change events waiting to be sent.
-                          format: int64
-                          type: integer
-                          x-unverified: true
-                        remoteRepoKey:
-                          description: Optional within this object. Repository key on the target mirror.
-                          type: string
-                        remoteUrl:
-                          description: Optional within this object. Base URL of the target mirror's instance.
-                          type: string
-                        status:
-                          description: Optional within this object. Whether the mirror is in sync. Version 1 reports
-                            SYNCED or OUT_OF_SYNC; version 2 reports the member states (HEALTHY, PENDING_FS,
-                            FULL_SYNC_RUNNING, ERROR_GENERIC, ERROR_INACTIVE, ERROR_OUT_OF_SYNC, READ_ONLY,
-                            IMPORT_IN_PROGRESS).
-                          type: string
-                          x-unverified: true
-                        updateEvents:
-                          description: Optional within this object. Update events waiting to be sent.
-                          format: int64
-                          type: integer
-                          x-unverified: true
-                      type: object
-                    type: array
-                type: object
+                $ref: '#/components/schemas/FederatedRepositoryStatus'
           description: The sync status.
         '401':
           content:
@@ -1449,62 +1361,16 @@ paths:
           content:
             application/json:
               schema:
-                description: Federations and member states.
-                properties:
-                  federations:
-                    description: Optional within this object. One entry per federated repository.
-                    items:
-                      description: One federation.
-                      properties:
-                        localRepoKey:
-                          description: Optional within this object. Repository key on this instance.
-                          type: string
-                        memberInfoList:
-                          description: Optional within this object. The members and their state.
-                          items:
-                            description: One member.
-                            properties:
-                              aggregatedStatus:
-                                description: Optional within this object. The member's state, one of those counted
-                                  by the state summary operation.
-                                type: string
-                              isDisabled:
-                                description: Optional within this object. True when sync to this member is turned
-                                  off.
-                                type: boolean
-                              isInLag:
-                                description: Optional within this object. True when the member's oldest undelivered
-                                  event is older than the lag threshold.
-                                type: boolean
-                              isSupported:
-                                description: Optional within this object. False when the member's sync protocol
-                                  version is incompatible.
-                                type: boolean
-                              repoKey:
-                                description: Optional within this object. Repository key on the member.
-                                type: string
-                              url:
-                                description: Optional within this object. Base URL of the member instance.
-                                type: string
-                            type: object
-                          type: array
-                        priority:
-                          description: Optional within this object. Queue priority of the repository, `HIGH` or
-                            `STANDARD`.
-                          enum:
-                          - HIGH
-                          - STANDARD
-                          type: string
-                      type: object
-                    type: array
-                type: object
+                $ref: '#/components/schemas/FederationStateList'
           description: The federations and their members.
         '400':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: The request was malformed or a value is invalid.
+                anyOf:
+                - $ref: '#/components/schemas/FederationStateList'
+                - $ref: '#/components/schemas/ErrorResponse'
+          description: Missing base configuration returns the empty state envelope; invalid input returns an error.
         '401':
           content:
             application/json:
@@ -1546,50 +1412,16 @@ paths:
           content:
             application/json:
               schema:
-                description: Member counts per state.
-                properties:
-                  federationStates:
-                    description: Optional within this object. Number of members in each state.
-                    properties:
-                      DELAYED:
-                        description: Optional within this object. Members whose events wait longer than the lag
-                          threshold.
-                        format: int64
-                        type: integer
-                      DISABLED:
-                        description: Optional within this object. Members with sync turned off.
-                        format: int64
-                        type: integer
-                      ERROR:
-                        description: Optional within this object. Members whose events fail after every retry.
-                        format: int64
-                        type: integer
-                      FULL_SYNC_RUNNING:
-                        description: Optional within this object. Members in a full sync.
-                        format: int64
-                        type: integer
-                      HEALTHY:
-                        description: Optional within this object. Members receiving events promptly.
-                        format: int64
-                        type: integer
-                      NOT_AVAILABLE:
-                        description: Optional within this object. Members that cannot be reached.
-                        format: int64
-                        type: integer
-                      PENDING_FS:
-                        description: Optional within this object. Members waiting for a full sync, for example right
-                          after joining.
-                        format: int64
-                        type: integer
-                    type: object
-                type: object
+                $ref: '#/components/schemas/FederationStateSummary'
           description: Member counts per state.
         '400':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: The request was malformed or a value is invalid.
+                anyOf:
+                - $ref: '#/components/schemas/FederationStateSummary'
+                - $ref: '#/components/schemas/ErrorResponse'
+          description: Missing base configuration returns the empty state envelope; invalid input returns an error.
         '401':
           content:
             application/json:
@@ -1754,95 +1586,7 @@ paths:
           content:
             application/json:
               schema:
-                description: Sync status of one federated repository.
-                properties:
-                  binariesTasksInfo:
-                    description: Optional within this object. Binary transfer tasks for the repository.
-                    properties:
-                      failingTasks:
-                        description: Optional within this object. Tasks that exhausted their retries (ten by default).
-                        type: integer
-                      inProgressTasks:
-                        description: Optional within this object. Tasks in flight or waiting to be retried.
-                        type: integer
-                    type: object
-                  federatedArtifactStatus:
-                    description: 'Optional within this object. Artifact replication counts on this instance: artifacts
-                      replicated with metadata and binary, and artifacts whose metadata arrived but whose binary has
-                      not.'
-                    properties:
-                      fullyReplicatedArtifacts:
-                        description: Optional within this object. Artifacts with both metadata and binary present.
-                        format: int64
-                        type: integer
-                        x-unverified: true
-                      metadataOnlyArtifacts:
-                        description: Optional within this object. Artifacts whose binary is still being fetched.
-                        format: int64
-                        type: integer
-                        x-unverified: true
-                    type: object
-                  localKey:
-                    description: Optional within this object. Repository key on this instance.
-                    type: string
-                  mirrorEventsStatusInfo:
-                    description: Optional within this object. Event delivery state per target mirror.
-                    items:
-                      description: Event delivery state of one target mirror.
-                      properties:
-                        createEvents:
-                          description: Optional within this object. Create events waiting to be sent.
-                          format: int64
-                          type: integer
-                          x-unverified: true
-                        deleteEvents:
-                          description: Optional within this object. Delete events waiting to be sent.
-                          format: int64
-                          type: integer
-                          x-unverified: true
-                        errorEvents:
-                          description: Optional within this object. Events that failed during sync.
-                          format: int64
-                          type: integer
-                          x-unverified: true
-                        eventRegistrationTimeStamp:
-                          description: Optional within this object. When the mirror next registers with its target,
-                            in epoch milliseconds. Same name as the mirror lag operation.
-                          format: int64
-                          type: integer
-                          x-unverified: true
-                        lagInMS:
-                          description: 'Optional within this object. Mirror latency: now minus the time of the oldest
-                            event not yet handled, in milliseconds. Same name and meaning as the mirror lag operation.'
-                          format: int64
-                          type: integer
-                          x-unverified: true
-                        propertiesEvents:
-                          description: Optional within this object. Property change events waiting to be sent.
-                          format: int64
-                          type: integer
-                          x-unverified: true
-                        remoteRepoKey:
-                          description: Optional within this object. Repository key on the target mirror.
-                          type: string
-                        remoteUrl:
-                          description: Optional within this object. Base URL of the target mirror's instance.
-                          type: string
-                        status:
-                          description: Optional within this object. Whether the mirror is in sync. Version 1 reports
-                            SYNCED or OUT_OF_SYNC; version 2 reports the member states (HEALTHY, PENDING_FS,
-                            FULL_SYNC_RUNNING, ERROR_GENERIC, ERROR_INACTIVE, ERROR_OUT_OF_SYNC, READ_ONLY,
-                            IMPORT_IN_PROGRESS).
-                          type: string
-                          x-unverified: true
-                        updateEvents:
-                          description: Optional within this object. Update events waiting to be sent.
-                          format: int64
-                          type: integer
-                          x-unverified: true
-                      type: object
-                    type: array
-                type: object
+                $ref: '#/components/schemas/FederatedRepositoryStatus'
           description: The sync status.
         '401':
           content:

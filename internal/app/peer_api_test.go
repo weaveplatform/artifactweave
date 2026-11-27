@@ -162,8 +162,8 @@ func TestAccPeerOperationsRefuseUnsignedAtStartUp(t *testing.T) {
 					}
 				}
 			}
-			if checked != 9 {
-				t.Errorf("checked %d peer operations, want the 9 the spec declares", checked)
+			if checked != 10 {
+				t.Errorf("checked %d peer operations, want the 10 the spec declares", checked)
 			}
 		})
 	}
@@ -359,6 +359,8 @@ func TestAccPeerOperationsSignedBetweenInstances(t *testing.T) {
 					// A and the use cases B holds there: none.
 					status, code := http.StatusNotImplemented, `"NOT_IMPLEMENTED"`
 					switch {
+					case method == http.MethodGet && path == "/repositories/{repoKey}":
+						status, code = http.StatusForbidden, `"FORBIDDEN"`
 					case method == http.MethodGet && path == "/status":
 						status, code = http.StatusOK, `"instance_id":"`+a.self.InstanceID+`"`
 					case method == http.MethodPost && path == "/pair",
@@ -373,8 +375,8 @@ func TestAccPeerOperationsSignedBetweenInstances(t *testing.T) {
 					secrets = append(secrets, req.Header.Get("Signature"), resp.Header.Get("Signature"))
 				}
 			}
-			if checked != 9 {
-				t.Errorf("checked %d peer operations, want 9", checked)
+			if checked != 10 {
+				t.Errorf("checked %d peer operations, want 10", checked)
 			}
 			secrets = append(secrets, refusedLive(t, a, b)...)
 

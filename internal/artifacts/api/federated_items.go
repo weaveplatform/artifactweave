@@ -7,6 +7,18 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
+// ItemOperation distinguishes the source change for federation monitoring.
+// Delivery still carries and applies the item's whole state.
+type ItemOperation string
+
+// Item operations used by the federation event counters.
+const (
+	ItemCreate     ItemOperation = "create"
+	ItemUpdate     ItemOperation = "update"
+	ItemProperties ItemOperation = "properties"
+	ItemDelete     ItemOperation = "delete"
+)
+
 // ItemChange is the state of one file or folder of a repository after a
 // change, as the item service committed it: what a member of a federated
 // repository sends the others (decision 0022, What propagates). A deleted
@@ -14,6 +26,7 @@ import (
 // whole set after the change, never a difference, so whichever change wins
 // the conflict rule leaves the same item on every member.
 type ItemChange struct {
+	Operation  ItemOperation
 	Repository string
 	// Path is repository-relative, without a leading slash.
 	Path    string
@@ -42,6 +55,11 @@ type ItemChange struct {
 // reporting the last would send a change back to where it came from.
 type ItemFeed interface {
 	ItemChanged(ctx context.Context, c ItemChange) error
+}
+
+// FederatedItemReader lists current item states for snapshots and status reads.
+type FederatedItemReader interface {
+	List(ctx context.Context, repoKey, after string, limit int, properties bool) ([]ItemChange, error)
 }
 
 // FederatedItems applies another member's changes to a federated

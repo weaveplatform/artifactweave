@@ -1,0 +1,96 @@
+components:
+  schemas:
+    FederationStateList:
+      description: Federations and member states.
+      properties:
+        federations:
+          description: Optional within this object. One entry per federated repository.
+          items:
+            description: One federation.
+            properties:
+              localRepoKey:
+                description: Optional within this object. Repository key on this instance.
+                type: string
+              memberInfoList:
+                description: Optional within this object. The members and their state.
+                items:
+                  description: One member.
+                  properties:
+                    aggregatedStatus:
+                      description: Optional within this object. The member's state, one of those counted
+                        by the state summary operation.
+                      type: string
+                    isDisabled:
+                      description: Optional within this object. True when sync to this member is turned
+                        off.
+                      type: boolean
+                    isInLag:
+                      description: Optional within this object. True when the member's oldest undelivered
+                        event is older than the lag threshold.
+                      type: boolean
+                    isSupported:
+                      description: Optional within this object. False when the member's sync protocol
+                        version is incompatible.
+                      type: boolean
+                    repoKey:
+                      description: Optional within this object. Repository key on the member.
+                      type: string
+                    url:
+                      description: Optional within this object. Base URL of the member instance.
+                      type: string
+                  type: object
+                type: array
+              priority:
+                description: Optional within this object. Queue priority of the repository, `HIGH` or
+                  `STANDARD`.
+                enum:
+                - HIGH
+                - STANDARD
+                type: string
+            type: object
+          type: array
+      type: object
+    FederationStateSummary:
+      description: Member counts per state.
+      properties:
+        federationStates:
+          description: Optional within this object. Number of members in each state.
+          properties:
+            DELAYED:
+              description: Optional within this object. Members whose events wait longer than the lag
+                threshold.
+              format: int64
+              type: integer
+            DISABLED:
+              description: Optional within this object. Members with sync turned off.
+              format: int64
+              type: integer
+            ERROR:
+              description: Optional within this object. Members whose events fail after every retry.
+              format: int64
+              type: integer
+            FULL_SYNC_RUNNING:
+              description: Optional within this object. Members in a full sync.
+              format: int64
+              type: integer
+            HEALTHY:
+              description: Optional within this object. Members receiving events promptly.
+              format: int64
+              type: integer
+            NOT_AVAILABLE:
+              description: Optional within this object. Members that cannot be reached.
+              format: int64
+              type: integer
+            PENDING_FS:
+              description: Optional within this object. Members waiting for a full sync, for example right
+                after joining.
+              format: int64
+              type: integer
+            READ_ONLY:
+              description: Optional within this object. Members in a read-only state. Receiving-only mode
+                alone does not count as this state.
+              format: int64
+              type: integer
+              x-unverified: true
+          type: object
+      type: object

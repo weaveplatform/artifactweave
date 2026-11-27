@@ -74,6 +74,9 @@
 // REP-01 configuration, durable single-target status and stored-config execute
 // are implemented. One-shot overrides and advanced, event-driven
 // and checksum replication retain their separate generated/deferred owners.
-// The service_trust endpoints are implemented P13 (PEER-02, #1926).
+// The service_trust endpoints are implemented P13 (PEER-02, #1926). FED-05's
+// status read model serves legacy/v2 repository projections, RTFS-era lists and
+// summaries, lag and configuration drift. RTFS migration/internal resources keep
+// the researched fixed answers and disclose no state.
 // Receiving-only member enforcement and connectionStates are FED-03 (#1933).
 package federationhttp

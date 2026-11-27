@@ -5403,6 +5403,26 @@ paths:
       x-idempotency: none
       x-idempotency-reason: external-effect
       x-cost: expensive
+  /api/federation/baseUrlAndRepos:
+    get:
+      operationId: getFederationBaseUrlAndRepositories
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /api/federation/binaries/failures/delete:
     delete:
       description: Deletes recorded failed content-fetch tasks of a federated repository, all of them or only the tasks for one SHA-1. Cancellation prevents their queued or in-flight retries from publishing; a newer event or full sync can supply the content later.
@@ -5634,6 +5654,45 @@ paths:
         - query:repoKey
         - query:sha1
       x-cost: expensive
+  /api/federation/binaries/rtfs:
+    put:
+      operationId: putFederationInternalBinaryTasks
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    get:
+      operationId: getFederationInternalBinaryTasks
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /api/federation/binaries/tasks/{repoKey}:
     get:
       description: Returns failed content-fetch counts for a federated repository. Administrators only. The closed-source DTO shape is inferred.
@@ -5692,6 +5751,26 @@ paths:
       x-unverified: true
       x-idempotency: safe
       x-cost: ordinary
+  /api/federation/binary/provider/v2/check:
+    get:
+      operationId: checkFederationInternalBinary
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /api/federation/configSync/{repoKey}:
     post:
       description: Sends this member's configuration of a federated repository to every other member, repairing drift left by a network failure, and answers "Configuration sync executed successfully" once the sends are queued (7.x's FederatedRepoResource). Each member keeps its own repository key. A member that cannot be reached is logged as unavailable and retried until it receives the configuration. Administrators only.
@@ -5841,6 +5920,127 @@ paths:
       x-idempotency-natural:
         - 'body:'
       x-cost: expensive
+  /api/federation/disableRemoteMember:
+    post:
+      operationId: disableFederationRemoteMember
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/federation/dryfullsync/repo/{fileName}:
+    post:
+      operationId: postFederationDryFullSyncFile
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      parameters:
+        - name: fileName
+          in: path
+          required: true
+          description: Required path parameter. The internal fileName.
+          schema:
+            type: string
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/federation/extendedInfo/{repoKey}:
+    get:
+      operationId: getFederationExtendedInfo
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      parameters:
+        - name: repoKey
+          in: path
+          required: true
+          description: Required path parameter. The internal repoKey.
+          schema:
+            type: string
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/federation/federatedConfigInfo/{repoKey}:
+    get:
+      operationId: getFederationConfigInfo
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      parameters:
+        - name: repoKey
+          in: path
+          required: true
+          description: Required path parameter. The internal repoKey.
+          schema:
+            type: string
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/federation/federatedRepoConfigInfo:
+    get:
+      operationId: getFederationRepositoryConfigInfo
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /api/federation/forceFullSync/{repoKey}:
     post:
       description: Starts a full synchronization of a federated repository, interrupting one already in progress. Use it when a full sync appears stuck.
@@ -5990,6 +6190,125 @@ paths:
       x-idempotency: none
       x-idempotency-reason: external-effect
       x-cost: expensive
+  /api/federation/fullsync/repo/{fileName}:
+    post:
+      operationId: postFederationFullSyncFile
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      parameters:
+        - name: fileName
+          in: path
+          required: true
+          description: Required path parameter. The internal fileName.
+          schema:
+            type: string
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    get:
+      operationId: getFederationFullSyncFile
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      parameters:
+        - name: fileName
+          in: path
+          required: true
+          description: Required path parameter. The internal fileName.
+          schema:
+            type: string
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    delete:
+      operationId: deleteFederationFullSyncFile
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      parameters:
+        - name: fileName
+          in: path
+          required: true
+          description: Required path parameter. The internal fileName.
+          schema:
+            type: string
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/federation/fullsync/systemRepo:
+    post:
+      operationId: postFederationFullSyncSystemRepository
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/federation/grid/topology/events:
+    post:
+      operationId: postFederationGridTopologyEvents
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /api/federation/inconsistentRepos:
     get:
       description: Lists federated repositories whose shared configuration differs from at least one member's. Repair them with the configuration sync operation.
@@ -6035,6 +6354,105 @@ paths:
       x-cost: ordinary
       x-pagination: complete
       x-pagination-next: none
+  /api/federation/lastIdInSystem:
+    get:
+      operationId: getFederationLastIdInSystem
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/federation/member/enable:
+    post:
+      operationId: enableFederationInternalMember
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/federation/metadata:
+    post:
+      operationId: postFederationInternalMetadata
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    put:
+      operationId: putFederationInternalMetadata
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/federation/metadata/invalidate:
+    post:
+      operationId: invalidateFederationInternalMetadata
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /api/federation/migrate/{repoKey}:
     post:
       description: Converts a local repository into a federated repository with this instance as its only member, keeping content and metadata. Add members afterwards by updating the repository's `members`. Inside a project, every member of a federation must carry the same project key. A package type that cannot be federated (terraformbackend), a repository that is not local and one with push replication configured answer 400. Administrators only.
@@ -6091,6 +6509,123 @@ paths:
       x-idempotency-natural:
         - path:repoKey
       x-cost: expensive
+  /api/federation/migration:
+    put:
+      operationId: putFederationMigration
+      summary: Refuses the migration-tool-only write for every caller.
+      description: Refuses the migration-tool-only write for every caller. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '400':
+          description: Access denied. This endpoint is restricted to migration tool calls only.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/federation/migration/status:
+    get:
+      operationId: getFederationMigrationStatus
+      summary: Reports the integrated federation service state; administrators only.
+      description: Reports the integrated federation service state; administrators only. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '200':
+          description: The integrated service state.
+          content:
+            text/plain:
+              schema:
+                type: string
+        '401':
+          description: Credentials are required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: An administrator is required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          description: The server could not check current authority.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/federation/migration/status/verbose:
+    get:
+      operationId: getFederationVerboseMigrationStatus
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    put:
+      operationId: putFederationVerboseMigrationStatus
+      summary: Refuses the migration-tool-only write for every caller.
+      description: Refuses the migration-tool-only write for every caller. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '400':
+          description: Access denied. This endpoint is restricted to migration tool calls only.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/federation/negotiation/disable:
+    put:
+      operationId: disableFederationNegotiation
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /api/federation/prioritization/{repoKey}:
     put:
       description: Gives a federated repository's outgoing event queue priority over standard queues when the outbox is busy. At most 10 repositories can be high priority at once.
@@ -6219,6 +6754,220 @@ paths:
       x-idempotency-natural:
         - route
       x-cost: expensive
+  /api/federation/properties/{repoKey}:
+    post:
+      operationId: getFederationInternalProperties
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      parameters:
+        - name: repoKey
+          in: path
+          required: true
+          description: Required path parameter. The internal repoKey.
+          schema:
+            type: string
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/federation/property/{repoKey}/{fileName}:
+    get:
+      operationId: getFederationInternalProperty
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      parameters:
+        - name: repoKey
+          in: path
+          required: true
+          description: Required path parameter. The internal repoKey.
+          schema:
+            type: string
+        - name: fileName
+          in: path
+          required: true
+          description: Required path parameter. The internal fileName.
+          schema:
+            type: string
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/federation/queue/deregister:
+    put:
+      operationId: deregisterFederationQueue
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/federation/queue/remaining:
+    post:
+      operationId: getFederationQueueRemaining
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/federation/queue/reset:
+    post:
+      operationId: resetFederationQueue
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/federation/queue/state:
+    get:
+      operationId: getFederationQueueState
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/federation/queue/state/{state}:
+    put:
+      operationId: putFederationQueueState
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      parameters:
+        - name: state
+          in: path
+          required: true
+          description: Required path parameter. The internal state.
+          schema:
+            type: string
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/federation/queue/stop:
+    put:
+      operationId: stopFederationQueue
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/federation/ready/{repoKey}:
+    get:
+      operationId: getFederationRepositoryReady
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      parameters:
+        - name: repoKey
+          in: path
+          required: true
+          description: Required path parameter. The internal repoKey.
+          schema:
+            type: string
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /api/federation/reconnect:
     post:
       description: 'Re-establishes the link between the repository service and the federation sync worker, which runs inside the server process. The call restarts that worker: it re-reads the peer keys, re-opens the outbound queues and returns once the worker is running. Administrators only.'
@@ -6440,6 +7189,150 @@ paths:
       x-idempotency-natural:
         - 'body:'
       x-cost: expensive
+  /api/federation/repoExists/{repoKey}:
+    get:
+      operationId: getFederationRepositoryExists
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      parameters:
+        - name: repoKey
+          in: path
+          required: true
+          description: Required path parameter. The internal repoKey.
+          schema:
+            type: string
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/federation/repos:
+    get:
+      operationId: getFederationInternalRepositories
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/federation/repos/enable:
+    post:
+      operationId: enableFederationInternalRepositories
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/federation/rtfs:
+    put:
+      operationId: putFederationServiceConnection
+      summary: Refuses the migration-tool-only write for every caller.
+      description: Refuses the migration-tool-only write for every caller. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '400':
+          description: Access denied. This endpoint is restricted to migration tool calls only.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    get:
+      operationId: getFederationServiceConnection
+      summary: Reports the integrated federation service state; administrators only.
+      description: Reports the integrated federation service state; administrators only. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '200':
+          description: The integrated service state.
+          content:
+            text/plain:
+              schema:
+                type: string
+        '401':
+          description: Credentials are required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: An administrator is required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          description: The server could not check current authority.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/federation/snapshotFederatedRepos:
+    put:
+      operationId: snapshotFederationRepositories
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /api/federation/state:
     get:
       deprecated: true
@@ -6517,6 +7410,26 @@ paths:
       x-cost: ordinary
       x-pagination: complete
       x-pagination-next: none
+  /api/federation/status:
+    get:
+      operationId: getFederationInternalStatus
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /api/federation/status/connectionStates/{repoKey}:
     get:
       description: Shows, for each member of one federated repository, whether events are flowing and how far behind delivery is. The cheapest status operation, suited to routine monitoring.
@@ -6688,89 +7601,81 @@ paths:
           content:
             application/json:
               schema:
-                description: Sync status of one federated repository.
-                properties:
-                  binariesTasksInfo:
-                    description: Optional within this object. Binary transfer tasks for the repository.
-                    properties:
-                      failingTasks:
-                        description: Optional within this object. Tasks that exhausted their retries (ten by default).
-                        type: integer
-                      inProgressTasks:
-                        description: Optional within this object. Tasks in flight or waiting to be retried.
-                        type: integer
-                    type: object
-                  federatedArtifactStatus:
-                    description: 'Optional within this object. Artifact replication counts on this instance: artifacts replicated with metadata and binary, and artifacts whose metadata arrived but whose binary has not.'
-                    properties:
-                      fullyReplicatedArtifacts:
-                        description: Optional within this object. Artifacts with both metadata and binary present.
-                        format: int64
-                        type: integer
-                        x-unverified: true
-                      metadataOnlyArtifacts:
-                        description: Optional within this object. Artifacts whose binary is still being fetched.
-                        format: int64
-                        type: integer
-                        x-unverified: true
-                    type: object
-                  localKey:
-                    description: Optional within this object. Repository key on this instance.
-                    type: string
-                  mirrorEventsStatusInfo:
-                    description: Optional within this object. Event delivery state per target mirror.
-                    items:
-                      description: Event delivery state of one target mirror.
-                      properties:
-                        createEvents:
-                          description: Optional within this object. Create events waiting to be sent.
-                          format: int64
-                          type: integer
-                          x-unverified: true
-                        deleteEvents:
-                          description: Optional within this object. Delete events waiting to be sent.
-                          format: int64
-                          type: integer
-                          x-unverified: true
-                        errorEvents:
-                          description: Optional within this object. Events that failed during sync.
-                          format: int64
-                          type: integer
-                          x-unverified: true
-                        eventRegistrationTimeStamp:
-                          description: Optional within this object. When the mirror next registers with its target, in epoch milliseconds. Same name as the mirror lag operation.
-                          format: int64
-                          type: integer
-                          x-unverified: true
-                        lagInMS:
-                          description: 'Optional within this object. Mirror latency: now minus the time of the oldest event not yet handled, in milliseconds. Same name and meaning as the mirror lag operation.'
-                          format: int64
-                          type: integer
-                          x-unverified: true
-                        propertiesEvents:
-                          description: Optional within this object. Property change events waiting to be sent.
-                          format: int64
-                          type: integer
-                          x-unverified: true
-                        remoteRepoKey:
-                          description: Optional within this object. Repository key on the target mirror.
-                          type: string
-                        remoteUrl:
-                          description: Optional within this object. Base URL of the target mirror's instance.
-                          type: string
-                        status:
-                          description: Optional within this object. Whether the mirror is in sync. Version 1 reports SYNCED or OUT_OF_SYNC; version 2 reports the member states (HEALTHY, PENDING_FS, FULL_SYNC_RUNNING, ERROR_GENERIC, ERROR_INACTIVE, ERROR_OUT_OF_SYNC, READ_ONLY, IMPORT_IN_PROGRESS).
-                          type: string
-                          x-unverified: true
-                        updateEvents:
-                          description: Optional within this object. Update events waiting to be sent.
-                          format: int64
-                          type: integer
-                          x-unverified: true
-                      type: object
-                    type: array
-                type: object
+                $ref: '#/components/schemas/FederatedRepositoryStatus'
           description: The sync status.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The named resource does not exist.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not returned.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Get federated repository sync status
+      tags:
+        - federation
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getfederatedrepositorystatus.md
+      x-unverified: true
+      x-idempotency: safe
+      x-cost: ordinary
+  /api/federation/status/repo/{repoKey}/{federatedKey}:
+    get:
+      deprecated: true
+      description: 'Detailed sync status of one federated repository: binary transfer tasks, event delivery per member and artifact counts. Expensive on large repositories; use the connection state operation for routine monitoring.'
+      operationId: getFederatedRepositoryStatusProjection
+      parameters:
+        - description: Required path parameter. Key of the federated repository.
+          in: path
+          name: repoKey
+          required: true
+          schema:
+            description: Repository key.
+            type: string
+        - description: Required path parameter. Select mirrors or binaries; any other value is refused.
+          in: path
+          name: federatedKey
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FederatedRepositoryStatus'
+          description: The sync status.
+        '400':
+          description: The projection selector is not mirrors or binaries.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '401':
           content:
             application/json:
@@ -6886,57 +7791,16 @@ paths:
           content:
             application/json:
               schema:
-                description: Federations and member states.
-                properties:
-                  federations:
-                    description: Optional within this object. One entry per federated repository.
-                    items:
-                      description: One federation.
-                      properties:
-                        localRepoKey:
-                          description: Optional within this object. Repository key on this instance.
-                          type: string
-                        memberInfoList:
-                          description: Optional within this object. The members and their state.
-                          items:
-                            description: One member.
-                            properties:
-                              aggregatedStatus:
-                                description: Optional within this object. The member's state, one of those counted by the state summary operation.
-                                type: string
-                              isDisabled:
-                                description: Optional within this object. True when sync to this member is turned off.
-                                type: boolean
-                              isInLag:
-                                description: Optional within this object. True when the member's oldest undelivered event is older than the lag threshold.
-                                type: boolean
-                              isSupported:
-                                description: Optional within this object. False when the member's sync protocol version is incompatible.
-                                type: boolean
-                              repoKey:
-                                description: Optional within this object. Repository key on the member.
-                                type: string
-                              url:
-                                description: Optional within this object. Base URL of the member instance.
-                                type: string
-                            type: object
-                          type: array
-                        priority:
-                          description: Optional within this object. Queue priority of the repository, `HIGH` or `STANDARD`.
-                          enum:
-                            - HIGH
-                            - STANDARD
-                          type: string
-                      type: object
-                    type: array
-                type: object
+                $ref: '#/components/schemas/FederationStateList'
           description: The federations and their members.
         '400':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: The request was malformed or a value is invalid.
+                anyOf:
+                  - $ref: '#/components/schemas/FederationStateList'
+                  - $ref: '#/components/schemas/ErrorResponse'
+          description: Missing base configuration returns the empty state envelope; invalid input returns an error.
         '401':
           content:
             application/json:
@@ -6982,48 +7846,16 @@ paths:
           content:
             application/json:
               schema:
-                description: Member counts per state.
-                properties:
-                  federationStates:
-                    description: Optional within this object. Number of members in each state.
-                    properties:
-                      DELAYED:
-                        description: Optional within this object. Members whose events wait longer than the lag threshold.
-                        format: int64
-                        type: integer
-                      DISABLED:
-                        description: Optional within this object. Members with sync turned off.
-                        format: int64
-                        type: integer
-                      ERROR:
-                        description: Optional within this object. Members whose events fail after every retry.
-                        format: int64
-                        type: integer
-                      FULL_SYNC_RUNNING:
-                        description: Optional within this object. Members in a full sync.
-                        format: int64
-                        type: integer
-                      HEALTHY:
-                        description: Optional within this object. Members receiving events promptly.
-                        format: int64
-                        type: integer
-                      NOT_AVAILABLE:
-                        description: Optional within this object. Members that cannot be reached.
-                        format: int64
-                        type: integer
-                      PENDING_FS:
-                        description: Optional within this object. Members waiting for a full sync, for example right after joining.
-                        format: int64
-                        type: integer
-                    type: object
-                type: object
+                $ref: '#/components/schemas/FederationStateSummary'
           description: Member counts per state.
         '400':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: The request was malformed or a value is invalid.
+                anyOf:
+                  - $ref: '#/components/schemas/FederationStateSummary'
+                  - $ref: '#/components/schemas/ErrorResponse'
+          description: Missing base configuration returns the empty state envelope; invalid input returns an error.
         '401':
           content:
             application/json:
@@ -7123,6 +7955,46 @@ paths:
       x-cost: ordinary
       x-pagination: complete
       x-pagination-next: none
+  /api/federation/task/submit:
+    post:
+      operationId: submitFederationInternalTask
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/federation/tenant/move/status:
+    get:
+      operationId: getFederationTenantMoveStatus
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /api/federation/updateMemberUrl:
     post:
       description: Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource) with the same body and effect as replaceUrl. Administrators only.
@@ -7177,6 +8049,33 @@ paths:
       x-idempotency-natural:
         - 'body:'
       x-cost: expensive
+  /api/federation/validate/{repoKey}:
+    get:
+      operationId: validateFederationRepository
+      summary: The internal RTFS endpoint is unavailable; instances use the signed peer protocol.
+      description: The internal RTFS endpoint is unavailable; instances use the signed peer protocol. See research 40 section 7 and decision 0022.
+      tags: [federation]
+      security: []
+      x-idempotency: safe
+      x-cost: ordinary
+      parameters:
+        - name: repoKey
+          in: path
+          required: true
+          description: Required path parameter. The internal repoKey.
+          schema:
+            type: string
+      responses:
+        '404':
+          description: The internal service endpoint is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /api/gems/{repoKey}/reindex:
     post:
       description: Rebuilds the RubyGems package index from valid local or one-node federated gem archives and answers OK once it is done. Requires Manage on the repository.
@@ -18297,89 +19196,81 @@ paths:
           content:
             application/json:
               schema:
-                description: Sync status of one federated repository.
-                properties:
-                  binariesTasksInfo:
-                    description: Optional within this object. Binary transfer tasks for the repository.
-                    properties:
-                      failingTasks:
-                        description: Optional within this object. Tasks that exhausted their retries (ten by default).
-                        type: integer
-                      inProgressTasks:
-                        description: Optional within this object. Tasks in flight or waiting to be retried.
-                        type: integer
-                    type: object
-                  federatedArtifactStatus:
-                    description: 'Optional within this object. Artifact replication counts on this instance: artifacts replicated with metadata and binary, and artifacts whose metadata arrived but whose binary has not.'
-                    properties:
-                      fullyReplicatedArtifacts:
-                        description: Optional within this object. Artifacts with both metadata and binary present.
-                        format: int64
-                        type: integer
-                        x-unverified: true
-                      metadataOnlyArtifacts:
-                        description: Optional within this object. Artifacts whose binary is still being fetched.
-                        format: int64
-                        type: integer
-                        x-unverified: true
-                    type: object
-                  localKey:
-                    description: Optional within this object. Repository key on this instance.
-                    type: string
-                  mirrorEventsStatusInfo:
-                    description: Optional within this object. Event delivery state per target mirror.
-                    items:
-                      description: Event delivery state of one target mirror.
-                      properties:
-                        createEvents:
-                          description: Optional within this object. Create events waiting to be sent.
-                          format: int64
-                          type: integer
-                          x-unverified: true
-                        deleteEvents:
-                          description: Optional within this object. Delete events waiting to be sent.
-                          format: int64
-                          type: integer
-                          x-unverified: true
-                        errorEvents:
-                          description: Optional within this object. Events that failed during sync.
-                          format: int64
-                          type: integer
-                          x-unverified: true
-                        eventRegistrationTimeStamp:
-                          description: Optional within this object. When the mirror next registers with its target, in epoch milliseconds. Same name as the mirror lag operation.
-                          format: int64
-                          type: integer
-                          x-unverified: true
-                        lagInMS:
-                          description: 'Optional within this object. Mirror latency: now minus the time of the oldest event not yet handled, in milliseconds. Same name and meaning as the mirror lag operation.'
-                          format: int64
-                          type: integer
-                          x-unverified: true
-                        propertiesEvents:
-                          description: Optional within this object. Property change events waiting to be sent.
-                          format: int64
-                          type: integer
-                          x-unverified: true
-                        remoteRepoKey:
-                          description: Optional within this object. Repository key on the target mirror.
-                          type: string
-                        remoteUrl:
-                          description: Optional within this object. Base URL of the target mirror's instance.
-                          type: string
-                        status:
-                          description: Optional within this object. Whether the mirror is in sync. Version 1 reports SYNCED or OUT_OF_SYNC; version 2 reports the member states (HEALTHY, PENDING_FS, FULL_SYNC_RUNNING, ERROR_GENERIC, ERROR_INACTIVE, ERROR_OUT_OF_SYNC, READ_ONLY, IMPORT_IN_PROGRESS).
-                          type: string
-                          x-unverified: true
-                        updateEvents:
-                          description: Optional within this object. Update events waiting to be sent.
-                          format: int64
-                          type: integer
-                          x-unverified: true
-                      type: object
-                    type: array
-                type: object
+                $ref: '#/components/schemas/FederatedRepositoryStatus'
           description: The sync status.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The named resource does not exist.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not returned.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Get federated repository sync status (version 2)
+      tags:
+        - federation
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getfederatedrepositorystatusv2.md
+      x-unverified: true
+      x-idempotency: safe
+      x-cost: ordinary
+  /api/v2/federation/status/repo/{repoKey}/{federatedKey}:
+    get:
+      deprecated: true
+      description: Version 2 of the repository sync status, which reports a wider set of member states. The fields are those of version 1.
+      operationId: getFederatedRepositoryStatusProjectionV2
+      parameters:
+        - description: Required path parameter. Key of the federated repository.
+          in: path
+          name: repoKey
+          required: true
+          schema:
+            description: Repository key.
+            type: string
+        - description: Required path parameter. Select mirrors or binaries; any other value is refused.
+          in: path
+          name: federatedKey
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FederatedRepositoryStatus'
+          description: The sync status.
+        '400':
+          description: The projection selector is not mirrors or binaries.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '401':
           content:
             application/json:
@@ -25374,6 +26265,21 @@ components:
       required:
         - exportPath
       type: object
+    FederatedArtifactStatus:
+      type: object
+      description: Optional within this object. The artifact counts named by the 7.161.26 source DTO.
+      x-unverified: true
+      properties:
+        countFullyReplicateArtifacts:
+          type: integer
+          description: Optional within this object. Files currently present, excluding paths with a newer change awaiting content.
+          x-unverified: true
+          format: int64
+        countArtificiallyReplicatedArtifacts:
+          type: integer
+          description: Optional within this object. File paths whose winning metadata is still awaiting content.
+          x-unverified: true
+          format: int64
     FederatedBinaryTaskCounts:
       description: Counts derived from failed-fetch records. The proprietary DTO is unavailable; these fields are inferred.
       properties:
@@ -25406,6 +26312,58 @@ components:
           type: string
           x-unverified: true
       type: object
+    FederatedMirrorEvents:
+      type: object
+      description: The event fields named by the 7.161.26 source DTO.
+      x-unverified: true
+      properties:
+        remoteUrl:
+          type: string
+          description: Optional within this object. The member instance base URL.
+          x-unverified: true
+        remoteRepoKey:
+          type: string
+          description: Optional within this object. The member repository key.
+          x-unverified: true
+        status:
+          type: string
+          description: Optional within this object. Version 1 uses SYNCED or OUT_OF_SYNC; version 2 uses its detailed member state.
+          x-unverified: true
+        createEvents:
+          type: integer
+          description: Optional within this object. Undelivered creates.
+          x-unverified: true
+          format: int64
+        updateEvents:
+          type: integer
+          description: Optional within this object. Undelivered updates. Entries written before operation categories were recorded count as updates.
+          x-unverified: true
+          format: int64
+        deleteEvents:
+          type: integer
+          description: Optional within this object. Undelivered deletions.
+          x-unverified: true
+          format: int64
+        propsEvents:
+          type: integer
+          description: Optional within this object. Undelivered property changes.
+          x-unverified: true
+          format: int64
+        errorEvents:
+          type: integer
+          description: Optional within this object. Queued events on a cursor with a recorded delivery error.
+          x-unverified: true
+          format: int64
+        lagInMS:
+          type: integer
+          description: Optional within this object. Age of the oldest unacknowledged event in milliseconds; zero when caught up.
+          x-unverified: true
+          format: int64
+        eventRegistrationTimeStamp:
+          type: integer
+          description: Optional within this object. Registration time of that event in epoch milliseconds; zero when caught up.
+          x-unverified: true
+          format: int64
     FederatedReplaceUrl:
       description: A member base URL and its replacement (7.161.26's ReplaceUrlConfig).
       properties:
@@ -25686,6 +26644,44 @@ components:
       x-go-type: repo.Config
       x-go-type-import:
         path: github.com/weaveplatform/artifactweave/internal/artifacts/api/repo
+    FederatedRepositoryStatus:
+      type: object
+      description: The 7.161.26 repository status DTO. JSON field names follow source fields and remain inferred.
+      x-unverified: true
+      properties:
+        localKey:
+          description: Optional within this object. The repository key on this instance.
+          x-unverified: true
+          type: string
+        binariesTasksInfo:
+          description: Optional within this object. Binary tasks recorded for this repository.
+          x-unverified: true
+          $ref: '#/components/schemas/FederatedStatusBinaryTasks'
+        mirrorEventsStatusInfo:
+          description: Optional within this object. Outbound event state for each current remote member.
+          x-unverified: true
+          type: array
+          items:
+            $ref: '#/components/schemas/FederatedMirrorEvents'
+        federatedArtifactStatus:
+          description: Optional within this object. Actual files and changes awaiting a binary.
+          x-unverified: true
+          $ref: '#/components/schemas/FederatedArtifactStatus'
+    FederatedStatusBinaryTasks:
+      type: object
+      description: Optional within this object. Binary task counts from current pending changes and failed-fetch records.
+      x-unverified: true
+      properties:
+        failingTasks:
+          type: integer
+          description: Optional within this object. Recorded content fetches with a failed attempt.
+          x-unverified: true
+          format: int64
+        inProgressTasks:
+          type: integer
+          description: Optional within this object. Distinct pending contents with no recorded failed fetch.
+          x-unverified: true
+          format: int64
     FederationConnection:
       description: One member connection.
       properties:
@@ -25732,6 +26728,92 @@ components:
         supported:
           description: Optional within this object. False when the remote member cannot report federation status; the connection then shows N/A or UNSUPPORTED. It is false when the peer speaks a protocol major version this instance does not (decision 0021).
           type: boolean
+      type: object
+    FederationStateList:
+      description: Federations and member states.
+      properties:
+        federations:
+          description: Optional within this object. One entry per federated repository.
+          items:
+            description: One federation.
+            properties:
+              localRepoKey:
+                description: Optional within this object. Repository key on this instance.
+                type: string
+              memberInfoList:
+                description: Optional within this object. The members and their state.
+                items:
+                  description: One member.
+                  properties:
+                    aggregatedStatus:
+                      description: Optional within this object. The member's state, one of those counted by the state summary operation.
+                      type: string
+                    isDisabled:
+                      description: Optional within this object. True when sync to this member is turned off.
+                      type: boolean
+                    isInLag:
+                      description: Optional within this object. True when the member's oldest undelivered event is older than the lag threshold.
+                      type: boolean
+                    isSupported:
+                      description: Optional within this object. False when the member's sync protocol version is incompatible.
+                      type: boolean
+                    repoKey:
+                      description: Optional within this object. Repository key on the member.
+                      type: string
+                    url:
+                      description: Optional within this object. Base URL of the member instance.
+                      type: string
+                  type: object
+                type: array
+              priority:
+                description: Optional within this object. Queue priority of the repository, `HIGH` or `STANDARD`.
+                enum:
+                  - HIGH
+                  - STANDARD
+                type: string
+            type: object
+          type: array
+      type: object
+    FederationStateSummary:
+      description: Member counts per state.
+      properties:
+        federationStates:
+          description: Optional within this object. Number of members in each state.
+          properties:
+            DELAYED:
+              description: Optional within this object. Members whose events wait longer than the lag threshold.
+              format: int64
+              type: integer
+            DISABLED:
+              description: Optional within this object. Members with sync turned off.
+              format: int64
+              type: integer
+            ERROR:
+              description: Optional within this object. Members whose events fail after every retry.
+              format: int64
+              type: integer
+            FULL_SYNC_RUNNING:
+              description: Optional within this object. Members in a full sync.
+              format: int64
+              type: integer
+            HEALTHY:
+              description: Optional within this object. Members receiving events promptly.
+              format: int64
+              type: integer
+            NOT_AVAILABLE:
+              description: Optional within this object. Members that cannot be reached.
+              format: int64
+              type: integer
+            PENDING_FS:
+              description: Optional within this object. Members waiting for a full sync, for example right after joining.
+              format: int64
+              type: integer
+            READ_ONLY:
+              description: Optional within this object. Members in a read-only state. Receiving-only mode alone does not count as this state.
+              format: int64
+              type: integer
+              x-unverified: true
+          type: object
       type: object
     FileInfo:
       description: Metadata of one file item as returned by the storage API without a mode query parameter. Timestamps are RFC 3339 with millisecond precision and a zone offset.
