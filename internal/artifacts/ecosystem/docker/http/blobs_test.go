@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -16,17 +17,19 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
-	"github.com/weaveplatform/artifactweave/internal/artifacts/core/registry"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/baseurl"
+	"github.com/weaveplatform/artifactweave/internal/platform/testkit/storekit"
 )
 
 func digestOf(s string) string {
@@ -128,7 +131,9 @@ func expect(t *testing.T, rec *httptest.ResponseRecorder, status int, errCode st
 }
 
 func TestAccMonolithicUploadAndPull(t *testing.T) {
-	w := newBlobWorld(t)
+	w := newBlobWorld(t, func(o *Options) {
+		o.Store = struct{ Store }{o.Store}
+	})
 	d := digestOf("layer bytes")
 	rec := w.do(http.MethodPost, "/v2/docker-local/team/app/blobs/uploads/?digest="+d,
 		"layer bytes", nil)
@@ -165,6 +170,75 @@ func TestAccMonolithicUploadAndPull(t *testing.T) {
 	sub := w.do(http.MethodGet, "/v2/team/app/blobs/"+d, "",
 		map[string]string{"Host": "docker-local.reg.example.com"})
 	expect(t, sub, http.StatusOK, "")
+}
+
+// admissionResponse observes the actual native response boundary, including a
+// writer wrapped by the registry's authentication middleware.
+type admissionResponse struct {
+	*httptest.ResponseRecorder
+	before func()
+}
+
+func (w *admissionResponse) WriteHeader(status int) {
+	if w.before != nil {
+		before := w.before
+		w.before = nil
+		before()
+	}
+	w.ResponseRecorder.WriteHeader(status)
+}
+
+func (w *admissionResponse) Write(data []byte) (int, error) {
+	if w.before != nil {
+		w.WriteHeader(http.StatusOK)
+	}
+	return w.ResponseRecorder.Write(data)
+}
+
+// A transparent HTTP Store wrapper must retain real durable admission for both
+// native response paths, until the final byte has been handed to the client.
+func TestAccHostedRegistryAdmissionBeforeResponse(t *testing.T) {
+	for _, kind := range []string{"blob", "manifest"} {
+		t.Run(kind, func(t *testing.T) {
+			w := newBlobWorld(t, func(o *Options) { o.Store = struct{ Store }{o.Store} })
+			ctx := t.Context()
+			body := "layer bytes"
+			base := "/v2/fed-docker/team/app/"
+			expect(t, w.do(http.MethodPost, base+"blobs/uploads/?digest="+digestOf(body), body, nil), http.StatusCreated, "")
+			target := base + "blobs/" + digestOf(body)
+			if kind == "manifest" {
+				expect(t, w.do(http.MethodPost, base+"blobs/uploads/?digest="+digestOf(imageConfig), imageConfig, nil), http.StatusCreated, "")
+				body = image(body)
+				target = base + "manifests/v1"
+				expect(t, w.do(http.MethodPut, target, body, ociManifest), http.StatusCreated, "")
+			}
+			// An independent indexed version proves the repository-wide drain,
+			// without assuming that the selected native item has a version link.
+			guard := w.deploy("fed-docker", "guard.txt", "indexed guard")
+			pkg := storekit.Get[artmodel.Package](t)(w.db.Packages().Ensure(ctx, artmodel.Package{RepoKey: "fed-docker", Type: repo.Docker, Name: "cleanup-guard"}))
+			version := storekit.Get[artmodel.PackageVersion](t)(w.db.Packages().PutVersion(ctx, artmodel.PackageVersion{PackageID: pkg.ID, Version: "1"}))
+			storekit.Must(t, w.db.Packages().LinkFile(ctx, artmodel.VersionFile{VersionID: version.ID, ItemID: guard.ID}))
+			repository := storekit.Get[api.CleanupRepository](t)(pkgindex.NewCleanupMetadata(w.db).Repository(ctx, "fed-docker"))
+			ref := api.CleanupExclusion{
+				ID: "native-response", Owner: "coordinator", Repository: "fed-docker",
+				Incarnation: repository.Incarnation, Generation: repository.Generation,
+				Versions: []api.CleanupVersionIdentity{{DownloadVersion: api.DownloadVersion{Package: pkg.Name, Version: version.Version}, ID: version.ID}},
+			}
+			exclusions := w.db.CleanupExclusions()
+			observed := false
+			response := &admissionResponse{ResponseRecorder: httptest.NewRecorder(), before: func() {
+				observed = true
+				if !errors.Is(exclusions.Prepare(ctx, ref), api.ErrCleanupExcluded) {
+					t.Fatal("native response preceded durable admission")
+				}
+			}}
+			w.h.ServeHTTP(response, httptest.NewRequest(http.MethodGet, target, nil))
+			if !observed || response.Code != http.StatusOK || response.Body.String() != body {
+				t.Fatalf("native %s response: observed=%v status=%d", kind, observed, response.Code)
+			}
+			storekit.Must(t, exclusions.Prepare(ctx, ref))
+		})
+	}
 }
 
 func TestAccBlobReadErrors(t *testing.T) {
@@ -707,7 +781,7 @@ func (f failingCopies) Search(ctx context.Context, q *aql.Query, o aql.Options) 
 }
 
 type itemsFault struct {
-	registry.Store
+	Store
 	items port.ItemStore
 }
 

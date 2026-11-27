@@ -36,8 +36,9 @@
 //     DockerAPI in the artifactory spec's strict server; its operations
 //     (rest.go) check image names with ValidName and find repositories with
 //     Lookup.
-//   - Driven: the registry's store (Options.Store, an
-//     artifacts/core/registry Store), which resolves repositories and reads
+//   - Driven: the HTTP Store (Options.Store), which includes the
+//     artifacts/core/registry Store and durable hosted-response admission,
+//     resolves repositories and reads
 //     items, and over which the registry's writes (artifacts/core/registry)
 //     keep upload sessions and store blobs, mounts, manifests and deletes
 //     through the item service; Lookup reads only repositories, from any

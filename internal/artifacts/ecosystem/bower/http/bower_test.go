@@ -125,6 +125,7 @@ func (f *fixture) get(path, user string) *httptest.ResponseRecorder {
 
 func TestUnitBowerLocalFederatedAndVirtualResolver(t *testing.T) {
 	f := newFixture(t)
+	f.mount(nil, func(st pkgroute.Store) pkgroute.Store { return struct{ pkgroute.Store }{st} })
 	l := f.repo("bower-local", repo.Local)
 	fed := f.repo("bower-fed", repo.Federated)
 	_ = f.repo("bower-virtual", repo.Virtual, l.Key, fed.Key)

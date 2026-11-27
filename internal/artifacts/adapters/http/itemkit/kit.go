@@ -8,6 +8,7 @@ import (
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
+	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
@@ -29,9 +30,11 @@ import (
 // and awaits derived work, with the upload sessions, which the Docker REST
 // operations' registry service keeps (registry.Store). It names no access
 // or configuration-module store: the kit reaches the access module through
-// Deps.Access. Each composite store in app is a Store.
+// Deps.Access. Durable hosted-response admission is part of this contract so
+// interface-embedding wrappers retain it. Each composite store in app is a Store.
 type Store interface {
 	item.Store
+	CleanupExclusions() artifactsapi.CleanupExclusions
 	Uploads() session.UploadStore
 	VirtualCopies() virtual.CopyStore
 }

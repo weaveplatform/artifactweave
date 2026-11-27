@@ -177,9 +177,11 @@ func TestUnitHostedAdmissionBeforeResponse(t *testing.T) {
 	for _, test := range []struct {
 		name, method, query, rangeHeader    string
 		redirect, virtual, cancel, metadata bool
+		embedded                            bool
 		status                              int
 	}{
 		{name: "GET", method: http.MethodGet, status: 200},
+		{name: "interface_embedded_store", method: http.MethodGet, embedded: true, status: 200},
 		{name: "statistics skipped", method: http.MethodGet, query: "?skipUpdateStats=true", status: 200},
 		{name: "nonfirst range", method: http.MethodGet, rangeHeader: "bytes=2-4", status: 206},
 		{name: "cancelled response", method: http.MethodGet, query: "?skipUpdateStats=true", cancel: true, status: 200},
@@ -236,6 +238,11 @@ func TestUnitHostedAdmissionBeforeResponse(t *testing.T) {
 			if test.redirect {
 				deps.Blobs = admissionSigner{w.Blobs}
 			}
+			var st itemkit.Store = w.Store
+			if test.embedded {
+				st = struct{ itemkit.Store }{st}
+				deps.Store = st
+			}
 			kit := w.Kit(deps)
 			if test.virtual {
 				virtual := w.Virtual
@@ -244,7 +251,7 @@ func TestUnitHostedAdmissionBeforeResponse(t *testing.T) {
 				request.URL.Path = "/artifactory/" + virtual.Key + "/package.tgz"
 				kit.GetItem(response, request)
 			} else {
-				kit.ServeItemFile(response, request, w.Store, itemkit.Found{Repo: configuration, Item: it}, kittest.Admin)
+				kit.ServeItemFile(response, request, st, itemkit.Found{Repo: configuration, Item: it}, kittest.Admin)
 			}
 			if !response.observed || response.Code != test.status {
 				t.Fatalf("response %d, observed=%v body=%s", response.Code, response.observed, response.Body.String())
