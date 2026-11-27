@@ -23,6 +23,7 @@ import (
 	"github.com/cucumber/godog"
 
 	"github.com/weaveplatform/artifactweave/pkg/containertest"
+	"github.com/weaveplatform/artifactweave/test/clienttest"
 )
 
 // The registry's real clients (decision 0015): the runner's docker, whose
@@ -289,10 +290,7 @@ func (w *world) runDocker(args string) error {
 	if err != nil {
 		return err
 	}
-	cmd := exec.Command(
-		"docker",
-		append([]string{"--config", dir}, strings.Fields(w.expand(args))...)...)
-	cmd.Dir = w.dir
+	cmd := clienttest.Docker(w.t.Context(), w.dir, dir, strings.Fields(w.expand(args)))
 	return w.runClient(cmd)
 }
 
@@ -349,9 +347,7 @@ func (w *world) runTool(tool, args string) error {
 	if err != nil {
 		return err
 	}
-	cmd := exec.Command(os.Getenv(registryTools[tool]), strings.Fields(w.expand(args))...)
-	cmd.Dir = w.dir
-	cmd.Env = append(os.Environ(), "DOCKER_CONFIG="+dir, "COSIGN_PASSWORD=", "COSIGN_YES=true")
+	cmd := clienttest.Registry(w.t.Context(), w.dir, dir, os.Getenv(registryTools[tool]), strings.Fields(w.expand(args)))
 	return w.runClient(cmd)
 }
 

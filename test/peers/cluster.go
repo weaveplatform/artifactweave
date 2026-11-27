@@ -72,6 +72,10 @@ const (
 
 // Options says what Start builds.
 type Options struct {
+	// InstanceTest defaults to the production RunInstance child. A test stream
+	// supplies its own entry point, retaining the same process supervision.
+	InstanceTest string
+
 	// Instances is how many instances start, at least one; P13's scenarios
 	// use two or three.
 	Instances int
@@ -115,6 +119,9 @@ func Start(t *testing.T, opts Options) *Cluster {
 	if opts.Instances < 1 {
 		t.Fatalf("peers: %d instances; a cluster needs at least one", opts.Instances)
 	}
+	if opts.InstanceTest == "" {
+		opts.InstanceTest = InstanceTest
+	}
 	if opts.Driver == "" {
 		opts.Driver = SQLite
 	}
@@ -144,6 +151,7 @@ func Start(t *testing.T, opts Options) *Cluster {
 		name := fmt.Sprintf("peer%d", i+1)
 		in := &Instance{
 			Name:          name,
+			instanceTest:  opts.InstanceTest,
 			DataDir:       filepath.Join(work, name, "data"),
 			AdminPassword: "peer-admin-" + strings.ToLower(rand.Text()),
 			masterKey:     "peer-master-key-" + strings.ToLower(rand.Text()),
@@ -233,6 +241,34 @@ func (c *Cluster) Heal(a, b int) {
 func (c *Cluster) Stop(i int) {
 	c.t.Helper()
 	c.instance(i).stop()
+}
+
+// Restart starts a stopped instance with its original address, identity and
+// data. It reports the previous exit before another child can overwrite it.
+func (c *Cluster) Restart(i int) {
+	c.t.Helper()
+	in := c.instance(i)
+	select {
+	case <-in.done:
+	default:
+		c.t.Fatalf("peers: %s is still running", in.Name)
+	}
+	if in.exit != nil {
+		c.t.Fatalf("peers: %s exited unsuccessfully: %v", in.Name, in.exit)
+	}
+	log, err := in.openLog()
+	if err != nil {
+		c.t.Fatal(err)
+	}
+	done := make(chan struct{})
+	stdin, kill, err := startProcess(log, in.instanceTest, in.config, done, &in.exit)
+	if err != nil {
+		c.t.Fatal(err)
+	}
+	in.stdin, in.done, in.kill = stdin, done, kill
+	if err := in.awaitReady(); err != nil {
+		c.t.Fatal(err)
+	}
 }
 
 // DoFrom sends a request to instance to's base URL as to's administrator,
@@ -361,15 +397,14 @@ func (c *Cluster) dumpLogsOnFailure() {
 		return
 	}
 	for _, in := range c.Instances {
-		if in.logPath == "" {
-			continue
+		for _, path := range in.logPaths {
+			data, err := readTail(path, logTail)
+			if err != nil {
+				c.t.Logf("peers: %s server log %s: %v", in.Name, path, err)
+				continue
+			}
+			c.t.Logf("peers: %s server log (%s):\n%s", in.Name, path, data)
 		}
-		data, err := readTail(in.logPath, logTail)
-		if err != nil {
-			c.t.Logf("peers: %s server log %s: %v", in.Name, in.logPath, err)
-			continue
-		}
-		c.t.Logf("peers: %s server log (%s):\n%s", in.Name, in.logPath, data)
 	}
 }
 
@@ -412,7 +447,8 @@ type Instance struct {
 	// AdminPassword is AdminUser's password, different on every instance.
 	AdminPassword string
 
-	cluster *Cluster
+	cluster      *Cluster
+	instanceTest string
 	// probe and retention are the configuration's federation section:
 	// peer_probe_interval and outbox_retention, left out when zero.
 	probe     time.Duration
@@ -430,6 +466,7 @@ type Instance struct {
 	masterKey string
 	addr      string
 	logPath   string
+	logPaths  []string
 	stdin     io.WriteCloser
 	done      chan struct{}
 	exit      error
@@ -688,7 +725,7 @@ func (in *Instance) startOnce(origins []string) error {
 		return err
 	}
 	done := make(chan struct{})
-	stdin, kill, err := startProcess(log, path, done, &in.exit)
+	stdin, kill, err := startProcess(log, in.instanceTest, path, done, &in.exit)
 	if err != nil {
 		return fmt.Errorf("%s: %w", in.Name, err)
 	}
@@ -718,6 +755,7 @@ func (in *Instance) openLog() (*os.File, error) {
 		return nil, err
 	}
 	in.logPath = f.Name()
+	in.logPaths = append(in.logPaths, f.Name())
 	return f, nil
 }
 

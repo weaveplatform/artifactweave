@@ -54,7 +54,18 @@ func run(ctx context.Context, cfg config.Config, log *slog.Logger, ready chan<- 
 	if err != nil {
 		return fmt.Errorf("start: %w", err)
 	}
-	err = serve(ctx, cfg, rt, ready)
+	return runRuntime(ctx, cfg, rt, ready)
+}
+
+// RunRuntime serves an already composed runtime with Run's router, limits,
+// logging and shutdown lifecycle, including closing the runtime on failure.
+// Callers may register a stream kind before exposing the listener.
+func RunRuntime(ctx context.Context, cfg config.Config, rt *Runtime) error {
+	return runRuntime(ctx, cfg, rt, nil)
+}
+
+func runRuntime(ctx context.Context, cfg config.Config, rt *Runtime, ready chan<- string) error {
+	err := serve(ctx, cfg, rt, ready)
 	// Mirror commits still running after the drain get as long again to be
 	// recorded.
 	closeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), drain)

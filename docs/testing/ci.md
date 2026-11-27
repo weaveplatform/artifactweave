@@ -357,6 +357,12 @@ Terraform federated scenario that reuses them (QUA-02):
   hash and key costs. Closing its standard input stops it as a signal stops
   serve. It inherits the binary's `-test.gocoverdir`, so under `-cover` its
   counters join the job's coverage.
+  The ordered test-stream fixture registers existing `streamtest.Kind` in a
+  production-cost runtime, then uses `app.RunRuntime`, the same serving/drain/close
+  path used by `app.Run`. Its separate loopback control API is fixture-only;
+  application routes, request limits and logging are composed only once.
+  Restart retains the instance's configuration, identity and database and collects
+  each process's exit and coverage before starting the next.
 - **Ports and base URLs.** Each instance listens on its own loopback port,
   `127.0.0.1:<port>`. A port another process takes before the instance binds
   it is retried with a new one. In front of it the cluster runs its
@@ -2099,3 +2105,11 @@ user annotations, and current Manage/credential revocation before execution and 
 PostgreSQL runs on Linux CI; a local Docker-unavailable skip is not PostgreSQL evidence.
 
 The Conda `@conda` partition includes the opt-in `@conda_shards` scenarios. They use the same [digest-pinned micromamba client](ci-client-images.md), explicitly enable `MAMBA_USE_SHARDED_REPODATA`, and assert successful shard-index and content-shard GETs with no classic repodata requests. `XDG_CACHE_HOME` is isolated under the removable client root so the virtual/offline proof cannot pass using a prior client shard cache. Conda's application-level source/cache/revision tests are in `test/server/artifacts/conda/conda_remote_test.go`, which the selector inventory gives to Conda with the rest of that package.
+
+The P13 native peer scenarios share `test/clienttest` with the existing
+acceptance clients: pinned npm/Maven containers, private product caches, verified
+Maven tool tails, and pinned JF. The Linux peer lane prepares these prerequisites
+and fails if they are absent. Other operating systems explicitly skip these
+Linux-host-networking scenarios; that local skip is not native-client proof.
+See the [P13 qualification record](../implementation/plan.md#p13-qualification-record)
+for the complete requirement map and pending merged-main acceptance.

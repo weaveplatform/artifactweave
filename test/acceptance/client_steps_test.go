@@ -28,6 +28,8 @@ import (
 	"time"
 
 	"github.com/cucumber/godog"
+
+	"github.com/weaveplatform/artifactweave/test/clienttest"
 )
 
 // The package clients P7 and P8 test against (decision 0015): npm, Maven,
@@ -311,18 +313,7 @@ func (w *world) runContainerWith(stdin io.Reader, image string, flags, argv []st
 	if err != nil {
 		return err
 	}
-	args := []string{
-		"run", "--rm", "--network", "host",
-		"--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()),
-		"-v", dir + ":/work", "-w", "/work", "-e", "HOME=/work",
-	}
-	if stdin != nil {
-		args = append(args, "-i")
-	}
-	args = append(append(append(args, flags...), image), argv...)
-	cmd := exec.Command("docker", args...)
-	cmd.Stdin = stdin
-	return w.runClient(cmd)
+	return w.runClient(clienttest.Container(w.t.Context(), dir, image, stdin, flags, argv))
 }
 
 // runNPM runs npm in the pinned node image, with its cache in the scenario's
@@ -331,13 +322,11 @@ func (w *world) runNPM(args string) error { return w.runNPMWith(nil, args) }
 
 // runNPMWith is runNPM with stdin attached.
 func (w *world) runNPMWith(stdin io.Reader, args string) error {
-	return w.runContainerWith(stdin, w.npmImage, []string{
-		"--entrypoint", "npm",
-		"-e", "npm_config_cache=/work/.npm-cache",
-		"-e", "npm_config_update_notifier=false",
-		"-e", "npm_config_audit=false",
-		"-e", "npm_config_fund=false",
-	}, w.clientArgs(args))
+	dir, err := w.filesDir()
+	if err != nil {
+		return err
+	}
+	return w.runClient(clienttest.NPM(w.t.Context(), dir, w.npmImage, stdin, w.clientArgs(args)))
 }
 
 // runMaven runs the pinned Maven image with private tools and product caches.
@@ -347,11 +336,12 @@ func (w *world) runMaven(args string) error {
 	if err != nil {
 		return err
 	}
-	return w.runContainer(w.mavenImage, []string{
-		"--entrypoint", "mvn",
-		"-v", repo + ":/m2:ro",
-		"-e", "MAVEN_OPTS=-Duser.home=/work",
-	}, w.mavenClientArgs(args))
+	dir, err := w.filesDir()
+	if err != nil {
+		return err
+	}
+	return w.runClient(clienttest.Maven(w.t.Context(), dir, w.mavenImage, repo,
+		w.clientArgs(strings.ReplaceAll(args, "{m2}", "/m2"))))
 }
 
 // binaryAvailable skips the scenario unless the client's pinned binary is
