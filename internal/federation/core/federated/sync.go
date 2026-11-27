@@ -89,6 +89,13 @@ func (s Sender) Send(ctx context.Context, item work.WorkItem) error {
 	if c.Class != repo.Federated {
 		return nil
 	}
+	selfBase, err := s.Membership.SelfBase(ctx)
+	if err != nil {
+		return err
+	}
+	if selfReceiver(c, selfBase) {
+		return nil
+	}
 	st := s.Membership.Store
 	members, err := st.Federation().Members(ctx, key)
 	if err != nil {
@@ -163,7 +170,7 @@ var (
 // name this instance at its own base URL and repoKey and the caller among
 // the others; every other member must be a peer of this instance too.
 func (r Receiver) Apply(ctx context.Context, caller model.Peer, repoKey string, cfg map[string]any) error {
-	if !caller.Has(model.UseFederatedRepo) {
+	if !caller.Has(model.UseFederatedRepo) && (!caller.Has(model.UseFederatedRepoRead) || !caller.ReceivesFederationOnly) {
 		return ErrNotFederatedPeer
 	}
 	var c repo.Config
@@ -180,6 +187,16 @@ func (r Receiver) Apply(ctx context.Context, caller model.Peer, repoKey string, 
 	st := r.Membership.Store
 	//nolint:wrapcheck // each step names what failed, and refusals keep their type
 	return st.Tx(ctx, func(ctx context.Context) error {
+		current, err := st.Peers().Get(ctx, caller.InstanceID)
+		if errors.Is(err, kernel.ErrNotFound) {
+			return ErrNotFederatedPeer
+		}
+		if err != nil {
+			return fmt.Errorf("configuration sender trust: %w", err)
+		}
+		if !current.Has(model.UseFederatedRepo) && (!current.Has(model.UseFederatedRepoRead) || !current.ReceivesFederationOnly) {
+			return ErrNotFederatedPeer
+		}
 		self, err := r.Membership.SelfBase(ctx)
 		if err != nil {
 			return err

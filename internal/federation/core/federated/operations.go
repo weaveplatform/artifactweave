@@ -117,6 +117,9 @@ func (o Operations) Migrate(ctx context.Context, key string) error {
 }
 
 func (o Operations) write(ctx context.Context, c repo.Config) error {
+	if err := o.Membership.CheckLocalUpdate(ctx, c, o.Repositories.Get); err != nil {
+		return err
+	}
 	if err := o.Membership.Admit(ctx, &c); err != nil {
 		return err
 	}
@@ -145,6 +148,11 @@ func (o Operations) ConvertToLocal(ctx context.Context, keys []string) ([]string
 		err := o.Membership.Store.Tx(ctx, func(ctx context.Context) error {
 			c, err := o.federated(ctx, key)
 			if err != nil {
+				return err
+			}
+			next := c
+			next.Class = repo.Local
+			if err := o.Membership.CheckLocalUpdate(ctx, next, o.Repositories.Get); err != nil {
 				return err
 			}
 			members, err := o.Membership.Store.Federation().Members(ctx, key)

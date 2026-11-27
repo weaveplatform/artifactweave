@@ -11,7 +11,11 @@
 // It is generic over stream kinds: a Kind says who exchanges its streams
 // and applies their entries; core/federated registers repo:<key> (FED-02).
 // A kind that pauses a subscribed peer (Pauser) is sent nothing while it
-// pauses, and the peer resumes from its acknowledged position.
+// pauses, and the peer resumes from its acknowledged position. Optional
+// AllowsPeer and AllowsStream policies additionally bind exchange to trust
+// direction and current membership roles; regrant checks them in apply
+// transactions. AuthoritativeSnapshot makes a receiver reconcile its local
+// divergence even when a sender requests normal full sync.
 //
 // # Inputs
 //

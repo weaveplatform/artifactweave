@@ -155,6 +155,10 @@ type Peer struct {
 	// Delivery is how stream entries travel to and from the peer; the
 	// stores return DeliveryPush for a peer recorded without one.
 	Delivery Delivery
+	// ReceivesFederationOnly is true on the redeemer of federated-repo/r:
+	// this peer issued the grant and sends to this instance. Two-way trust
+	// overrides it; the issuer records false and only sends to the redeemer.
+	ReceivesFederationOnly bool
 }
 
 // Pushes reports whether this instance pushes its entries to the peer.

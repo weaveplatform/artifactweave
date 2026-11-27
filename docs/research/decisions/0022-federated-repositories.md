@@ -17,7 +17,7 @@ snapshot and reconciler, `fullSync`, `forceFullSync`, `recovery`, `reconnect`,
 `removeMember`, `prioritization` and `propagateCreatedTime`. The
 rest of the decision below describes intended behavior that later P13 tasks
 implement; their generated API stubs and storage models do not implement it yet.
-A `receiver` member is refused until FED-03.
+Receiver members and receiving-only trust are implemented by FED-03 (#1933).
 P37 owns vendor federation/RTFS interoperability and migration contracts. [0042](0042-capability-scope-and-supersession.md)
 replaces permanent scope cuts; [research 10](../10-scope-and-tiers.md) records current
 availability.
@@ -95,7 +95,26 @@ copy (`configSync`); a member that cannot be reached is reported as unavailable 
 - It refuses `fullSync` and `forceFullSync` for that repository, and any change to the
   repository's members, with 400 naming receiver mode.
 - Adding a receiver member, at create or update, starts a full sync to it.
-- Status reports its mode as `Receiving_Only` in `connectionStates`.
+- `connectionStates` reports `mode: Receiving_Only` independently of connection health
+  (`status: HEALTHY` when healthy). The mode field name is inferred and marked
+  `x-unverified`; the receiving-only documentation states both values but does not
+  publish the mode field name. Receiver mode is never substituted for health.
+- After authorization, `connectionStates` returns 200 with an empty
+  `memberConnections` array for an unknown or non-federated repository, before
+  checking the base URL. A federated repository without a configured base URL
+  returns 400 with the same empty envelope (7.161.26's
+  `FederatedStatusResource.java:232-243,293-295`). Store failures remain errors.
+- Receiver local changes remove any previous inbound conflict stamp without appending
+  an event. A sender's full sync is authoritative on a receiver, including a normal
+  request: it restores local deletes/changes and removes receiver-only additions.
+- Adding a receiver queues the configuration and a full-sync request atomically. The
+  request also sends the current configuration before asking for the snapshot, avoiding
+  a request racing ahead of repository creation on the target.
+- Connection health reads current peer compatibility/status, delivery cursors, the two
+  sides' full-sync flags and pending full-sync requests. Disabled membership wins,
+  then unsupported peers, errors/unavailability, active/pending full sync, and lag.
+  A fresh event in flight is healthy; lag above one minute is delayed (artifactweave
+  monitoring policy, not a measured JFrog threshold).
 - The peer relationship enforces the same direction when it was paired with
   `federated-repo/r` (0021), whatever the repository says.
 
@@ -135,6 +154,15 @@ them against a live 7.x in P19):
 - Maven treats a federated repository as a local one for metadata, snapshot names and
   cleanup, since 7.x's `FederatedRepoDescriptor` extends `LocalRepoDescriptor`
   ([research 40](../40-federated-repositories-7x.md)).
+
+Receiver mode qualification uses the repositories API and YAML descriptor
+application, which preserve `members[].mode` in the repository configuration
+store. GET XML configuration intentionally retains empty repository sections,
+as 7.161.26's `CentralConfigServiceImpl.getFilteredDescriptor` and
+`cleanupConfigDescriptorRepositories` do (CFG-01, #1893; decision 0009).
+XML import/replacement remains P36. FED-03 does not add repository entries to
+that export or claim an XML repository round trip.
+
 
 **Operations.**
 
@@ -202,7 +230,10 @@ them against a live 7.x in P19):
   ([I]; the public page names ten default attempts but not list visibility timing).
   Tasks are one per repository and SHA-256, ordered by SHA-256;
   list pages start at one with 1000 tasks by default and positive page sizes, with a
-  next-page Link. The documented task fields carry SHA-1, repository, first-failure
+  next-page Link. The SQL store filters the repository stream and applies its stable
+  order and page window before the selected page's pending paths are read; the list
+  never loads every failed task to slice a page. The documented task fields carry
+  SHA-1, repository, first-failure
   epoch milliseconds and failed-attempt count. `path` is an inferred extension naming
   the first still-pending path in byte order; a superseded task has no path. SHA-1 is
   captured from pending metadata when failure is first recorded, so a later deletion

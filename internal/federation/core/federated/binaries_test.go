@@ -227,6 +227,28 @@ func (o binaryFaultOutbox) FailedFetches(ctx context.Context, s string) ([]outbo
 	return o.OutboxStore.FailedFetches(ctx, s)
 }
 
+func (o binaryFaultOutbox) FailedFetchPage(ctx context.Context, s string, limit, offset int) ([]outbox.FailedBlobFetch, bool, error) {
+	if o.list != nil {
+		return nil, false, o.list
+	}
+	return o.OutboxStore.FailedFetchPage(ctx, s, limit, offset)
+}
+
+type pagedBinaryOutbox struct{ outbox.OutboxStore }
+
+func (pagedBinaryOutbox) FailedFetches(context.Context, string) ([]outbox.FailedBlobFetch, error) {
+	return nil, errors.New("list must not read every failed fetch")
+}
+
+func TestUnitFailedBinariesListUsesStorePage(t *testing.T) {
+	b, s := binaryFixture(t)
+	b.Store = binaryFaultStore{BinaryStore: s, out: pagedBinaryOutbox{s.Outbox()}, stamps: s.Stamps()}
+	got, more, err := b.List(t.Context(), "fed", 1, 2)
+	if err != nil || !more || len(got) != 1 || got[0].Path != "file1" {
+		t.Fatalf("store page not preserved: %+v, %t, %v", got, more, err)
+	}
+}
+
 func (o binaryFaultOutbox) ClearFailedFetch(ctx context.Context, s, sha string) error {
 	if o.clear != nil {
 		return o.clear

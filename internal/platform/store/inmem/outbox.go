@@ -254,6 +254,28 @@ func (o outboxStore) RetryFailedFetch(ctx context.Context, stream, sha256, reaso
 	})
 }
 
+func (o outboxStore) FailedFetchPage(ctx context.Context, stream string, limit, offset int) ([]outbox.FailedBlobFetch, bool, error) {
+	if limit < 1 || offset < 0 {
+		return nil, false, fmt.Errorf("invalid failed fetch page: %w", kernel.ErrInvalid)
+	}
+	var out []outbox.FailedBlobFetch
+	var more bool
+	err := o.s.Do(ctx, func() error {
+		rows := o.failed().Sorted(func(k peersPair, _ outbox.FailedBlobFetch) bool {
+			return stream == "" || k.a == stream
+		}, func(a, b outbox.FailedBlobFetch) int {
+			return cmp.Or(strings.Compare(a.Stream, b.Stream), strings.Compare(a.SHA256, b.SHA256))
+		})
+		if offset >= len(rows) {
+			return nil
+		}
+		end := offset + min(limit, len(rows)-offset)
+		out, more = kernel.Clone(rows[offset:end]), end < len(rows)
+		return nil
+	})
+	return out, more, err
+}
+
 func (o outboxStore) ResetFailedFetch(ctx context.Context, stream, sha256 string) error {
 	return o.s.Do(ctx, func() error {
 		k := peersPair{stream, sha256}

@@ -53,6 +53,7 @@ func federatedMatrix() []matrixRow {
 		}).
 			alone(),
 
+		row("GET "+base+"/status/connectionStates/{repoKey}", base+"/status/connectionStates/fconn-{p}", "", administrators, 400).seeding(create("fconn-", repo.Federated)),
 		row("POST "+base+"/configSync/{repoKey}", base+"/configSync/fsync-{p}", "", administrators, 200).
 			seeding(create("fsync-", repo.Federated)),
 		row("POST "+base+"/migrate/{repoKey}", base+"/migrate/fmig-{p}", "", administrators, 200).

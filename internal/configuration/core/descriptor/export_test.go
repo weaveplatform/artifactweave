@@ -107,6 +107,7 @@ federatedRepositories:
     members:
       - url: https://peer.invalid/repo
         enabled: false
+        mode: receiver
 proxies:
   'proxy <>&':
     host: proxy.invalid
@@ -199,6 +200,10 @@ downloadRedirectConfig:
 		if strings.Contains(body, key) {
 			t.Error("repository reached the XML", key)
 		}
+	}
+	stored, err := d.Repositories.Get(t.Context(), "export-federated")
+	if err != nil || len(stored.Members) != 1 || stored.Members[0].Mode != repo.ModeReceiver {
+		t.Fatalf("descriptor lost receiver mode: %+v %v", stored.Members, err)
 	}
 	assertEmptyRepositorySections(t, node)
 }

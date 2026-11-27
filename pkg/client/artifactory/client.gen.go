@@ -370,6 +370,45 @@ func (e CopyOrMoveMessageLevel) Valid() bool {
 	}
 }
 
+// Defines values for FederationConnectionStatus.
+const (
+	FederationConnectionStatusDELAYED         FederationConnectionStatus = "DELAYED"
+	FederationConnectionStatusDISABLED        FederationConnectionStatus = "DISABLED"
+	FederationConnectionStatusERROR           FederationConnectionStatus = "ERROR"
+	FederationConnectionStatusFULLSYNCRUNNING FederationConnectionStatus = "FULL_SYNC_RUNNING"
+	FederationConnectionStatusHEALTHY         FederationConnectionStatus = "HEALTHY"
+	FederationConnectionStatusNA              FederationConnectionStatus = "N/A"
+	FederationConnectionStatusPENDINGFS       FederationConnectionStatus = "PENDING_FS"
+	FederationConnectionStatusREADONLY        FederationConnectionStatus = "READONLY"
+	FederationConnectionStatusUNSUPPORTED     FederationConnectionStatus = "UNSUPPORTED"
+)
+
+// Valid indicates whether the value is a known member of the FederationConnectionStatus enum.
+func (e FederationConnectionStatus) Valid() bool {
+	switch e {
+	case FederationConnectionStatusDELAYED:
+		return true
+	case FederationConnectionStatusDISABLED:
+		return true
+	case FederationConnectionStatusERROR:
+		return true
+	case FederationConnectionStatusFULLSYNCRUNNING:
+		return true
+	case FederationConnectionStatusHEALTHY:
+		return true
+	case FederationConnectionStatusNA:
+		return true
+	case FederationConnectionStatusPENDINGFS:
+		return true
+	case FederationConnectionStatusREADONLY:
+		return true
+	case FederationConnectionStatusUNSUPPORTED:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for KeyPairInputPairType.
 const (
 	ECDSA   KeyPairInputPairType = "ECDSA"
@@ -1771,45 +1810,6 @@ func (e GetFederationSyncState200JSONResponseBodyStatus) Valid() bool {
 	case GetFederationSyncState200JSONResponseBodyStatusOUTOFSYNC:
 		return true
 	case GetFederationSyncState200JSONResponseBodyStatusSYNCING:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatus.
-const (
-	GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatusDELAYED         GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatus = "DELAYED"
-	GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatusDISABLED        GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatus = "DISABLED"
-	GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatusERROR           GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatus = "ERROR"
-	GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatusFULLSYNCRUNNING GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatus = "FULL_SYNC_RUNNING"
-	GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatusHEALTHY         GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatus = "HEALTHY"
-	GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatusNA              GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatus = "N/A"
-	GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatusPENDINGFS       GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatus = "PENDING_FS"
-	GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatusREADONLY        GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatus = "READONLY"
-	GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatusUNSUPPORTED     GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatus = "UNSUPPORTED"
-)
-
-// Valid indicates whether the value is a known member of the GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatus enum.
-func (e GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatus) Valid() bool {
-	switch e {
-	case GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatusDELAYED:
-		return true
-	case GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatusDISABLED:
-		return true
-	case GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatusERROR:
-		return true
-	case GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatusFULLSYNCRUNNING:
-		return true
-	case GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatusHEALTHY:
-		return true
-	case GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatusNA:
-		return true
-	case GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatusPENDINGFS:
-		return true
-	case GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatusREADONLY:
-		return true
-	case GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatusUNSUPPORTED:
 		return true
 	default:
 		return false
@@ -4489,6 +4489,42 @@ type FederatedReplaceUrl struct {
 
 // FederatedRepositoryConfiguration Configuration of a federated repository: a local repository whose content and metadata are kept in sync with copies on other instances of this server (decision 0022). Members are instances of this server that trust each other through pairing (decision 0021). Deploys, deletes, moves, copies and property changes on any member are sent to the others as ordered events; where two members change the same item, the change with the later event time wins and the originating instance id breaks ties. A full sync repairs members that missed events.
 type FederatedRepositoryConfiguration = repo.Config
+
+// FederationConnection One member connection.
+type FederationConnection struct {
+	// Disabled Optional within this object. True when sync to this member is turned off.
+	Disabled *bool `json:"disabled,omitempty"`
+
+	// LagInMs Optional within this object. Age of the oldest undelivered event, in milliseconds.
+	LagInMs *int64 `json:"lagInMs,omitempty"`
+
+	// LocalPlatformUrl Optional within this object. Base URL of this instance.
+	LocalPlatformUrl *string `json:"localPlatformUrl,omitempty"`
+
+	// LocalRepoKey Optional within this object. Repository key on this instance.
+	LocalRepoKey *string `json:"localRepoKey,omitempty"`
+
+	// Mode Optional within this object. Target member mode. Receiving_Only identifies a receiver independently of its connection health. The JSON field name is inferred from the documented mode.
+	Mode *string `json:"mode,omitempty"`
+
+	// QueuedEvents Optional within this object. Events waiting for delivery.
+	QueuedEvents *int64 `json:"queuedEvents,omitempty"`
+
+	// RemotePlatformUrl Optional within this object. Base URL of the member instance.
+	RemotePlatformUrl *string `json:"remotePlatformUrl,omitempty"`
+
+	// RemoteRepoKey Optional within this object. Repository key on the member.
+	RemoteRepoKey *string `json:"remoteRepoKey,omitempty"`
+
+	// Status Optional within this object. Dashboard state of the connection from the local member to the remote one. HEALTHY: events flow promptly. DELAYED: HEALTHY with lag above the threshold. ERROR: any underlying error state (generic, inactive target, out of sync). PENDING_FS: waiting for a full sync. FULL_SYNC_RUNNING: a full sync is preparing or running. DISABLED: the member is disabled. UNSUPPORTED: the remote member cannot report status. READONLY: the member is receiving-only. N/A: the state cannot be determined because a side is unreachable.
+	Status *FederationConnectionStatus `json:"status,omitempty"`
+
+	// Supported Optional within this object. False when the remote member cannot report federation status; the connection then shows N/A or UNSUPPORTED. It is false when the peer speaks a protocol major version this instance does not (decision 0021).
+	Supported *bool `json:"supported,omitempty"`
+}
+
+// FederationConnectionStatus Optional within this object. Dashboard state of the connection from the local member to the remote one. HEALTHY: events flow promptly. DELAYED: HEALTHY with lag above the threshold. ERROR: any underlying error state (generic, inactive target, out of sync). PENDING_FS: waiting for a full sync. FULL_SYNC_RUNNING: a full sync is preparing or running. DISABLED: the member is disabled. UNSUPPORTED: the remote member cannot report status. READONLY: the member is receiving-only. N/A: the state cannot be determined because a side is unreachable.
+type FederationConnectionStatus string
 
 // FileInfo Metadata of one file item as returned by the storage API without a mode query parameter. Timestamps are RFC 3339 with millisecond precision and a zone offset.
 type FileInfo struct {
@@ -7365,9 +7401,6 @@ type RemoveFederationMemberTextBody = string
 
 // GetFederationSyncState200JSONResponseBodyStatus defines parameters for GetFederationSyncState.
 type GetFederationSyncState200JSONResponseBodyStatus string
-
-// GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatus defines parameters for GetFederationConnectionDetails.
-type GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatus string
 
 // GetFederationMirrorLagTimeParams defines parameters for GetFederationMirrorLagTime.
 type GetFederationMirrorLagTimeParams struct {
@@ -51342,37 +51375,13 @@ type GetFederationConnectionDetailsResponse struct {
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *struct {
 		// MemberConnections Optional within this object. One entry per member.
-		MemberConnections *[]struct {
-			// Disabled Optional within this object. True when sync to this member is turned off.
-			Disabled *bool `json:"disabled,omitempty"`
-
-			// LagInMs Optional within this object. Age of the oldest undelivered event, in milliseconds.
-			LagInMs *int64 `json:"lagInMs,omitempty"`
-
-			// LocalPlatformUrl Optional within this object. Base URL of this instance.
-			LocalPlatformUrl *string `json:"localPlatformUrl,omitempty"`
-
-			// LocalRepoKey Optional within this object. Repository key on this instance.
-			LocalRepoKey *string `json:"localRepoKey,omitempty"`
-
-			// QueuedEvents Optional within this object. Events waiting for delivery.
-			QueuedEvents *int64 `json:"queuedEvents,omitempty"`
-
-			// RemotePlatformUrl Optional within this object. Base URL of the member instance.
-			RemotePlatformUrl *string `json:"remotePlatformUrl,omitempty"`
-
-			// RemoteRepoKey Optional within this object. Repository key on the member.
-			RemoteRepoKey *string `json:"remoteRepoKey,omitempty"`
-
-			// Status Optional within this object. Dashboard state of the connection from the local member to the remote one. HEALTHY: events flow promptly. DELAYED: HEALTHY with lag above the threshold. ERROR: any underlying error state (generic, inactive target, out of sync). PENDING_FS: waiting for a full sync. FULL_SYNC_RUNNING: a full sync is preparing or running. DISABLED: the member is disabled. UNSUPPORTED: the remote member cannot report status. READONLY: the member is receiving-only. N/A: the state cannot be determined because a side is unreachable.
-			Status *GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatus `json:"status,omitempty"`
-
-			// Supported Optional within this object. False when the remote member cannot report federation status; the connection then shows N/A or UNSUPPORTED. It is false when the peer speaks a protocol major version this instance does not (decision 0021).
-			Supported *bool `json:"supported,omitempty"`
-		} `json:"memberConnections,omitempty"`
+		MemberConnections *[]FederationConnection `json:"memberConnections,omitempty"`
 	}
 	// JSON400 the response for an HTTP 400 `application/json` response
-	JSON400 *ErrorResponse
+	JSON400 *struct {
+		// MemberConnections Optional within this object. Empty when the base URL is not configured.
+		MemberConnections *[]FederationConnection `json:"memberConnections,omitempty"`
+	}
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *ErrorResponse
 	// JSON403 the response for an HTTP 403 `application/json` response
@@ -51394,40 +51403,16 @@ type GetFederationConnectionDetailsResponse struct {
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r GetFederationConnectionDetailsResponse) GetJSON200() *struct {
 	// MemberConnections Optional within this object. One entry per member.
-	MemberConnections *[]struct {
-		// Disabled Optional within this object. True when sync to this member is turned off.
-		Disabled *bool `json:"disabled,omitempty"`
-
-		// LagInMs Optional within this object. Age of the oldest undelivered event, in milliseconds.
-		LagInMs *int64 `json:"lagInMs,omitempty"`
-
-		// LocalPlatformUrl Optional within this object. Base URL of this instance.
-		LocalPlatformUrl *string `json:"localPlatformUrl,omitempty"`
-
-		// LocalRepoKey Optional within this object. Repository key on this instance.
-		LocalRepoKey *string `json:"localRepoKey,omitempty"`
-
-		// QueuedEvents Optional within this object. Events waiting for delivery.
-		QueuedEvents *int64 `json:"queuedEvents,omitempty"`
-
-		// RemotePlatformUrl Optional within this object. Base URL of the member instance.
-		RemotePlatformUrl *string `json:"remotePlatformUrl,omitempty"`
-
-		// RemoteRepoKey Optional within this object. Repository key on the member.
-		RemoteRepoKey *string `json:"remoteRepoKey,omitempty"`
-
-		// Status Optional within this object. Dashboard state of the connection from the local member to the remote one. HEALTHY: events flow promptly. DELAYED: HEALTHY with lag above the threshold. ERROR: any underlying error state (generic, inactive target, out of sync). PENDING_FS: waiting for a full sync. FULL_SYNC_RUNNING: a full sync is preparing or running. DISABLED: the member is disabled. UNSUPPORTED: the remote member cannot report status. READONLY: the member is receiving-only. N/A: the state cannot be determined because a side is unreachable.
-		Status *GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatus `json:"status,omitempty"`
-
-		// Supported Optional within this object. False when the remote member cannot report federation status; the connection then shows N/A or UNSUPPORTED. It is false when the peer speaks a protocol major version this instance does not (decision 0021).
-		Supported *bool `json:"supported,omitempty"`
-	} `json:"memberConnections,omitempty"`
+	MemberConnections *[]FederationConnection `json:"memberConnections,omitempty"`
 } {
 	return r.JSON200
 }
 
 // GetJSON400 returns the response for an HTTP 400 `application/json` response
-func (r GetFederationConnectionDetailsResponse) GetJSON400() *ErrorResponse {
+func (r GetFederationConnectionDetailsResponse) GetJSON400() *struct {
+	// MemberConnections Optional within this object. Empty when the base URL is not configured.
+	MemberConnections *[]FederationConnection `json:"memberConnections,omitempty"`
+} {
 	return r.JSON400
 }
 
@@ -93510,34 +93495,7 @@ func ParseGetFederationConnectionDetailsResponse(rsp *http.Response) (*GetFedera
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
 			// MemberConnections Optional within this object. One entry per member.
-			MemberConnections *[]struct {
-				// Disabled Optional within this object. True when sync to this member is turned off.
-				Disabled *bool `json:"disabled,omitempty"`
-
-				// LagInMs Optional within this object. Age of the oldest undelivered event, in milliseconds.
-				LagInMs *int64 `json:"lagInMs,omitempty"`
-
-				// LocalPlatformUrl Optional within this object. Base URL of this instance.
-				LocalPlatformUrl *string `json:"localPlatformUrl,omitempty"`
-
-				// LocalRepoKey Optional within this object. Repository key on this instance.
-				LocalRepoKey *string `json:"localRepoKey,omitempty"`
-
-				// QueuedEvents Optional within this object. Events waiting for delivery.
-				QueuedEvents *int64 `json:"queuedEvents,omitempty"`
-
-				// RemotePlatformUrl Optional within this object. Base URL of the member instance.
-				RemotePlatformUrl *string `json:"remotePlatformUrl,omitempty"`
-
-				// RemoteRepoKey Optional within this object. Repository key on the member.
-				RemoteRepoKey *string `json:"remoteRepoKey,omitempty"`
-
-				// Status Optional within this object. Dashboard state of the connection from the local member to the remote one. HEALTHY: events flow promptly. DELAYED: HEALTHY with lag above the threshold. ERROR: any underlying error state (generic, inactive target, out of sync). PENDING_FS: waiting for a full sync. FULL_SYNC_RUNNING: a full sync is preparing or running. DISABLED: the member is disabled. UNSUPPORTED: the remote member cannot report status. READONLY: the member is receiving-only. N/A: the state cannot be determined because a side is unreachable.
-				Status *GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatus `json:"status,omitempty"`
-
-				// Supported Optional within this object. False when the remote member cannot report federation status; the connection then shows N/A or UNSUPPORTED. It is false when the peer speaks a protocol major version this instance does not (decision 0021).
-				Supported *bool `json:"supported,omitempty"`
-			} `json:"memberConnections,omitempty"`
+			MemberConnections *[]FederationConnection `json:"memberConnections,omitempty"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -93545,7 +93503,10 @@ func ParseGetFederationConnectionDetailsResponse(rsp *http.Response) (*GetFedera
 		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest ErrorResponse
+		var dest struct {
+			// MemberConnections Optional within this object. Empty when the base URL is not configured.
+			MemberConnections *[]FederationConnection `json:"memberConnections,omitempty"`
+		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

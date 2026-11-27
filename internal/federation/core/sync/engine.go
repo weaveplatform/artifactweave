@@ -228,6 +228,17 @@ func (e *Engine) authorize(ctx context.Context, peer model.Peer, stream string, 
 	if !slices.Contains(subs, peer.InstanceID) {
 		return nil, ErrNoStream
 	}
+	if directional, ok := k.(interface {
+		AllowsStream(context.Context, string, model.Peer, Direction) (bool, error)
+	}); ok {
+		allowed, err := directional.AllowsStream(ctx, stream, peer, d)
+		if err != nil {
+			return nil, fmt.Errorf("authorize stream %s: %w", stream, err)
+		}
+		if !allowed {
+			return nil, ErrRefused
+		}
+	}
 	return k, nil
 }
 

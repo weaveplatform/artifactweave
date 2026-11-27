@@ -300,6 +300,7 @@ func apiReviewHandlers(t *testing.T) map[string]apiReviewHandler {
 		"AccessService":      "access",
 		"SubscriptionsAPI":   "event",
 		"ReplicationAPI":     "artifactory",
+		"FederatedAPI":       "artifactory",
 		"PackagePoliciesAPI": "artifactory",
 	}
 	out := map[string]apiReviewHandler{}
@@ -791,6 +792,7 @@ func apiReviewCompleteText(e *apiReviewOperation) string {
 // content is known only once every element is read, so writing it as it
 // is read would change the bytes.
 var apiReviewCollected = map[string]string{
+	"GET /artifactory/api/federation/status/connectionStates/{repoKey}":                "membership is capped at ten including self; the complete connection list has at most nine peer rows",
 	"GET /artifactory/api/cleanup/policies/view":                                       "administrator-defined configuration in the authorized global/project scope, with current labels and last-run/schedule metadata under one authority transaction; commit or visibility failure must not publish a partial overview",
 	"GET /artifactory/api/replications/{repoKey}":                                      "one repository's single configured target is authorized and redacted under its metadata guard before publication; legacy multi-target configurations are rejected, never published as a list",
 	"GET /event/api/v1/subscriptions":                                                  "complete configuration snapshot is authorized, secret-redacted and committed before response bytes; visibility or commit failure must not expose a partial list; no keyset or constant-memory claim",
@@ -961,6 +963,23 @@ func (c *apiReviewClasses) pagingText() string {
 }
 
 func apiReviewPersistence(path string) (string, string, []string) {
+	if path == "/artifactory/api/federation/binaries/failures/list" {
+		return "federation-failed-binary-pages", "repository stream filter and bytewise stream/SHA-256 order in SQL before LIMIT+1/OFFSET; only the selected page receives current pending-path metadata; next Link when another row exists", []string{
+			"internal/federation/adapters/http/binaries.go",
+			"internal/federation/core/federated/binaries.go",
+			"internal/platform/store/sql/outbox.go",
+			"internal/platform/store/storetest/outbox.go",
+			"internal/federation/core/federated/binaries_test.go: TestUnitFailedBinariesListUsesStorePage",
+		}
+	}
+	if path == "/artifactory/api/federation/status/connectionStates/{repoKey}" {
+		return "federation-member-connections", "administrator-only transaction over current membership, peer direction/liveness, stream cursors and full-sync flags; at most ten members; mode is independent of connection health", []string{
+			"internal/federation/adapters/http/connections.go",
+			"internal/federation/core/federated/connections.go",
+			"test/peers/receiver_test.go",
+		}
+	}
+
 	if path == "/artifactory/api/replication/execute/{repoPath}" || path == "/artifactory/api/replication/execute/*" {
 		return "single-replication-execution", "one saved or explicit single target and canonical path; resolved one-shot options, transfer progress, execution and queue reference commit together; bounded direction steps and dual-generation ownership run outside HTTP admission", []string{
 			"internal/federation/adapters/http/execute.go",

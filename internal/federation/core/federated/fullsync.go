@@ -73,7 +73,11 @@ func (m Membership) QueueFullSync(ctx context.Context, key, peer string, forced 
 type Resyncer struct {
 	Membership Membership
 	Remote     Remote
-	Log        *slog.Logger
+	// Repositories lets a receiver's initial full sync establish its configuration first.
+	Repositories interface {
+		Get(context.Context, string) (repo.Config, error)
+	}
+	Log *slog.Logger
 }
 
 func (r Resyncer) log() *slog.Logger {
@@ -110,6 +114,12 @@ func (r Resyncer) Send(ctx context.Context, item work.WorkItem) error {
 	if err != nil {
 		return fmt.Errorf("full sync of %s: %w", key, err)
 	}
+	if member.Mode == repo.ModeReceiver && r.Repositories != nil {
+		sender := Sender{Membership: r.Membership, Repositories: r.Repositories, Remote: r.Remote, Log: r.Log}
+		if err := sender.Send(ctx, work.WorkItem{Key: syncKey(peerID, key)}); err != nil {
+			return err
+		}
+	}
 	err = r.Remote.RequestResync(ctx, peer, model.RepositoryStream(key), forced)
 	var refusal *RemoteRefusal
 	switch {
@@ -139,8 +149,16 @@ func (r Resyncer) Send(ctx context.Context, item work.WorkItem) error {
 // forced. Each member records its run in its full_sync_runs.
 func (o Operations) FullSync(ctx context.Context, key, mirror string, forced bool) error {
 	return o.tx(ctx, func(ctx context.Context) error {
-		if _, err := o.federated(ctx, key); err != nil {
+		c, err := o.federated(ctx, key)
+		if err != nil {
 			return err
+		}
+		self, err := o.Membership.SelfBase(ctx)
+		if err != nil {
+			return err
+		}
+		if selfReceiver(c, self) {
+			return refuse("Repository '%s' is in receiver mode: full sync cannot be initiated locally", key)
 		}
 		members, err := o.Membership.Store.Federation().Members(ctx, key)
 		if err != nil {

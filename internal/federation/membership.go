@@ -91,7 +91,7 @@ func (m *Module) registerConfigSyncWork(queue *work.Queue) error {
 	if err := queue.Handle(federated.ConfigSyncKind, sender.Send); err != nil {
 		return fmt.Errorf("register federated configSync: %w", err)
 	}
-	resyncer := federated.Resyncer{Membership: ms, Remote: remote, Log: log}
+	resyncer := federated.Resyncer{Membership: ms, Remote: remote, Log: log, Repositories: m.deps.Repositories}
 	if err := queue.Handle(federated.FullSyncRequestKind, resyncer.Send); err != nil {
 		return fmt.Errorf("register federated full-sync requests: %w", err)
 	}
@@ -102,12 +102,15 @@ func (m *Module) registerConfigSyncWork(queue *work.Queue) error {
 // stored and rewrites them to their stored form (federated.Membership.Admit).
 // A refusal is the 400 the repositories API answers in its envelope.
 func (l repositoryLifecycle) AdmitRepository(ctx context.Context, c *repo.Config) error {
-	if c.Class != repo.Federated {
-		return nil
-	}
 	ms, err := l.deps.membership()
 	if err != nil {
+		if c.Class != repo.Federated {
+			return nil
+		}
 		return err
+	}
+	if err := ms.CheckLocalUpdate(ctx, *c, l.deps.Repositories.Get); err != nil {
+		return answer(err)
 	}
 	return answer(ms.Admit(ctx, c))
 }
@@ -168,8 +171,8 @@ func (l membershipLifecycle) RefreshRepository(ctx context.Context, key string) 
 }
 
 func (l membershipLifecycle) AdmitRepository(ctx context.Context, c *repo.Config) error {
-	if c.Class != repo.Federated {
-		return nil
+	if err := l.ms.CheckLocalUpdate(ctx, *c, l.get); err != nil {
+		return answer(err)
 	}
 	return answer(l.ms.Admit(ctx, c))
 }

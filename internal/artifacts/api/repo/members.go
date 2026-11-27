@@ -31,11 +31,6 @@ const MaxMembers = 10
 // repository. It is not a URL, so it cannot match a member a client sends.
 const SelfMemberBase = "{self}"
 
-// receiverServed reports whether receiver members are accepted. FED-03
-// implements their behaviour; until then a receiver member is refused, so
-// no member is stored with a mode the server does not honour.
-const receiverServed = false
-
 // SelfMemberURL is the stored URL of a repository's own member.
 func SelfMemberURL(key string) string { return SelfMemberBase + "/" + key }
 
@@ -111,11 +106,7 @@ func validateMembers(c *Config, add func(field, msg string)) {
 			add("members.url", fmt.Sprintf("%q must be an http or https URL that ends in the member's repository key", m.URL))
 		}
 		switch m.Mode {
-		case "", ModeBidirectional:
-		case ModeReceiver:
-			if !receiverServed {
-				add("members.mode", fmt.Sprintf("%q is not supported yet; use %s", m.Mode, ModeBidirectional))
-			}
+		case "", ModeBidirectional, ModeReceiver:
 		default:
 			add("members.mode", fmt.Sprintf("%q is not one of %s, %s", m.Mode, ModeBidirectional, ModeReceiver))
 		}

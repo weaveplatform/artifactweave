@@ -1,8 +1,9 @@
 // Package federated manages federated repositories: their members, the
 // configuration sync between them (FED-01), and the repo:<key> stream kind
 // that converges their content under the conflict rule (FED-02), with its
-// full sync and the member operations (FED-04), and failed-binary controls
-// (FED-06); as P13 continues, lag.
+// full sync and the member operations (FED-04), receiving-only members
+// (FED-03), connection states and failed-binary controls (FED-06); as P13
+// continues, broader status and lag.
 //
 // # Role
 //
@@ -44,13 +45,22 @@
 //
 // Binaries lists, queues immediate replay and deletes failed content fetches,
 // with repository task counts for administrators and a Read-authorized
-// repoState projection. Replay never performs network I/O in a metadata
-// transaction and never publishes a superseded change or an operator-cancelled
+// repoState projection. List pages failed rows in the store before reading
+// pending-path metadata for the selected page. Replay never performs network I/O
+// in a metadata transaction and never publishes a superseded change or an operator-cancelled
 // task. A normal full sync repairs same-stamp pending content too. Repository
 // reset or class exit clears failed rows with the pending stamps and members
 // in their transaction, so a new lifetime exposes no previous failed state.
 //
-// Planned: status and lag (decision 0022; plan P13, FED-05).
+// Receivers accept local writes without producing stream entries. Their inbound
+// stamps are forgotten on local changes so a sender's authoritative full sync
+// reconciles divergence. Peer receiving-only grants and membership roles bind
+// every push, pull, blob fetch and snapshot. connectionStates reports mode
+// independently from health. After authorization, unknown/non-federated keys
+// return an empty list; an existing federation without a base URL selects
+// the source-backed empty 400 envelope.
+//
+// Planned: broader status and lag (decision 0022; plan P13, FED-05).
 //
 // # References
 //
@@ -73,6 +83,7 @@
 //
 // Members and configuration sync implemented (FED-01, issue #1930); change
 // propagation implemented (FED-02, issue #1931); full sync and the member
-// operations implemented (FED-04, issue #1932); failed binaries implemented
-// (FED-06, issue #1935); the rest of P13 to follow.
+// operations implemented (FED-04, issue #1932); receivers and connection states
+// implemented (FED-03, issue #1933); failed binaries implemented (FED-06,
+// issue #1935); the rest of P13 to follow.
 package federated

@@ -259,6 +259,7 @@
     ],
     "internal/federation/adapters/http": [
       "binaries_test.go",
+      "connections_test.go",
       "execute_boundaries_test.go",
       "replication_test.go",
       "servicetrust_test.go",

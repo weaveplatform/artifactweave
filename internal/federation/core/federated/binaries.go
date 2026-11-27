@@ -90,19 +90,18 @@ func (b Binaries) List(ctx context.Context, key string, limit, page int) ([]Fail
 		if limit < 1 || page < 1 {
 			return refuse("limit and page must be at least 1")
 		}
-		all, err := b.tasks(ctx, key, "")
-		if err != nil {
-			return err
-		}
 		out = []FailedBinary{}
-		// Check the quotient before multiplying: a huge page cannot overflow.
-		if len(all) == 0 || page-1 > (len(all)-1)/limit {
+		// An unrepresentable offset is beyond any representable result set.
+		if page-1 > int(^uint(0)>>1)/limit {
 			return nil
 		}
-		start := (page - 1) * limit
-		end := start + min(limit, len(all)-start)
-		out, more = all[start:end], end < len(all)
-		return nil
+		fs, next, err := b.Store.Outbox().FailedFetchPage(ctx, model.RepositoryStream(key), limit, (page-1)*limit)
+		if err != nil {
+			return fmt.Errorf("page failed binaries of %s: %w", key, err)
+		}
+		out, err = b.describeTasks(ctx, key, "", fs)
+		more = next
+		return err
 	})
 	return out, more, err //nolint:wrapcheck // the callback names its failures
 }
@@ -112,6 +111,10 @@ func (b Binaries) tasks(ctx context.Context, key, sha1 string) ([]FailedBinary, 
 	if err != nil {
 		return nil, fmt.Errorf("failed binaries of %s: %w", key, err)
 	}
+	return b.describeTasks(ctx, key, sha1, fs)
+}
+
+func (b Binaries) describeTasks(ctx context.Context, key, sha1 string, fs []outbox.FailedBlobFetch) ([]FailedBinary, error) {
 	out := make([]FailedBinary, 0, len(fs))
 	for _, f := range fs {
 		w, err := b.Store.Stamps().PendingOn(ctx, key, f.SHA256)

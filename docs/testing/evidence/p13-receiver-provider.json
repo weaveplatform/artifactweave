@@ -1,0 +1,38 @@
+{
+  "checked_at": "2026-11-26T19:49:09.143374+00:00",
+  "terraform_cli": "1.17.1",
+  "platform": "darwin_arm64",
+  "metadata_driver": "sqlite",
+  "provider": "jfrog/artifactory",
+  "version": "12.11.14",
+  "resource": "artifactory_federated_generic_repository",
+  "receiver_members": 1,
+  "bidirectional_members": 2,
+  "commands": [
+    {
+      "command": "terraform init -no-color",
+      "exit_code": 0
+    },
+    {
+      "command": "terraform apply -auto-approve -no-color",
+      "exit_code": 0
+    },
+    {
+      "command": "terraform plan -detailed-exitcode -no-color",
+      "exit_code": 0
+    },
+    {
+      "command": "terraform apply -refresh-only -auto-approve -no-color",
+      "exit_code": 0
+    },
+    {
+      "command": "terraform plan -detailed-exitcode -no-color",
+      "exit_code": 0
+    },
+    {
+      "command": "terraform destroy -auto-approve -no-color",
+      "exit_code": 0
+    }
+  ],
+  "empty_followup_plan": true
+}

@@ -940,3 +940,24 @@ func TestUnitDefaults(t *testing.T) {
 		t.Error("StaleAfter is not honoured")
 	}
 }
+
+// Receiving-only pairing persists different directions on issuer and redeemer,
+// including when two-way trust is added and subsequently removed.
+func TestUnitReceivingOnlyPairDirection(t *testing.T) {
+	net := newNetwork()
+	a, b := net.add(t, "https://a.example.com"), net.add(t, "https://b.example.com")
+	pair(t, a, b, model.UseFederatedRepoRead)
+	if a.store.peers(t)[0].ReceivesFederationOnly || !b.store.peers(t)[0].ReceivesFederationOnly {
+		t.Fatal("receiving-only pairing did not preserve issuer/redeemer direction")
+	}
+	pair(t, a, b, model.UseFederatedRepo)
+	if !b.store.peers(t)[0].ReceivesFederationOnly {
+		t.Fatal("two-way grant erased the receiving-only grant's direction")
+	}
+	if err := b.svc.Drop(t.Context(), a.store.identity().InstanceID, model.UseFederatedRepo); err != nil {
+		t.Fatal(err)
+	}
+	if !b.store.peers(t)[0].ReceivesFederationOnly {
+		t.Fatal("removing two-way trust erased the receiving-only direction")
+	}
+}

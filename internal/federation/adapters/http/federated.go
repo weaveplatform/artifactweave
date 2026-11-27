@@ -59,8 +59,11 @@ const (
 // updateMemberUrl under /artifactory/api/federation (FED-01). Without
 // Operations each answers 501, as its stub did.
 type FederatedAPI struct {
-	Operations FederatedOperations
-	Binaries   FailedBinaries
+	Operations  FederatedOperations
+	Binaries    FailedBinaries
+	Connections interface {
+		Connections(context.Context, string) ([]federated.Connection, error)
+	}
 }
 
 func (a FederatedAPI) ops() (FederatedOperations, error) {

@@ -372,6 +372,13 @@ Terraform federated scenario that reuses them (QUA-02):
   container of its own (`containertest.RunPostgres`, pinned by digest with
   mirror.gcr.io as its second source) and gives each instance a database of its
   own on it.
+- **SQLite admission.** These private multi-process SQLite fixtures set
+  `api.budget_timeout` to five seconds so race/coverage instrumentation can
+  tolerate finite metadata writer contention
+  ([#1974](https://github.com/weaveplatform/artifactweave/issues/1974)). The
+  production default remains 500ms, PostgreSQL keeps that default, and a
+  backend held beyond the fixture deadline still answers 503. This setting
+  changes neither response assertions nor retry behavior.
 - **Identity.** Each instance creates its own instance identity on its first
   start, so `GET /api/system/service_id` differs between them; each seeds
   `admin` with a password of its own.
@@ -423,10 +430,23 @@ across a partition answers the network failure and pairs nothing, and the same
 token pairs once healed; an unpair across a partition fails unless forced.
 `TestAccFederatedMembersSQLite` and `TestAccFederatedMembersPostgres` pair three
 instances and federate one repository across them (FED-01, [#1930](https://github.com/weaveplatform/artifactweave/issues/1930)):
-an unpaired or receiver member is refused, a create on one instance reaches the
+an unpaired member is refused, a create on one instance reaches the
 other two as their own copies listing every member, an update reaches a member
 cut off from the sender once the cut is restored, a member's own change reaches
 the others, and configSync answers as 7.x does.
+`TestAccFederatedReceiverSQLite` and `TestAccFederatedReceiverPostgres` qualify
+FED-03 ([#1933](https://github.com/weaveplatform/artifactweave/issues/1933)) with
+two bidirectional members and one receiving-only member: initial full sync,
+deploys, properties and deletes; local receiver writes and properties stay
+local and a sender full sync restores its authoritative content and properties;
+receiver membership/full-sync changes and a signed `/r` redeemer push are refused;
+repository mode persists and connection mode remains separate from health.
+`TestAccFederatedReceiverPullSQLite` and `TestAccFederatedReceiverPullPostgres`
+then qualify `/r` delivery with sender-to-receiver traffic cut after the initial
+baseline. Content created after the cut, its property update and its deletion
+reach the receiver through pull; the reverse connection remains available for
+signed reads and blob fetches. These scenarios use the production delivery
+defaults except for the two explicitly configured peer delivery records.
 `TestAccPeerLivenessSQLite` and `TestAccPeerLivenessPostgres` pair two instances
 that read each other's signed `GET /artifactweave/peer/v1/status` every second
 ([#1949](https://github.com/weaveplatform/artifactweave/issues/1949)): each
@@ -461,6 +481,13 @@ generic and Maven files to a real instance, then invokes `file`, `awaitFile`
 and `absent` through controlled 401/403/500/503 responses and a closed
 transport. It checks the reported failures, 200 content/presence and true 404
 controls, and restores the instance address to verify both files remain.
+`TestAccPeerFixtureAdmissionWithMetadataWriter` owns the SQLite fixture's
+admission regression: it holds a real metadata writer, releases finite work
+after one second from the client's request-write signal and requires 200;
+holding the writer until the response must still yield the admission 503.
+The client signal bounds the controlled hold without claiming server-side
+admission-start synchronization. Production limit/envelope tests retain their
+500ms policy and `Retry-After` controls outside this fixture.
 
 The package acceptance lane leaves `test/peers` out (`tools/citestselection`
 scans it as it does `test/acceptance` and `test/platform`), so each cluster

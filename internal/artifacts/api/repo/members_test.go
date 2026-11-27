@@ -85,7 +85,6 @@ func TestUnitValidateMembers(t *testing.T) {
 	for _, tc := range []struct{ members, want string }{
 		{"[" + strings.Join(eleven, ",") + "]", "members: allows at most 10 members, this instance's included"},
 		{`[{"url":"nope"}]`, "members.url"},
-		{`[{"url":"https://b.example/fed","mode":"receiver"}]`, `members.mode: "receiver" is not supported yet; use bidirectional`},
 		{`[{"url":"https://b.example/fed","mode":"unidirectional"}]`, `members.mode: "unidirectional" is not one of bidirectional, receiver`},
 	} {
 		c := federated(tc.members)
