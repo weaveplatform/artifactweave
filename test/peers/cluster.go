@@ -88,6 +88,11 @@ type Options struct {
 	// ChildTest selects a dedicated TestAcc child entry in this binary.
 	// Empty keeps InstanceTest and the production app.Run server.
 	ChildTest string
+	// SanitizeLogs receives each complete raw server log after Close,
+	// including when Start itself fails. Raw logs stay in private work
+	// directories. Successful returned bytes are trusted and published
+	// verbatim to failure output and retained copies; an error prevents both.
+	SanitizeLogs func([]byte) ([]byte, error)
 }
 
 // Cluster is a set of artifactweave instances, each in its own OS process
@@ -101,11 +106,12 @@ type Cluster struct {
 	t *testing.T
 	// ingresses maps each instance's ingress address to its index: the
 	// only destinations the egress proxies carry connections to.
-	ingresses map[string]int
-	client    *http.Client
-	postgres  containertest.PostgresEndpoint
-	stopPG    func()
-	closeOnce sync.Once
+	ingresses    map[string]int
+	client       *http.Client
+	postgres     containertest.PostgresEndpoint
+	stopPG       func()
+	closeOnce    sync.Once
+	sanitizeLogs func([]byte) ([]byte, error)
 }
 
 // Start builds a cluster for t and starts every instance, returning once
@@ -129,9 +135,10 @@ func Start(t *testing.T, opts Options) *Cluster {
 	work := t.TempDir()
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	c := &Cluster{
-		t:         t,
-		ingresses: map[string]int{},
-		client:    &http.Client{Transport: transport, Timeout: time.Minute},
+		t:            t,
+		ingresses:    map[string]int{},
+		client:       &http.Client{Transport: transport, Timeout: time.Minute},
+		sanitizeLogs: opts.SanitizeLogs,
 	}
 	t.Cleanup(c.dumpLogsOnFailure)
 	t.Cleanup(c.Close)
@@ -381,11 +388,23 @@ func (c *Cluster) createDatabase(t *testing.T, name string) string {
 }
 
 func (c *Cluster) dumpLogsOnFailure() {
-	if !c.t.Failed() {
+	if !c.t.Failed() && c.sanitizeLogs == nil {
 		return
 	}
 	for _, in := range c.Instances {
 		if in.logPath == "" {
+			continue
+		}
+		if c.sanitizeLogs != nil {
+			var print func([]byte)
+			if c.t.Failed() {
+				print = func(data []byte) {
+					c.t.Logf("peers: %s server log (%s):\n%s", in.Name, in.logPath, logTailBytes(data, logTail))
+				}
+			}
+			if err := publishLog(in.logPath, os.Getenv(ProcessLogDirEnv), c.sanitizeLogs, print); err != nil {
+				c.t.Errorf("peers: %s server log publication failed", in.Name)
+			}
 			continue
 		}
 		data, err := readTail(in.logPath, logTail)
@@ -735,7 +754,7 @@ func (in *Instance) launch() error {
 
 func (in *Instance) openLog() (*os.File, error) {
 	dir := os.Getenv(ProcessLogDirEnv)
-	if dir == "" {
+	if dir == "" || in.cluster.sanitizeLogs != nil {
 		dir = in.work
 	}
 	if err := os.MkdirAll(dir, 0o700); err != nil {

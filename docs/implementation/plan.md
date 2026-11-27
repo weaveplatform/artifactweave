@@ -1337,8 +1337,12 @@ FED-01–06 and QUA-01–02. The [peer](https://github.com/weaveplatform/artifac
 [repository](https://github.com/weaveplatform/artifactweave/issues/1922) and
 [qualification](https://github.com/weaveplatform/artifactweave/issues/1923) epics record
 their child merges separately from integrated acceptance. FED-07
-([#1798](https://github.com/weaveplatform/artifactweave/issues/1798)) remains unpublished
-while its consistency guarantee is unresolved. P13 is not accepted.
+([#1798](https://github.com/weaveplatform/artifactweave/issues/1798)) remains unpublished.
+The maintainer selected coordinated exclusion on 2026-11-27: it must cover in-flight
+and newly admitted downloads and prevent deletion when required peer coordination
+cannot be established. The former five-second observation proposal and its receipts
+remain historical evidence. Implementation, qualification and merge of the accepted
+guarantee are pending. P13 is not accepted.
 
 [QUA-03 #1937](https://github.com/weaveplatform/artifactweave/issues/1937) adds explicit
 SQLite/PostgreSQL process scenarios in `test/peers`: native Maven/npm publication and
@@ -1349,6 +1353,16 @@ state at its sequence without inventing application-history entries for pruned e
 Host-client results supplement the required pinned Linux client execution. Final
 merged-main CI, the clean literal gate and independent epic acceptance remain pending
 QUA-03 and the merged cleanup implementation.
+
+**Accepted signature boundary (2026-11-27).** Required RFC 9421 `Signature` and
+`Signature-Input` headers remain on authenticated peer responses, and pairing keeps
+its required token responses. Private keys never appear in responses, logs or evidence.
+Pairing secrets and signatures appear only in protocol messages that require them;
+logs, refusal bodies and captured evidence redact them. This resolves the wording in
+[#1921](https://github.com/weaveplatform/artifactweave/issues/1921), as recorded in
+[decision 0021](../research/decisions/0021-peer-trust-and-sync-protocol.md). Bounded
+canary checks and source review do not establish universal redaction or final P13
+acceptance; the exact merged-main execution and remaining criteria still apply.
 
 P14 owns Access federation and topology; P19 owns live comparison of inferred answers;
 P37 owns vendor interoperability and cold-instance contracts; P40 owns Mission Control

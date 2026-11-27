@@ -350,13 +350,20 @@ harness they share. `peers.Start(t, peers.Options{Instances: n, Driver: d})`
 starts a cluster and these conventions hold for every scenario, and for the
 Terraform federated scenario that reuses them (QUA-02):
 
-- **Processes.** Each instance is the test binary itself, re-executed into
-  `TestAccPeerInstance` as P11's two-process push suites do. It loads a strict
+- **Processes.** Each instance is the test binary itself, by default re-executed
+  into `TestAccPeerInstance` through `peers.RunInstance`, as P11's two-process
+  push suites do. The default child loads a strict
   YAML configuration with `config.Load`, without the host's environment, and
   runs `app.Run`, so it has serve's runtime, router, API limits and production
   hash and key costs. Closing its standard input stops it as a signal stops
   serve. It inherits the binary's `-test.gocoverdir`, so under `-cover` its
   counters join the job's coverage.
+  `Options.ChildTest` instead selects a dedicated acceptance child entry
+  using `peers.RunInstanceWith`. Stream qualification uses this seam to
+  register the existing test kind with the production runtime, middleware,
+  signed transport and background workers. Its commands and receipts use
+  private files in the instance data directory; they add no application route
+  or configuration option.
 - **Ports and base URLs.** Each instance listens on its own loopback port,
   `127.0.0.1:<port>`. A port another process takes before the instance binds
   it is retried with a new one. In front of it the cluster runs its
@@ -400,9 +407,15 @@ Terraform federated scenario that reuses them (QUA-02):
   `to`. A scenario must not add another platform default proxy, nor set a
   remote's `disableProxy`: that traffic would bypass the egress and cross
   every partition.
-- **Logs and teardown.** Each instance's output goes to a log file, under
-  `ARTIFACTWEAVE_TEST_PROCESS_LOG_DIR` when it is set. When a scenario fails,
-  its output carries the tail of each instance's log. `c.Close()` stops the
+- **Logs and teardown.** By default each instance's output goes to a log file,
+  under `ARTIFACTWEAVE_TEST_PROCESS_LOG_DIR` when it is set. When a scenario
+  fails, its output carries the tail of each instance's log.
+  `Options.SanitizeLogs` keeps raw logs in private instance work directories.
+  After `c.Close()`, its callback prepares a sanitized copy before failure
+  output or a retained artifact can receive it; a callback error prevents both.
+  The protocol qualification fixture checks the actual raw logs before this
+  publication, so sanitizing exported evidence cannot hide a canary failure.
+  `c.Close()` stops the
   instances, closes the ingresses and egresses and removes the container, and
   `c.Leftovers` names any process, ingress or egress or container that
   survived it, asking each owner rather than dialling ports another
@@ -413,6 +426,11 @@ Terraform federated scenario that reuses them (QUA-02):
   replaces the key that record holds. `c.Stop(i)` stops one instance and
   leaves the rest running; `Options.PeerProbeInterval` sets every instance's
   `federation.peer_probe_interval`.
+  `c.Restart(i)` requires the instance to have stopped and exited successfully;
+  a live or failed previous process fails the scenario. Restart retains its
+  configuration, listener, ingress, data, database and identity, and opens a
+  fresh process. The private stream fixture also reconstructs its saved
+  subscriptions and retains command receipts across restart.
 
 The first scenario, `TestAccPeersHarnessSQLite` and `TestAccPeersHarnessPostgres`,
 uses no peer feature. Three instances report distinct service ids, answer
@@ -470,6 +488,27 @@ runtimes item by item: stamps, folders and the `isDry` and `compareResult`
 deviations.
 `TestAccPeersFailurePrintsEachServerLog` runs a deliberately failing scenario in
 a process of its own and requires its output to carry each instance's log.
+
+P13 qualification adds native Maven/npm/JFrog execution, six API-only format
+cases, signed protocol checks and stream restart/recovery cases. The API-only
+cases do not establish native client compatibility. Required Linux CI installs
+checksum-pinned Maven tools and JFrog CLI and builds the Node and Maven images
+from the repository's digest-pinned client Dockerfiles. It sets
+`ARTIFACTWEAVE_REQUIRE_DOCKER=1`, both client image variables and the action's
+`ARTIFACTWEAVE_JF_BIN` and `ARTIFACTWEAVE_MAVEN_TOOLS` environment values. Missing required
+clients fail qualification. `ARTIFACTWEAVE_PEER_NATIVE_HOST=1` is an explicit
+supplementary local mode and is refused together with required Docker mode.
+
+The job records `go test -json` output and requires top-level `pass` events for
+all eight cases: `TestAccFederatedNativeSQLite/Postgres`,
+`TestAccFederatedAPIFormatsSQLite/Postgres`,
+`TestAccPeerProtocolQualificationSQLite/Postgres` and
+`TestAccPeerStreamSQLite/Postgres` (each suffix denotes a separate test).
+A missing, failed or skipped result fails this check. The always-uploaded
+`peer-qualification-results` artifact retains the raw event stream for seven
+days; the job separately uploads coverage and, on failure, instance logs.
+These execution checks do not replace P13's prerequisite deliveries,
+requirement-to-evidence mapping or final merged-main phase acceptance.
 
 Shared file assertions accept HTTP 200 as presence and HTTP 404 as absence.
 Other HTTP statuses and transport errors fail the scenario immediately; they

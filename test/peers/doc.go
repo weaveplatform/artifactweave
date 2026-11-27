@@ -11,9 +11,13 @@
 //
 //   - Start's Options: how many instances, SQLite or PostgreSQL, how
 //     often each reads its peers' status, and the outbox retention window
-//     when a scenario outlasts it.
+//     when a scenario outlasts it; optional SanitizeLogs receives complete raw
+//     logs and returns trusted bytes for publication.
 //   - The test binary itself: every instance is a process of it running
-//     InstanceTest, which the binary declares by calling RunInstance.
+//     InstanceTest by default, which the binary declares by calling
+//     RunInstance. Options.ChildTest selects a dedicated child entry using
+//     RunInstanceWith; the stream qualification fixture adds only its test
+//     kind and private file controls to the production runtime.
 //   - Docker, for a PostgreSQL cluster's own container.
 //   - ARTIFACTWEAVE_TEST_PROCESS_LOG_DIR, where the server logs are kept
 //     when it is set.
@@ -28,11 +32,16 @@
 //     reaches the others through; Cut and Restore, Partition and Heal,
 //     which refuse destinations at the egress; DoFrom; DoHeader, for a
 //     request that needs its own headers; Stop, which stops one instance;
+//     Restart, which requires a stopped, successfully exited instance and
+//     retains its configuration, listener, ingress, data, database and identity;
 //     Close and Leftovers; on each Instance, Identity, Peer and SetPeerKey
 //     over its database.
 //   - Each instance's coverage, written in its own directory and collected
 //     into the binary's -test.gocoverdir after the instance exits.
-//   - Each instance's server log in a failing scenario's output.
+//   - Each instance's server log in a failing scenario's output. With
+//     SanitizeLogs, raw logs stay in private work directories; only a completed
+//     sanitized copy reaches failure output or the retained artifact directory.
+//     A sanitizer error prevents either publication.
 //   - The scenarios: the harness's own (harness_test.go) and pairing
 //     through service_trust (pairing_test.go), federated members and
 //     configuration sync (federated_test.go), change propagation

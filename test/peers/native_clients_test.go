@@ -325,8 +325,7 @@ func (c *peerNativeClients) consume(all []*peers.Instance, key, format string, a
 		if !present {
 			missing := strings.Contains(string(out), "E404") && strings.Contains(string(out), a.name)
 			if format == "maven" {
-				missing = strings.Contains(string(out), "Could not find artifact org.acme.p13:"+a.name+":jar:1.0.0") &&
-					strings.Contains(string(out), "in aw ("+in.URL+"/artifactory/"+key+")")
+				missing = mavenMissingProduct(string(out), "org.acme.p13:"+a.name+":jar:1.0.0", in.URL+"/artifactory/"+key)
 			}
 			if !missing {
 				c.t.Fatalf("%s on %s failed without proving missing product: %s", format, in.Name, out)
@@ -350,4 +349,25 @@ func (c *peerNativeClients) property(in *peers.Instance, path, value string) {
 
 func (c *peerNativeClients) remove(in *peers.Instance, path string) {
 	c.run("jf", c.work(), in, []string{"rt", "del", path, "--quiet"}, true)
+}
+
+func mavenMissingProduct(output, coordinate, repository string) bool {
+	if strings.Contains(output, "Could not find artifact "+coordinate+" in aw ("+repository+")") {
+		return true
+	}
+	cached := coordinate + " was not found in " + repository + " during a previous attempt."
+	for start := 0; start < len(output); {
+		offset := strings.Index(output[start:], cached)
+		if offset < 0 {
+			return false
+		}
+		offset += start
+		// Another Maven group can end in the expected group. Only a whole
+		// coordinate token proves the requested product was absent.
+		if offset == 0 || strings.ContainsAny(output[offset-1:offset], " \t\r\n") {
+			return true
+		}
+		start = offset + len(cached)
+	}
+	return false
 }

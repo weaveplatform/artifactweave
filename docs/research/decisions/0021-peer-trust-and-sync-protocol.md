@@ -159,10 +159,11 @@ role from repository configuration or relax receiving authorization.
 
 **Transport.** Peer traffic is HTTPS on the normal listener under the
 `/artifactweave/peer/v1/` prefix, which is artifactweave's own API, specified in its own
-OpenAPI document and versioned independently of the JFrog surfaces. Every request and
-every response is signed with HTTP Message Signatures (RFC 9421) using the sender's
-Ed25519 key over the method, target path, `Content-Digest`, `Date` and a nonce. The
-receiver rejects unknown keys, a clock skew above five minutes and replayed nonces
+OpenAPI document and versioned independently of the JFrog surfaces. Peer requests and
+authenticated protocol responses use HTTP Message Signatures (RFC 9421) with the
+sender's Ed25519 key. Required `Signature` and `Signature-Input` headers remain on
+peer protocol responses; their coverage is specified below. The receiver rejects
+unknown keys, a clock skew above five minutes and replayed nonces
 (cached for the skew window). TLS certificates are verified normally; peer signatures are
 an additional layer, not a substitute for TLS.
 
@@ -195,6 +196,17 @@ As implemented (PEER-03, `internal/federation/core/peer` and
   a signature, nonce or key, and the transport logs none.
 - The client retries only operations whose `x-idempotency` is safe or natural, after a
   connection failure, a timeout or 429, 502, 503 or 504, signing each attempt afresh.
+
+**Signature disclosure boundary (2026-11-27).** The maintainer confirmed the
+[#1921](https://github.com/weaveplatform/artifactweave/issues/1921) clarification:
+retain required signature headers and issued pairing-token responses. Private keys
+never appear in responses, logs or evidence. Pairing secrets and signatures appear
+only in protocol messages that require them; logs, refusal bodies and captured
+evidence redact them. The [decision record](https://github.com/weaveplatform/artifactweave/issues/1921#issuecomment-7213823211)
+keeps the acceptance criterion unchecked until independently proved. Refusals made before
+the middleware identifies the caller remain unsigned, as specified above. This
+records the accepted contract; the bounded fixture checks below and final P13
+qualification still need their own execution evidence.
 
 **Wire contract.** `api/src/peer/` specifies the peer API in its own OpenAPI document,
 version 1.0, served under `/artifactweave/peer/v1` and generated like the JFrog-facing

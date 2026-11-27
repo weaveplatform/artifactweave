@@ -3,6 +3,7 @@ package peers_test
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -29,6 +30,24 @@ import (
 	"github.com/weaveplatform/artifactweave/test/peers"
 )
 
+func TestUnitProtocolLogSanitizer(t *testing.T) {
+	t.Parallel()
+	canary := rand.Text()
+	w := &protocolQualification{secrets: []string{canary}}
+	raw := []byte("before\n" + canary + "\nafter\n")
+	if clean, err := w.sanitizeLog(raw); err == nil || len(clean) != 0 {
+		t.Fatal("protocol log publication must wait for all identity canaries")
+	}
+	w.canariesReady = true
+	clean, err := w.sanitizeLog(raw)
+	if err != nil || bytes.Contains(clean, []byte(canary)) || !bytes.Contains(clean, []byte("[REDACTED protocol canary]")) {
+		t.Fatal("protocol log publication did not redact its registered canary")
+	}
+	if !bytes.Contains(raw, []byte(canary)) {
+		t.Fatal("protocol log sanitizer mutated its private input")
+	}
+}
+
 func TestAccPeerProtocolQualificationSQLite(t *testing.T) {
 	t.Parallel()
 	testPeerProtocolQualification(t, peers.SQLite)
@@ -44,16 +63,21 @@ func TestAccPeerProtocolQualificationPostgres(t *testing.T) {
 // those identities. The proxy below changes an actual process's answer only
 // after checking its signature; it implements no peer endpoint or signing.
 func testPeerProtocolQualification(t *testing.T, driver peers.Driver) {
-	c := peers.Start(t, peers.Options{Instances: 3, Driver: driver, PeerProbeInterval: probeInterval})
-	w := &protocolQualification{t: t, cluster: c}
+	w := &protocolQualification{t: t}
+	c := peers.Start(t, peers.Options{
+		Instances: 3, Driver: driver, PeerProbeInterval: probeInterval, SanitizeLogs: w.sanitizeLog,
+	})
+	w.cluster = c
 	for _, in := range c.Instances {
 		id := in.Identity(t)
 		w.identities = append(w.identities, id)
 		for _, key := range [][]byte{id.PrivateKey, id.PrivateKey.Seed()} {
-			w.secrets = append(w.secrets, base64.StdEncoding.EncodeToString(key),
+			w.privateKeys = append(w.privateKeys, base64.StdEncoding.EncodeToString(key),
 				base64.RawURLEncoding.EncodeToString(key), hex.EncodeToString(key))
 		}
 	}
+	w.secrets = append(w.secrets, w.privateKeys...)
+	w.canariesReady = true
 	// Check after the processes drain their logs, before Start's failure-log
 	// cleanup can print anything. Canary values never appear in diagnostics.
 	t.Cleanup(func() {
@@ -120,16 +144,19 @@ func testPeerProtocolQualification(t *testing.T, driver peers.Driver) {
 }
 
 type protocolQualification struct {
-	t          *testing.T
-	cluster    *peers.Cluster
-	identities []instance.InstanceIdentity
-	secrets    []string
-	refused    []string
+	t             *testing.T
+	cluster       *peers.Cluster
+	identities    []instance.InstanceIdentity
+	secrets       []string
+	refused       []string
+	privateKeys   []string
+	canariesReady bool
 }
 
 func (w *protocolQualification) admin(i int, method, path, body, want string) string {
 	w.t.Helper()
 	status, data := w.cluster.Instances[i].Do(w.t, method, path, body)
+	w.checkPrivateKeys([]byte(data))
 	if status != http.StatusOK || want != "" && strings.TrimSpace(data) != want {
 		w.t.Fatalf("%s %s on %s: status %d or message differs from the 7.x contract", method, path, w.cluster.Instances[i].Name, status)
 	}
@@ -149,9 +176,16 @@ func (w *protocolQualification) pair(from, to int, use string) {
 		w.t.Fatal("issued pairing token did not parse")
 	}
 	parts := strings.Split(result.Token, ".")
-	w.secrets = append(w.secrets, parsed.Nonce, parts[2])
+	w.secrets = append(w.secrets, result.Token, parsed.Nonce, parts[2])
 	w.admin(to, http.MethodPut, stPairing+use, tokenBody(result.Token),
 		`{"message":"Trust with service federated-repo was established successfully"}`)
+	// The same real token must be refused without echoing its secrets.
+	status, data := w.cluster.Instances[to].Do(w.t, http.MethodPut, stPairing+use, tokenBody(result.Token))
+	w.refused = append(w.refused, data)
+	if status != http.StatusBadRequest || strings.TrimSpace(data) !=
+		`{"message":"Error while token pairing. The pairing token was already used"}` {
+		w.t.Fatal("reused pairing token refusal differs from the 7.x contract")
+	}
 }
 
 func (w *protocolQualification) pairings(use string, want [][]int) {
@@ -267,6 +301,7 @@ func (w *protocolQualification) exchange(t *testing.T, from, to int, corrupt boo
 			rw.WriteHeader(http.StatusBadGateway)
 			return
 		}
+		w.checkPrivateKeys(body)
 		capturedRequest, capturedResponse = r.Header.Clone(), resp.Header.Clone()
 		for key, values := range resp.Header {
 			rw.Header()[key] = values
@@ -357,6 +392,7 @@ func (w *protocolQualification) refusals(t *testing.T, from, to int) {
 		if err != nil {
 			t.Fatal("could not read protocol answer")
 		}
+		w.checkPrivateKeys(data)
 		if wantStatus != http.StatusOK {
 			w.refused = append(w.refused, string(data))
 		}
@@ -430,23 +466,34 @@ func (w *protocolQualification) checkLogs() {
 			w.t.Errorf("could not inspect %s's actual server log", in.Name)
 			continue
 		}
-		clean := data
 		for _, secret := range w.secrets {
-			if secret != "" && bytes.Contains(clean, []byte(secret)) {
+			if secret != "" && bytes.Contains(data, []byte(secret)) {
 				leaked = true
-				clean = bytes.ReplaceAll(clean, []byte(secret), []byte("[REDACTED protocol canary]"))
-			}
-		}
-		// Start prints the server log after a failure. Redact a discovered
-		// canary before reporting it, so a regression cannot publish secrets.
-		if !bytes.Equal(clean, data) {
-			if os.WriteFile(in.LogPath(), clean, 0o600) != nil {
-				// Truncating is the fallback if the sanitized write failed.
-				_ = os.Truncate(in.LogPath(), 0)
 			}
 		}
 	}
 	if leaked {
 		w.t.Error("a refusal body or actual server log disclosed a protocol secret canary")
+	}
+}
+
+func (w *protocolQualification) sanitizeLog(data []byte) ([]byte, error) {
+	if !w.canariesReady {
+		return nil, errors.New("protocol log canaries are unavailable")
+	}
+	for _, secret := range w.secrets {
+		if secret != "" {
+			data = bytes.ReplaceAll(data, []byte(secret), []byte("[REDACTED protocol canary]"))
+		}
+	}
+	return data, nil
+}
+
+func (w *protocolQualification) checkPrivateKeys(body []byte) {
+	w.t.Helper()
+	for _, key := range w.privateKeys {
+		if bytes.Contains(body, []byte(key)) {
+			w.t.Error("a protocol response body disclosed a private key canary")
+		}
 	}
 }

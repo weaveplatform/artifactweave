@@ -285,6 +285,18 @@ migration is complete:
   answers 404 like any path artifactweave does not serve. The peer protocol carries what
   those calls carry.
 
+**Project decision (2026-11-27):** artifactweave's authenticated peer responses
+retain the required RFC 9421 `Signature` and `Signature-Input` headers and issued
+pairing-token responses. Private keys never appear in responses, logs or evidence.
+Pairing secrets and signatures appear only in protocol messages that require them;
+logs, refusal bodies and captured evidence redact them. The maintainer
+[approved this criterion](https://github.com/weaveplatform/artifactweave/issues/1921#issuecomment-7213823211)
+for [#1921](https://github.com/weaveplatform/artifactweave/issues/1921).
+[Decision 0021](decisions/0021-peer-trust-and-sync-protocol.md) specifies signing,
+verification and unsigned refusals before caller identification. This is the
+artifactweave peer contract; it supplies no live JFrog wire observation or phase-exit
+result.
+
 ### Endpoint table
 
 Paths are under `/artifactory/api/`. Line numbers are the `@Path` lines in
