@@ -162,6 +162,11 @@ func (s *Kit) redirectAs(
 		s.signFailed(ctx, f.Repo.Key, via, err)
 		return false
 	}
+	done, admitted := s.admitHosted(w, r, st, f)
+	if !admitted {
+		return true
+	}
+	defer done()
 	// The 302 has no body, so the headers describing the artifact's body go;
 	// the signed URL carries the name and media type as overrides instead.
 	// The checksums stay for clients that read them before following.

@@ -2,6 +2,7 @@ package sql
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -202,6 +203,9 @@ func (p packages) Ensure(ctx context.Context, pkg model.Package) (model.Package,
 	}
 	var out model.Package
 	err := p.s.Tx(ctx, func(ctx context.Context) error {
+		if err := p.s.checkCleanupMutation(ctx, pkg.RepoKey, true); err != nil {
+			return err
+		}
 		if _, err := p.s.Exec(
 			ctx,
 			"ensure package "+pkg.Name,
@@ -274,12 +278,17 @@ func (p packages) List(
 }
 
 func (p packages) Delete(ctx context.Context, id int64) error {
-	return p.s.ExecOne(
-		ctx,
-		fmt.Sprintf("delete package %d", id),
-		"DELETE FROM packages WHERE id = ?",
-		id,
-	)
+	return p.s.Tx(ctx, func(ctx context.Context) error {
+		if err := p.s.checkCleanupPackage(ctx, id); err != nil {
+			return err
+		}
+		return p.s.ExecOne(
+			ctx,
+			fmt.Sprintf("delete package %d", id),
+			"DELETE FROM packages WHERE id = ?",
+			id,
+		)
+	})
 }
 
 func (p packages) PutVersion(
@@ -291,6 +300,9 @@ func (p packages) PutVersion(
 	}
 	var out model.PackageVersion
 	err := p.s.Tx(ctx, func(ctx context.Context) error {
+		if err := p.s.checkCleanupPackage(ctx, v.PackageID); err != nil {
+			return err
+		}
 		pkg, err := p.Get(ctx, v.PackageID)
 		if err != nil {
 			return err
@@ -298,14 +310,19 @@ func (p packages) PutVersion(
 		if _, err := p.s.Exec(
 			ctx,
 			"put package version "+v.Version,
-			dialect.Upsert("package_versions",
+			dialect.Upsert(
+				"package_versions",
 				[]string{"package_id", "version", "created_at", "last_downloaded_at", "metadata"},
-				[]string{"package_id", "version"}),
+				[]string{
+					"package_id",
+					"version",
+				},
+			)+", download_revision = CASE WHEN package_versions.last_downloaded_at IS DISTINCT FROM excluded.last_downloaded_at THEN ? ELSE package_versions.download_revision END",
 			v.PackageID,
 			v.Version,
 			dialect.Micros(v.Created),
 			dialect.Micros(v.LastDownloaded),
-			dialect.RawJSON(v.Metadata),
+			dialect.RawJSON(v.Metadata), rand.Text(),
 		); err != nil {
 			return err
 		}
@@ -385,6 +402,9 @@ func (p packages) Versions(ctx context.Context, packageID int64) ([]model.Packag
 
 func (p packages) DeleteVersion(ctx context.Context, id int64) error {
 	return p.s.Tx(ctx, func(ctx context.Context) error {
+		if err := p.s.checkCleanupVersion(ctx, id); err != nil {
+			return err
+		}
 		var pkgID int64
 		if err := p.s.Q(ctx).QueryRowContext(ctx, p.s.Dialect().Rebind(
 			"SELECT package_id FROM package_versions WHERE id = ?"), id).Scan(&pkgID); err != nil {
@@ -408,6 +428,9 @@ func (p packages) DeleteVersion(ctx context.Context, id int64) error {
 
 func (p packages) LinkFile(ctx context.Context, f model.VersionFile) error {
 	return p.s.Tx(ctx, func(ctx context.Context) error {
+		if err := p.s.checkCleanupVersion(ctx, f.VersionID); err != nil {
+			return err
+		}
 		for _, check := range []struct {
 			what string
 			q    string
@@ -475,6 +498,6 @@ func (p packages) RecordVersionDownload(ctx context.Context, versionID int64, at
 			return err
 		}
 		return p.s.ExecOne(ctx, fmt.Sprintf("record download of version %d", versionID),
-			"UPDATE package_versions SET last_downloaded_at = ? WHERE id = ?", dialect.Micros(at), versionID)
+			"UPDATE package_versions SET last_downloaded_at = ?, download_revision = ? WHERE id = ?", dialect.Micros(at), rand.Text(), versionID)
 	})
 }

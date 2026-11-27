@@ -10,7 +10,9 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/core/token"
 	"github.com/weaveplatform/artifactweave/internal/app/config"
 	"github.com/weaveplatform/artifactweave/internal/artifacts"
+	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/gc"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/repos"
 	nimmodelhttp "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/nimmodel/http"
 	"github.com/weaveplatform/artifactweave/internal/configuration"
@@ -40,6 +42,7 @@ type modules struct {
 // moduleStore is the metadata store the modules are built over: the store
 // type each module's constructor declares.
 type moduleStore interface {
+	CleanupExclusions() artifactsapi.CleanupExclusions
 	access.Store
 	artifacts.Store
 	configuration.Store
@@ -94,9 +97,11 @@ func buildModules(cfg config.Config, d moduleDeps) (modules, error) {
 	}
 	accessAPI := acc.API()
 	fed, err := federation.New(federation.Deps{
-		UserQueryLimit: cfg.Search.UserQueryLimit,
-		Lifetimes:      repos.NewRepositoryLifetimes(d.store),
-		Store:          d.store, Access: accessAPI, Ownership: repos.NewProjectRepositoryLookup(d.store),
+		UserQueryLimit:    cfg.Search.UserQueryLimit,
+		Lifetimes:         repos.NewRepositoryLifetimes(d.store),
+		CleanupMetadata:   pkgindex.NewCleanupMetadata(d.store, accessAPI.Projects.Guard),
+		CleanupExclusions: d.store.CleanupExclusions,
+		Store:             d.store, Access: accessAPI, Ownership: repos.NewProjectRepositoryLookup(d.store),
 		Repositories: repos.NewRepositories(d.store, accessAPI.Keys, accessAPI.Projects),
 		BaseURL:      cfg.BaseURL,
 	})
@@ -140,6 +145,7 @@ func buildModules(cfg config.Config, d moduleDeps) (modules, error) {
 			Access:       accessAPI,
 			Repositories: repos.NewProjectRepositoryLookup(d.store),
 			PackageIndex: artifactsAPI.PackageIndex,
+			Federation:   fed.Cleanup(),
 			ItemRemoval:  artifactsAPI.ItemRemoval,
 		},
 	)

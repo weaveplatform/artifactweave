@@ -81,6 +81,9 @@ func (r repos) EventContext(ctx context.Context, key string) (port.RepoEventCont
 
 func (r repos) Update(ctx context.Context, c repo.Config) error {
 	return r.s.Tx(ctx, func(ctx context.Context) error {
+		if err := r.s.checkCleanupMutation(ctx, c.Key, false); err != nil {
+			return err
+		}
 		if !r.t().Has(c.Key) {
 			return memtx.NotFound("repository", c.Key)
 		}
@@ -113,6 +116,9 @@ func (r repos) Update(ctx context.Context, c repo.Config) error {
 
 func (r repos) Delete(ctx context.Context, key string) error {
 	return r.s.Tx(ctx, func(ctx context.Context) error {
+		if err := r.s.checkCleanupMutation(ctx, key, false); err != nil {
+			return err
+		}
 		if !r.t().Has(key) {
 			return memtx.NotFound("repository", key)
 		}
@@ -133,6 +139,9 @@ func (r repos) Delete(ctx context.Context, key string) error {
 			return err //nolint:wrapcheck // storekit names the accounting boundary
 		}
 		r.t().Del(key)
+		cleanupRecords(r).barriers().Del(key)
+		cleanupRecords(r).repositoryActivity().Del(key)
+		cleanupRecords(r).admissions().DeleteWhere(func(_ string, admission storekit.CleanupAdmissionRecord) bool { return admission.Repository == key })
 		gitLFSLocks(r).rows().DeleteWhere(func(_ string, v model.GitLFSLock) bool {
 			return v.RepoKey == key
 		})

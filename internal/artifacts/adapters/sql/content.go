@@ -193,6 +193,9 @@ func decodeRepo(doc string) (repo.Config, error) {
 
 func (r repos) Update(ctx context.Context, c repo.Config) error {
 	return r.s.Tx(ctx, func(ctx context.Context) error {
+		if err := r.s.checkCleanupMutation(ctx, c.Key, false); err != nil {
+			return err
+		}
 		var change artapi.StorageChange
 		if r.s.storage != nil {
 			previous, err := r.ProjectRepository(ctx, c.Key)
@@ -257,6 +260,9 @@ func (r repos) Update(ctx context.Context, c repo.Config) error {
 
 func (r repos) Delete(ctx context.Context, key string) error {
 	return r.s.Tx(ctx, func(ctx context.Context) error {
+		if err := r.s.checkCleanupMutation(ctx, key, false); err != nil {
+			return err
+		}
 		var change artapi.StorageChange
 		if r.s.storage != nil {
 			previous, err := r.ProjectRepository(ctx, key)

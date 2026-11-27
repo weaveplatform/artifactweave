@@ -34,9 +34,8 @@ func NewWithStorageWatch(db *memtx.Store, watch api.StorageWatch) *Store {
 }
 
 func (s *Store) storageWrite(ctx context.Context, fn func(context.Context) error) error {
-	if s.storage == nil {
-		return s.Do(ctx, func() error { return fn(ctx) })
-	}
+	// Nested lifetime/admission guards join this transaction even when no
+	// project accounting watch is installed; a bare Do cannot pass its lock on.
 	return s.Tx(ctx, fn)
 }
 

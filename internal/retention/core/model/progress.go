@@ -7,6 +7,7 @@ import (
 	"unicode/utf8"
 
 	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
+	federationapi "github.com/weaveplatform/artifactweave/internal/federation/api"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
@@ -38,6 +39,8 @@ type CleanupProgress struct {
 	RepositoryDone, PackageDone, VersionDone               bool
 	Reason                                                 string
 	HadErrors                                              bool
+	Federation                                             *federationapi.CleanupEvidence
+	CleanupIntentID                                        string
 }
 
 // ValidateCleanupProgressAdvance rejects a stale continuation or terminal
@@ -61,6 +64,22 @@ func (p CleanupProgress) Validate() error {
 	for _, value := range []string{p.RepositoryAfter, p.PackageAfter, p.VersionAfter, p.FileAfter, p.Reason} {
 		if len(value) > 8192 || !utf8.ValidString(value) || strings.ContainsRune(value, 0) {
 			return fmt.Errorf("invalid cleanup progress continuation: %w", kernel.ErrInvalid)
+		}
+	}
+	if p.CleanupIntentID != "" && (len(p.CleanupIntentID) < 16 || len(p.CleanupIntentID) > 128 || strings.ContainsRune(p.CleanupIntentID, 0)) {
+		return fmt.Errorf("invalid cleanup operation reference: %w", kernel.ErrInvalid)
+	}
+	if p.Federation != nil {
+		if err := p.Federation.Validate(); err != nil {
+			return fmt.Errorf("invalid cleanup continuation evidence: %w", err)
+		}
+		if p.Federation.Scope.Repository != p.Version.Package.Repository.Key {
+			return fmt.Errorf("cleanup evidence changed repository: %w", kernel.ErrInvalid)
+		}
+		for _, pin := range p.Federation.Pins {
+			if pin.Package != p.Version.Package.Name || pin.Version != p.Version.Version || pin.Member == p.Federation.Scope.Self && pin.ID != p.Version.ID {
+				return fmt.Errorf("cleanup evidence changed version: %w", kernel.ErrInvalid)
+			}
 		}
 	}
 	switch p.Phase {

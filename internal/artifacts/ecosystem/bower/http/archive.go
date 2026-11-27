@@ -14,6 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/downloadadmission"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	bowerfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/bower"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -93,6 +94,14 @@ func (h handler) localBinary(w http.ResponseWriter, r *http.Request, name, versi
 	gz := gzip.NewWriter(&out)
 	tw := tar.NewWriter(gz)
 	for _, it := range items {
+		if r.Method == http.MethodGet {
+			done, err := downloadadmission.Begin(r.Context(), h.k.DB(), pkgroute.RequestFrom(r).Repo, it)
+			if err != nil {
+				h.k.Error(w, r, err)
+				return
+			}
+			defer done()
+		}
 		if err := r.Context().Err(); err != nil {
 			h.k.Error(w, r, err)
 			return

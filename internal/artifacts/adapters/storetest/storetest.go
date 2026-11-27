@@ -26,6 +26,8 @@ func Run(t *testing.T, newStore Factory) {
 	runBlobs(t, newStore)
 	runReplicas(t, newStore)
 	runContent(t, newStore)
+	t.Run("CleanupDownloads", func(t *testing.T) { testCleanupDownloads(t, newStore(t)) })
+	t.Run("CleanupExclusions", func(t *testing.T) { RunCleanupExclusions(t, newStore) })
 	runGitLFSLocks(t, newStore)
 	runBowerRegistrations(t, newStore)
 	runNPMExternals(t, newStore)

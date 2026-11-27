@@ -39,18 +39,73 @@ cleanup excludes remote caches and virtual repositories, as the
 [current cleanup guide](https://docs.jfrog.com/administration/docs/cleanup-policies)
 requires. That guide supports federated repositories too and requires checking
 downloads across their members. Federated policy configuration and availability
-remain accepted. P11 selection evaluates local repositories and federated
-repositories with an empty membership list: decision 0022 permits omitting the
-self entry, so this subset needs no external-member download evidence. A bounded
-membership-presence projection filters before paging and refreshes parent
-identity; adding a member between pages refuses further local-only evaluation.
-Federated repositories with configured members need peer-aware selection in P13
-([#1798](https://github.com/weaveplatform/artifactweave/issues/1798)), whose peer
-identity/evidence contracts are required before local statistics can safely
-represent a federation. This is an explicit implementation gap for configured
-members, not a vendor limitation. The generic index reader can describe remote
-and federated indexes for other owners; retention requests the admitted hosted
-classes with no federation members and refuses stale/foreign parents.
+remain accepted. The FED-07 implementation in progress
+([#1798](https://github.com/weaveplatform/artifactweave/issues/1798)) admits
+configured members through bounded peer observations rather than treating local
+statistics as the federation's statistics. Local, empty-membership and explicit
+self-only bidirectional repositories retain the same candidate semantics. A
+receiving-only repository retains policy CRUD and run admission but yields no
+local cleanup candidates or deletion authority. Its reads still protect a sender's
+candidates, and ordinary inbound tombstones apply (decision 0022).
+
+Scope acquisition and every peer-derived candidate outcome recheck current caller
+authority, canonical project, package type and repository incarnation/generation.
+Collection batches at most 64 logical versions across the supported membership,
+uses the existing signed transport outside metadata transactions, and binds the
+answer to a fresh challenge, current reciprocal member/grant identity and package
+type. Missing, unavailable, unverifiable or implausible observations retain content.
+Destructive execution refreshes observations and rechecks local lifetime, trust,
+download revisions, original credentials and run/lease ownership through ordinary
+artifact removal. Publication fences are checked again after waits; deletion,
+reports, native metadata and federation tombstones commit or roll back together.
+The generic index reader remains available to other owners; retention excludes
+remote caches and virtual repositories and refuses stale or foreign parents.
+
+On 2026-11-27 the product owner selected **coordinated exclusion**, preventing
+the member download/delete race; the earlier bounded-observation-only proposal
+is superseded. Observations still support selection and a five-second final
+comparison window, but timestamps never authorize destructive exclusion.
+
+Before destructive removal the coordinator persists an intent for one pending
+file and its native companions. Every current member durably closes new hosted
+download admissions for that exact repository lifetime and configuration.
+Preparation drains every existing hosted admission in that repository: format
+hooks determine native companions inside removal, so selected version links
+alone cannot predict the complete affected set on another member. An active or
+ambiguous response prevents acknowledgement. Admission commits before bytes or a member redirect,
+including non-first ranges and statistics opt-outs. Its private recency and
+revision do not change public download statistics. A response without a known
+completion keeps the affected cleanup/version ineligible; no timeout, clock or
+serving-process restart clears it. Repositories outside the actual barrier remain
+available. Repository/configuration replacement and ordinary writes cannot evade
+a barrier. Trusted ordered content application remains permitted so tombstones
+can arrive.
+
+Hidden admissions also cover hosted local responses. A response can remain active
+while its repository migrates to federated, and an already resolved local snapshot
+must still consult the current barrier before bytes or a member redirect. This
+does not change local cleanup selection or public download statistics.
+
+The intent advances from preparing to prepared, then irreversibly committed or
+aborted. Original credential, project, run, worker lease, lifetime and trust fences
+still apply to publication. The ordinary removal transaction commits every native
+companion, acknowledgement and tombstone with the intent's final repository-stream
+watermark. An abort cannot relabel a committed effect. A member releases only on
+an authenticated irreversible abort or after its applied coordinator stream has
+reached that committed watermark. Exact terminal release identities remain
+idempotent across later repository changes without clearing a replacement gate.
+The coordinator durably acknowledges each participant and attempts every
+independently safe release; an unavailable member keeps its unconfirmed gate
+closed while healthy members can settle. Unknown outcomes never grant release.
+Retention persists the intent reference before peer preparation;
+its existing durable work retries settlement before another deletion or terminal
+run handling. Known native denials and exhausted native-fault retries retain
+their ordinary report/failure semantics after that recovery boundary. No metadata transaction spans client or peer network I/O.
+
+A member's 302 is the accounted member operation. Arbitrary later use of a direct
+object-store URL is outside member download accounting and this coordination
+boundary. The extension remains unpublished and requires qualification; the
+selected contract is not a claim of captured JFrog peer behavior.
 
 Keep-last-N protects the comparator-newest versions before inclusion filters;
 zero still protects the newest. Version strings break comparator ties and supply

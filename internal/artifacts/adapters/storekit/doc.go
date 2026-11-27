@@ -12,6 +12,8 @@
 // cache rows as RemoteCacheRecords: its RemoteCache accessor returns
 // NewRemoteCache over them, and its LayoutWatch calls FenceLayoutSources.
 // The target layout does not name this package; decision 0044 places it.
+// CleanupExclusions also shares hosted admission and participant barrier rules
+// over each backend's durable CleanupRecords.
 // The package imports the standard library, the kernel, the platform's tx
 // package and the module's core and api only.
 //
@@ -21,6 +23,9 @@
 //     RemoteCacheRecords.
 //   - FenceLayoutSources: the name of the layout document that was created,
 //     changed or deleted.
+//   - NewCleanupExclusions: artifact stores, durable CleanupRecords and exact
+//     repository/version identities. Release receives an authorization callback
+//     for an already obtained irreversible coordinator outcome.
 //   - The context of the caller's transaction, if there is one.
 //
 // VirtualCopies adds the shared atomic blob-reference transaction for
@@ -36,6 +41,9 @@
 //   - FenceLayoutSources: a new source generation and the next policy
 //     revision for each remote repository that uses the layout, with its
 //     connection failures and offline windows cleared.
+//
+// CleanupExclusions returns private hosted admission, preparation, guard and
+// terminal-release operations; these never change public download statistics.
 //
 // # Invariants
 //
@@ -57,6 +65,11 @@
 //     (decision 0010).
 //   - The error texts are those the metadata store used before the module
 //     owned the code.
+//
+// Cleanup preparation drains every hosted response in the exact repository.
+// Release authorizes before locking immutable operation identity and conditionally
+// clears only its own barrier. Exact closed bindings remain idempotent across
+// later repository replacement; no timer grants release.
 //
 // # References
 //
@@ -80,11 +93,13 @@
 //
 // Implemented P9: the remote cache, as the metadata store's (pull request
 // 646), and layout fencing (pull request 680). Moved here in P9d, which added
-// Stores.
+// Stores. FED-07 adds durable hosted admission and cleanup participant exclusion.
 //
 // # Testing
 //
-// The package has no tests of its own. The artifacts contract's remote
+// Shared cleanup exclusion/migration contracts exercise in-memory and SQL
+// stores, including terminal replay and concurrent preparation/release.
+// The artifacts contract's remote
 // cache cases run the cache on both adapters (adapters/inmem
 // TestUnitContract, adapters/sql TestAccContract) and on the metadata
 // store's backends, whose RemoteLayoutFences cases edit layouts through the

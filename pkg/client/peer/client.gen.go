@@ -17,6 +17,51 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// Defines values for CleanupCoordinationOutcomeState.
+const (
+	Aborted   CleanupCoordinationOutcomeState = "aborted"
+	Committed CleanupCoordinationOutcomeState = "committed"
+	Prepared  CleanupCoordinationOutcomeState = "prepared"
+	Preparing CleanupCoordinationOutcomeState = "preparing"
+)
+
+// Valid indicates whether the value is a known member of the CleanupCoordinationOutcomeState enum.
+func (e CleanupCoordinationOutcomeState) Valid() bool {
+	switch e {
+	case Aborted:
+		return true
+	case Committed:
+		return true
+	case Prepared:
+		return true
+	case Preparing:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CleanupCoordinationRequestAction.
+const (
+	Outcome CleanupCoordinationRequestAction = "outcome"
+	Prepare CleanupCoordinationRequestAction = "prepare"
+	Release CleanupCoordinationRequestAction = "release"
+)
+
+// Valid indicates whether the value is a known member of the CleanupCoordinationRequestAction enum.
+func (e CleanupCoordinationRequestAction) Valid() bool {
+	switch e {
+	case Outcome:
+		return true
+	case Prepare:
+		return true
+	case Release:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for UseCase.
 const (
 	FederatedRepo  UseCase = "federated-repo/*"
@@ -42,6 +87,144 @@ type BlobReference struct {
 
 	// Size Required within this object. Size of the content in bytes.
 	Size int64 `json:"size"`
+}
+
+// CleanupCoordinationOutcome defines model for CleanupCoordinationOutcome.
+type CleanupCoordinationOutcome struct {
+	Exclusion CleanupExclusion `json:"exclusion"`
+
+	// State Required within this object. Durable coordinator state, or acknowledged participant preparation.
+	State CleanupCoordinationOutcomeState `json:"state"`
+
+	// Watermark Required within this object. Final coordinator repository stream frontier for a committed operation; zero otherwise.
+	Watermark int64 `json:"watermark"`
+}
+
+// CleanupCoordinationOutcomeState Required within this object. Durable coordinator state, or acknowledged participant preparation.
+type CleanupCoordinationOutcomeState string
+
+// CleanupCoordinationRequest defines model for CleanupCoordinationRequest.
+type CleanupCoordinationRequest struct {
+	// Action Required within this object. Prepare closes admissions, outcome reads irreversible state, release verifies the outcome and applied frontier.
+	Action    CleanupCoordinationRequestAction `json:"action"`
+	Exclusion CleanupExclusion                 `json:"exclusion"`
+
+	// PackageType Required within this object. Expected repository package type.
+	PackageType string `json:"packageType"`
+
+	// SourceRepository Required within this object. Current reciprocal requester repository key.
+	SourceRepository string `json:"sourceRepository"`
+}
+
+// CleanupCoordinationRequestAction Required within this object. Prepare closes admissions, outcome reads irreversible state, release verifies the outcome and applied frontier.
+type CleanupCoordinationRequestAction string
+
+// CleanupDownload defines model for CleanupDownload.
+type CleanupDownload struct {
+	// AdmissionRevision Required within this object. Independent generation of all hosted download admissions including statistics opt-outs.
+	AdmissionRevision string `json:"admissionRevision"`
+
+	// AdmittedAt Required within this object. Latest hidden admission evidence, independent of public statistics.
+	AdmittedAt time.Time `json:"admittedAt"`
+
+	// Created Required within this object. The recorded creation instant, used conservatively when no download is known.
+	Created time.Time `json:"created"`
+
+	// Id Required within this object. The immutable version identity on this member.
+	Id int64 `json:"id"`
+
+	// LastDownloaded Required within this object. The latest recorded local, linked-item or known remote download; zero when absent.
+	LastDownloaded time.Time `json:"lastDownloaded"`
+
+	// Package Required within this object. Exact logical package name on this repository.
+	Package string `json:"package"`
+
+	// Revision Required within this object. The independent generation of recorded downloads for this version.
+	Revision string `json:"revision"`
+
+	// Version Required within this object. Exact logical version string on this member.
+	Version string `json:"version"`
+}
+
+// CleanupDownloadBatch defines model for CleanupDownloadBatch.
+type CleanupDownloadBatch struct {
+	// Challenge Required within this object. A fresh unpredictable challenge echoed in the signed answer.
+	Challenge string `json:"challenge"`
+
+	// PackageType Required within this object. The expected or observed repository package type, identical on both members.
+	PackageType string `json:"packageType"`
+
+	// SourceRepository Required within this object. The requester repository named by current reciprocal membership.
+	SourceRepository string `json:"sourceRepository"`
+
+	// Versions Required within this object. One bounded batch of logical version identities or observations.
+	Versions []CleanupVersion `json:"versions"`
+}
+
+// CleanupDownloadObservation defines model for CleanupDownloadObservation.
+type CleanupDownloadObservation struct {
+	// Challenge Required within this object. A fresh unpredictable challenge echoed in the signed answer.
+	Challenge string `json:"challenge"`
+
+	// Generation Required within this object. The current repository configuration generation on the responding member.
+	Generation string `json:"generation"`
+
+	// Grant Required within this object. The current reciprocal trust generation on the responding member.
+	Grant string `json:"grant"`
+
+	// Incarnation Required within this object. The current durable repository lifetime on the responding member.
+	Incarnation string `json:"incarnation"`
+
+	// Instance Required within this object. The responding member instance identity.
+	Instance string `json:"instance"`
+
+	// PackageType Required within this object. The expected or observed repository package type, identical on both members.
+	PackageType string `json:"packageType"`
+
+	// Versions Required within this object. One bounded batch of logical version identities or observations.
+	Versions []CleanupDownload `json:"versions"`
+}
+
+// CleanupExclusion defines model for CleanupExclusion.
+type CleanupExclusion struct {
+	// Generation Required within this object. Participant repository configuration generation.
+	Generation string `json:"generation"`
+
+	// Id Required within this object. Durable coordinator operation identity.
+	Id string `json:"id"`
+
+	// Incarnation Required within this object. Durable participant repository lifetime.
+	Incarnation string `json:"incarnation"`
+
+	// Owner Required within this object. Coordinator instance identity.
+	Owner string `json:"owner"`
+
+	// Repository Required within this object. Exact participant repository key.
+	Repository string `json:"repository"`
+
+	// Versions Required within this object. Exact bounded participant versions.
+	Versions []CleanupExclusionVersion `json:"versions"`
+}
+
+// CleanupExclusionVersion defines model for CleanupExclusionVersion.
+type CleanupExclusionVersion struct {
+	// Id Required within this object. Immutable member-local version identity.
+	Id int64 `json:"id"`
+
+	// Package Required within this object. Exact logical package name.
+	Package string `json:"package"`
+
+	// Version Required within this object. Exact logical version string.
+	Version string `json:"version"`
+}
+
+// CleanupVersion defines model for CleanupVersion.
+type CleanupVersion struct {
+	// Package Required within this object. Exact logical package name on this repository.
+	Package string `json:"package"`
+
+	// Version Required within this object. Exact logical version string on this member.
+	Version string `json:"version"`
 }
 
 // ErrorResponse The flat error envelope of every peer answer other than a success. Version 1.0; a later minor version may add fields, which callers ignore.
@@ -347,6 +530,42 @@ type PutRepositoryConfigurationParams struct {
 	ContentDigest PeerContentDigest `json:"Content-Digest"`
 }
 
+// CoordinateRepositoryCleanupParams defines parameters for CoordinateRepositoryCleanup.
+type CoordinateRepositoryCleanupParams struct {
+	// ArtifactweavePeerProtocol Required header parameter. The protocol version the sender speaks, as `<major>.<minor>`, for example `1.0`. A major version other than 1 answers 400 and is recorded on the sender's peer record. The answer carries the receiver's version in the same header.
+	ArtifactweavePeerProtocol PeerProtocol `json:"Artifactweave-Peer-Protocol"`
+
+	// Date Required header parameter. The time the sender signed the request, as an HTTP date (RFC 9110, section 5.6.7), covered by the signature. More than five minutes from the receiver's clock answers 401.
+	Date PeerDate `json:"Date"`
+
+	// Signature Required header parameter. The Ed25519 signature (RFC 9421) named in `Signature-Input`, for example `sig1=:<base64>:`. One that does not verify with the key recorded for its `keyid` answers 401.
+	Signature PeerSignature `json:"Signature"`
+
+	// SignatureInput Required header parameter. The signature's covered components and parameters (RFC 9421), for example `sig1=("@method" "@target-uri" "date" "content-digest");created=1700000000;keyid="jfrt@<uuid>";alg="ed25519";nonce="<random>"`. `keyid` is the sender's instance id; `content-digest` is covered exactly when the request has a body. A `nonce` the receiver has accepted within the last five minutes answers 401.
+	SignatureInput PeerSignatureInput `json:"Signature-Input"`
+
+	// ContentDigest Required header parameter. The SHA-256 digest of the request body (RFC 9530), for example `sha-256=:<base64>:`, covered by the signature. A digest that does not match the body answers 401.
+	ContentDigest PeerContentDigest `json:"Content-Digest"`
+}
+
+// ObserveRepositoryDownloadsParams defines parameters for ObserveRepositoryDownloads.
+type ObserveRepositoryDownloadsParams struct {
+	// ArtifactweavePeerProtocol Required header parameter. The protocol version the sender speaks, as `<major>.<minor>`, for example `1.0`. A major version other than 1 answers 400 and is recorded on the sender's peer record. The answer carries the receiver's version in the same header.
+	ArtifactweavePeerProtocol PeerProtocol `json:"Artifactweave-Peer-Protocol"`
+
+	// Date Required header parameter. The time the sender signed the request, as an HTTP date (RFC 9110, section 5.6.7), covered by the signature. More than five minutes from the receiver's clock answers 401.
+	Date PeerDate `json:"Date"`
+
+	// Signature Required header parameter. The Ed25519 signature (RFC 9421) named in `Signature-Input`, for example `sig1=:<base64>:`. One that does not verify with the key recorded for its `keyid` answers 401.
+	Signature PeerSignature `json:"Signature"`
+
+	// SignatureInput Required header parameter. The signature's covered components and parameters (RFC 9421), for example `sig1=("@method" "@target-uri" "date" "content-digest");created=1700000000;keyid="jfrt@<uuid>";alg="ed25519";nonce="<random>"`. `keyid` is the sender's instance id; `content-digest` is covered exactly when the request has a body. A `nonce` the receiver has accepted within the last five minutes answers 401.
+	SignatureInput PeerSignatureInput `json:"Signature-Input"`
+
+	// ContentDigest Required header parameter. The SHA-256 digest of the request body (RFC 9530), for example `sha-256=:<base64>:`, covered by the signature. A digest that does not match the body answers 401.
+	ContentDigest PeerContentDigest `json:"Content-Digest"`
+}
+
 // GetPeerStatusParams defines parameters for GetPeerStatus.
 type GetPeerStatusParams struct {
 	// ArtifactweavePeerProtocol Required header parameter. The protocol version the sender speaks, as `<major>.<minor>`, for example `1.0`. A major version other than 1 answers 400 and is recorded on the sender's peer record. The answer carries the receiver's version in the same header.
@@ -445,6 +664,12 @@ type RedeemPairingJSONRequestBody = PairRequest
 
 // PutRepositoryConfigurationJSONRequestBody defines body for PutRepositoryConfiguration for application/json ContentType.
 type PutRepositoryConfigurationJSONRequestBody = RepositoryConfiguration
+
+// CoordinateRepositoryCleanupJSONRequestBody defines body for CoordinateRepositoryCleanup for application/json ContentType.
+type CoordinateRepositoryCleanupJSONRequestBody = CleanupCoordinationRequest
+
+// ObserveRepositoryDownloadsJSONRequestBody defines body for ObserveRepositoryDownloads for application/json ContentType.
+type ObserveRepositoryDownloadsJSONRequestBody = CleanupDownloadBatch
 
 // PushEventsJSONRequestBody defines body for PushEvents for application/json ContentType.
 type PushEventsJSONRequestBody = EventBatch
@@ -582,6 +807,42 @@ type ClientInterface interface {
 	//
 	// Corresponds with PUT /repositories/{repoKey} (the `PutRepositoryConfiguration` operationId).
 	PutRepositoryConfiguration(ctx context.Context, repoKey string, params *PutRepositoryConfigurationParams, body PutRepositoryConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CoordinateRepositoryCleanupWithBody Coordinate durable federated cleanup exclusion
+	//
+	// Signed participant preparation, coordinator outcome lookup and release for one exact durable cleanup operation. Preparation closes new member download admissions and refuses active or ambiguous readers. The reservation never expires by time. Release requires an irreversible fenced abort or local application of the coordinator's final committed repository watermark. All requests are idempotent for the same immutable operation binding. Unavailable peers and ambiguous outcomes retain exclusion. Member redirects are accounted through the member response; later direct object-store URL use is outside this boundary.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /repositories/{repoKey}/cleanup-exclusions (the `CoordinateRepositoryCleanup` operationId).
+	CoordinateRepositoryCleanupWithBody(ctx context.Context, repoKey string, params *CoordinateRepositoryCleanupParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CoordinateRepositoryCleanup Coordinate durable federated cleanup exclusion
+	//
+	// Signed participant preparation, coordinator outcome lookup and release for one exact durable cleanup operation. Preparation closes new member download admissions and refuses active or ambiguous readers. The reservation never expires by time. Release requires an irreversible fenced abort or local application of the coordinator's final committed repository watermark. All requests are idempotent for the same immutable operation binding. Unavailable peers and ambiguous outcomes retain exclusion. Member redirects are accounted through the member response; later direct object-store URL use is outside this boundary.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /repositories/{repoKey}/cleanup-exclusions (the `CoordinateRepositoryCleanup` operationId).
+	CoordinateRepositoryCleanup(ctx context.Context, repoKey string, params *CoordinateRepositoryCleanupParams, body CoordinateRepositoryCleanupJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ObserveRepositoryDownloadsWithBody Observe a bounded batch of member version downloads
+	//
+	// Read-only cleanup evidence for a current enabled member of this federated repository. Every requested logical version must exist with an indexed hosted file, otherwise the observation is unavailable. The signed answer echoes a fresh challenge and identifies the repository lifetime, configuration generation and independent download revision of every version. Receiving-only members can supply observations; this grants no event or configuration write. Each answer is an individual observation, not an atomic view across members. The requester bounds observation use to five seconds. Destructive cleanup additionally requires durable exclusion on every member; observation freshness alone grants no deletion permission.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /repositories/{repoKey}/downloads (the `ObserveRepositoryDownloads` operationId).
+	ObserveRepositoryDownloadsWithBody(ctx context.Context, repoKey string, params *ObserveRepositoryDownloadsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ObserveRepositoryDownloads Observe a bounded batch of member version downloads
+	//
+	// Read-only cleanup evidence for a current enabled member of this federated repository. Every requested logical version must exist with an indexed hosted file, otherwise the observation is unavailable. The signed answer echoes a fresh challenge and identifies the repository lifetime, configuration generation and independent download revision of every version. Receiving-only members can supply observations; this grants no event or configuration write. Each answer is an individual observation, not an atomic view across members. The requester bounds observation use to five seconds. Destructive cleanup additionally requires durable exclusion on every member; observation freshness alone grants no deletion permission.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /repositories/{repoKey}/downloads (the `ObserveRepositoryDownloads` operationId).
+	ObserveRepositoryDownloads(ctx context.Context, repoKey string, params *ObserveRepositoryDownloadsParams, body ObserveRepositoryDownloadsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetPeerStatus Read a peer's liveness and version
 	//
@@ -758,6 +1019,82 @@ func (c *Client) PutRepositoryConfigurationWithBody(ctx context.Context, repoKey
 // Corresponds with PUT /repositories/{repoKey} (the `PutRepositoryConfiguration` operationId).
 func (c *Client) PutRepositoryConfiguration(ctx context.Context, repoKey string, params *PutRepositoryConfigurationParams, body PutRepositoryConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPutRepositoryConfigurationRequest(c.Server, repoKey, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CoordinateRepositoryCleanupWithBody Coordinate durable federated cleanup exclusion
+//
+// Signed participant preparation, coordinator outcome lookup and release for one exact durable cleanup operation. Preparation closes new member download admissions and refuses active or ambiguous readers. The reservation never expires by time. Release requires an irreversible fenced abort or local application of the coordinator's final committed repository watermark. All requests are idempotent for the same immutable operation binding. Unavailable peers and ambiguous outcomes retain exclusion. Member redirects are accounted through the member response; later direct object-store URL use is outside this boundary.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /repositories/{repoKey}/cleanup-exclusions (the `CoordinateRepositoryCleanup` operationId).
+func (c *Client) CoordinateRepositoryCleanupWithBody(ctx context.Context, repoKey string, params *CoordinateRepositoryCleanupParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCoordinateRepositoryCleanupRequestWithBody(c.Server, repoKey, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CoordinateRepositoryCleanup Coordinate durable federated cleanup exclusion
+//
+// Signed participant preparation, coordinator outcome lookup and release for one exact durable cleanup operation. Preparation closes new member download admissions and refuses active or ambiguous readers. The reservation never expires by time. Release requires an irreversible fenced abort or local application of the coordinator's final committed repository watermark. All requests are idempotent for the same immutable operation binding. Unavailable peers and ambiguous outcomes retain exclusion. Member redirects are accounted through the member response; later direct object-store URL use is outside this boundary.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /repositories/{repoKey}/cleanup-exclusions (the `CoordinateRepositoryCleanup` operationId).
+func (c *Client) CoordinateRepositoryCleanup(ctx context.Context, repoKey string, params *CoordinateRepositoryCleanupParams, body CoordinateRepositoryCleanupJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCoordinateRepositoryCleanupRequest(c.Server, repoKey, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ObserveRepositoryDownloadsWithBody Observe a bounded batch of member version downloads
+//
+// Read-only cleanup evidence for a current enabled member of this federated repository. Every requested logical version must exist with an indexed hosted file, otherwise the observation is unavailable. The signed answer echoes a fresh challenge and identifies the repository lifetime, configuration generation and independent download revision of every version. Receiving-only members can supply observations; this grants no event or configuration write. Each answer is an individual observation, not an atomic view across members. The requester bounds observation use to five seconds. Destructive cleanup additionally requires durable exclusion on every member; observation freshness alone grants no deletion permission.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /repositories/{repoKey}/downloads (the `ObserveRepositoryDownloads` operationId).
+func (c *Client) ObserveRepositoryDownloadsWithBody(ctx context.Context, repoKey string, params *ObserveRepositoryDownloadsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewObserveRepositoryDownloadsRequestWithBody(c.Server, repoKey, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ObserveRepositoryDownloads Observe a bounded batch of member version downloads
+//
+// Read-only cleanup evidence for a current enabled member of this federated repository. Every requested logical version must exist with an indexed hosted file, otherwise the observation is unavailable. The signed answer echoes a fresh challenge and identifies the repository lifetime, configuration generation and independent download revision of every version. Receiving-only members can supply observations; this grants no event or configuration write. Each answer is an individual observation, not an atomic view across members. The requester bounds observation use to five seconds. Destructive cleanup additionally requires durable exclusion on every member; observation freshness alone grants no deletion permission.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /repositories/{repoKey}/downloads (the `ObserveRepositoryDownloads` operationId).
+func (c *Client) ObserveRepositoryDownloads(ctx context.Context, repoKey string, params *ObserveRepositoryDownloadsParams, body ObserveRepositoryDownloadsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewObserveRepositoryDownloadsRequest(c.Server, repoKey, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -1260,6 +1597,198 @@ func NewPutRepositoryConfigurationRequestWithBody(server string, repoKey string,
 	}
 
 	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Artifactweave-Peer-Protocol", params.ArtifactweavePeerProtocol, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("Artifactweave-Peer-Protocol", headerParam0)
+
+		var headerParam1 string
+
+		headerParam1, err = runtime.StyleParamWithOptions("simple", false, "Date", params.Date, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("Date", headerParam1)
+
+		var headerParam2 string
+
+		headerParam2, err = runtime.StyleParamWithOptions("simple", false, "Signature", params.Signature, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("Signature", headerParam2)
+
+		var headerParam3 string
+
+		headerParam3, err = runtime.StyleParamWithOptions("simple", false, "Signature-Input", params.SignatureInput, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("Signature-Input", headerParam3)
+
+		var headerParam4 string
+
+		headerParam4, err = runtime.StyleParamWithOptions("simple", false, "Content-Digest", params.ContentDigest, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("Content-Digest", headerParam4)
+
+	}
+
+	return req, nil
+}
+
+// NewCoordinateRepositoryCleanupRequest calls the generic CoordinateRepositoryCleanup builder with application/json body
+func NewCoordinateRepositoryCleanupRequest(server string, repoKey string, params *CoordinateRepositoryCleanupParams, body CoordinateRepositoryCleanupJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCoordinateRepositoryCleanupRequestWithBody(server, repoKey, params, "application/json", bodyReader)
+}
+
+// NewCoordinateRepositoryCleanupRequestWithBody constructs an http.Request for the CoordinateRepositoryCleanup method, with any body, and a specified content type
+func NewCoordinateRepositoryCleanupRequestWithBody(server string, repoKey string, params *CoordinateRepositoryCleanupParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "repoKey", repoKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/repositories/%s/cleanup-exclusions", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Artifactweave-Peer-Protocol", params.ArtifactweavePeerProtocol, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("Artifactweave-Peer-Protocol", headerParam0)
+
+		var headerParam1 string
+
+		headerParam1, err = runtime.StyleParamWithOptions("simple", false, "Date", params.Date, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("Date", headerParam1)
+
+		var headerParam2 string
+
+		headerParam2, err = runtime.StyleParamWithOptions("simple", false, "Signature", params.Signature, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("Signature", headerParam2)
+
+		var headerParam3 string
+
+		headerParam3, err = runtime.StyleParamWithOptions("simple", false, "Signature-Input", params.SignatureInput, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("Signature-Input", headerParam3)
+
+		var headerParam4 string
+
+		headerParam4, err = runtime.StyleParamWithOptions("simple", false, "Content-Digest", params.ContentDigest, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("Content-Digest", headerParam4)
+
+	}
+
+	return req, nil
+}
+
+// NewObserveRepositoryDownloadsRequest calls the generic ObserveRepositoryDownloads builder with application/json body
+func NewObserveRepositoryDownloadsRequest(server string, repoKey string, params *ObserveRepositoryDownloadsParams, body ObserveRepositoryDownloadsJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewObserveRepositoryDownloadsRequestWithBody(server, repoKey, params, "application/json", bodyReader)
+}
+
+// NewObserveRepositoryDownloadsRequestWithBody constructs an http.Request for the ObserveRepositoryDownloads method, with any body, and a specified content type
+func NewObserveRepositoryDownloadsRequestWithBody(server string, repoKey string, params *ObserveRepositoryDownloadsParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "repoKey", repoKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/repositories/%s/downloads", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
 	if err != nil {
 		return nil, err
 	}
@@ -1910,6 +2439,42 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with PUT /repositories/{repoKey} (the `PutRepositoryConfiguration` operationId).
 	PutRepositoryConfigurationWithResponse(ctx context.Context, repoKey string, params *PutRepositoryConfigurationParams, body PutRepositoryConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*PutRepositoryConfigurationResponse, error)
 
+	// CoordinateRepositoryCleanupWithBodyWithResponse Coordinate durable federated cleanup exclusion
+	//
+	// Signed participant preparation, coordinator outcome lookup and release for one exact durable cleanup operation. Preparation closes new member download admissions and refuses active or ambiguous readers. The reservation never expires by time. Release requires an irreversible fenced abort or local application of the coordinator's final committed repository watermark. All requests are idempotent for the same immutable operation binding. Unavailable peers and ambiguous outcomes retain exclusion. Member redirects are accounted through the member response; later direct object-store URL use is outside this boundary.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /repositories/{repoKey}/cleanup-exclusions (the `CoordinateRepositoryCleanup` operationId).
+	CoordinateRepositoryCleanupWithBodyWithResponse(ctx context.Context, repoKey string, params *CoordinateRepositoryCleanupParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CoordinateRepositoryCleanupResponse, error)
+
+	// CoordinateRepositoryCleanupWithResponse Coordinate durable federated cleanup exclusion
+	//
+	// Signed participant preparation, coordinator outcome lookup and release for one exact durable cleanup operation. Preparation closes new member download admissions and refuses active or ambiguous readers. The reservation never expires by time. Release requires an irreversible fenced abort or local application of the coordinator's final committed repository watermark. All requests are idempotent for the same immutable operation binding. Unavailable peers and ambiguous outcomes retain exclusion. Member redirects are accounted through the member response; later direct object-store URL use is outside this boundary.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /repositories/{repoKey}/cleanup-exclusions (the `CoordinateRepositoryCleanup` operationId).
+	CoordinateRepositoryCleanupWithResponse(ctx context.Context, repoKey string, params *CoordinateRepositoryCleanupParams, body CoordinateRepositoryCleanupJSONRequestBody, reqEditors ...RequestEditorFn) (*CoordinateRepositoryCleanupResponse, error)
+
+	// ObserveRepositoryDownloadsWithBodyWithResponse Observe a bounded batch of member version downloads
+	//
+	// Read-only cleanup evidence for a current enabled member of this federated repository. Every requested logical version must exist with an indexed hosted file, otherwise the observation is unavailable. The signed answer echoes a fresh challenge and identifies the repository lifetime, configuration generation and independent download revision of every version. Receiving-only members can supply observations; this grants no event or configuration write. Each answer is an individual observation, not an atomic view across members. The requester bounds observation use to five seconds. Destructive cleanup additionally requires durable exclusion on every member; observation freshness alone grants no deletion permission.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /repositories/{repoKey}/downloads (the `ObserveRepositoryDownloads` operationId).
+	ObserveRepositoryDownloadsWithBodyWithResponse(ctx context.Context, repoKey string, params *ObserveRepositoryDownloadsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ObserveRepositoryDownloadsResponse, error)
+
+	// ObserveRepositoryDownloadsWithResponse Observe a bounded batch of member version downloads
+	//
+	// Read-only cleanup evidence for a current enabled member of this federated repository. Every requested logical version must exist with an indexed hosted file, otherwise the observation is unavailable. The signed answer echoes a fresh challenge and identifies the repository lifetime, configuration generation and independent download revision of every version. Receiving-only members can supply observations; this grants no event or configuration write. Each answer is an individual observation, not an atomic view across members. The requester bounds observation use to five seconds. Destructive cleanup additionally requires durable exclusion on every member; observation freshness alone grants no deletion permission.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /repositories/{repoKey}/downloads (the `ObserveRepositoryDownloads` operationId).
+	ObserveRepositoryDownloadsWithResponse(ctx context.Context, repoKey string, params *ObserveRepositoryDownloadsParams, body ObserveRepositoryDownloadsJSONRequestBody, reqEditors ...RequestEditorFn) (*ObserveRepositoryDownloadsResponse, error)
+
 	// GetPeerStatusWithResponse Read a peer's liveness and version
 	//
 	// Answers a signed liveness and version read. A peer that answers is online for the use cases it lists; a peer whose answer does not verify, or that refuses the caller's signature, is unauthorized. The caller measures the clock skew between the two instances from `time`. Each instance reads every paired peer's status periodically.
@@ -2452,6 +3017,236 @@ func (r PutRepositoryConfigurationResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r PutRepositoryConfigurationResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// CoordinateRepositoryCleanupResponse429Headers the declared response headers of an HTTP 429 response for CoordinateRepositoryCleanup
+type CoordinateRepositoryCleanupResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// CoordinateRepositoryCleanupResponse503Headers the declared response headers of an HTTP 503 response for CoordinateRepositoryCleanup
+type CoordinateRepositoryCleanupResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type CoordinateRepositoryCleanupResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *CleanupCoordinationOutcome
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ErrorResponse
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *PeerUnauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *ErrorResponse
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *PeerInternalError
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *CoordinateRepositoryCleanupResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *CoordinateRepositoryCleanupResponse503Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r CoordinateRepositoryCleanupResponse) GetJSON200() *CleanupCoordinationOutcome {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r CoordinateRepositoryCleanupResponse) GetJSON400() *ErrorResponse {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r CoordinateRepositoryCleanupResponse) GetJSON401() *PeerUnauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r CoordinateRepositoryCleanupResponse) GetJSON403() *ErrorResponse {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r CoordinateRepositoryCleanupResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r CoordinateRepositoryCleanupResponse) GetJSON409() *ErrorResponse {
+	return r.JSON409
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r CoordinateRepositoryCleanupResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r CoordinateRepositoryCleanupResponse) GetJSON500() *PeerInternalError {
+	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r CoordinateRepositoryCleanupResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r CoordinateRepositoryCleanupResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CoordinateRepositoryCleanupResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CoordinateRepositoryCleanupResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CoordinateRepositoryCleanupResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ObserveRepositoryDownloadsResponse429Headers the declared response headers of an HTTP 429 response for ObserveRepositoryDownloads
+type ObserveRepositoryDownloadsResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// ObserveRepositoryDownloadsResponse503Headers the declared response headers of an HTTP 503 response for ObserveRepositoryDownloads
+type ObserveRepositoryDownloadsResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type ObserveRepositoryDownloadsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *CleanupDownloadObservation
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ErrorResponse
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *PeerUnauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *ErrorResponse
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *PeerInternalError
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *ObserveRepositoryDownloadsResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *ObserveRepositoryDownloadsResponse503Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ObserveRepositoryDownloadsResponse) GetJSON200() *CleanupDownloadObservation {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r ObserveRepositoryDownloadsResponse) GetJSON400() *ErrorResponse {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ObserveRepositoryDownloadsResponse) GetJSON401() *PeerUnauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r ObserveRepositoryDownloadsResponse) GetJSON403() *ErrorResponse {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r ObserveRepositoryDownloadsResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r ObserveRepositoryDownloadsResponse) GetJSON409() *ErrorResponse {
+	return r.JSON409
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r ObserveRepositoryDownloadsResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r ObserveRepositoryDownloadsResponse) GetJSON500() *PeerInternalError {
+	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r ObserveRepositoryDownloadsResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r ObserveRepositoryDownloadsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ObserveRepositoryDownloadsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ObserveRepositoryDownloadsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ObserveRepositoryDownloadsResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -3101,6 +3896,66 @@ func (c *ClientWithResponses) PutRepositoryConfigurationWithResponse(ctx context
 		return nil, err
 	}
 	return ParsePutRepositoryConfigurationResponse(rsp)
+}
+
+// CoordinateRepositoryCleanupWithBodyWithResponse Coordinate durable federated cleanup exclusion
+//
+// Signed participant preparation, coordinator outcome lookup and release for one exact durable cleanup operation. Preparation closes new member download admissions and refuses active or ambiguous readers. The reservation never expires by time. Release requires an irreversible fenced abort or local application of the coordinator's final committed repository watermark. All requests are idempotent for the same immutable operation binding. Unavailable peers and ambiguous outcomes retain exclusion. Member redirects are accounted through the member response; later direct object-store URL use is outside this boundary.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /repositories/{repoKey}/cleanup-exclusions (the `CoordinateRepositoryCleanup` operationId).
+func (c *ClientWithResponses) CoordinateRepositoryCleanupWithBodyWithResponse(ctx context.Context, repoKey string, params *CoordinateRepositoryCleanupParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CoordinateRepositoryCleanupResponse, error) {
+	rsp, err := c.CoordinateRepositoryCleanupWithBody(ctx, repoKey, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCoordinateRepositoryCleanupResponse(rsp)
+}
+
+// CoordinateRepositoryCleanupWithResponse Coordinate durable federated cleanup exclusion
+//
+// Signed participant preparation, coordinator outcome lookup and release for one exact durable cleanup operation. Preparation closes new member download admissions and refuses active or ambiguous readers. The reservation never expires by time. Release requires an irreversible fenced abort or local application of the coordinator's final committed repository watermark. All requests are idempotent for the same immutable operation binding. Unavailable peers and ambiguous outcomes retain exclusion. Member redirects are accounted through the member response; later direct object-store URL use is outside this boundary.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /repositories/{repoKey}/cleanup-exclusions (the `CoordinateRepositoryCleanup` operationId).
+func (c *ClientWithResponses) CoordinateRepositoryCleanupWithResponse(ctx context.Context, repoKey string, params *CoordinateRepositoryCleanupParams, body CoordinateRepositoryCleanupJSONRequestBody, reqEditors ...RequestEditorFn) (*CoordinateRepositoryCleanupResponse, error) {
+	rsp, err := c.CoordinateRepositoryCleanup(ctx, repoKey, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCoordinateRepositoryCleanupResponse(rsp)
+}
+
+// ObserveRepositoryDownloadsWithBodyWithResponse Observe a bounded batch of member version downloads
+//
+// Read-only cleanup evidence for a current enabled member of this federated repository. Every requested logical version must exist with an indexed hosted file, otherwise the observation is unavailable. The signed answer echoes a fresh challenge and identifies the repository lifetime, configuration generation and independent download revision of every version. Receiving-only members can supply observations; this grants no event or configuration write. Each answer is an individual observation, not an atomic view across members. The requester bounds observation use to five seconds. Destructive cleanup additionally requires durable exclusion on every member; observation freshness alone grants no deletion permission.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /repositories/{repoKey}/downloads (the `ObserveRepositoryDownloads` operationId).
+func (c *ClientWithResponses) ObserveRepositoryDownloadsWithBodyWithResponse(ctx context.Context, repoKey string, params *ObserveRepositoryDownloadsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ObserveRepositoryDownloadsResponse, error) {
+	rsp, err := c.ObserveRepositoryDownloadsWithBody(ctx, repoKey, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseObserveRepositoryDownloadsResponse(rsp)
+}
+
+// ObserveRepositoryDownloadsWithResponse Observe a bounded batch of member version downloads
+//
+// Read-only cleanup evidence for a current enabled member of this federated repository. Every requested logical version must exist with an indexed hosted file, otherwise the observation is unavailable. The signed answer echoes a fresh challenge and identifies the repository lifetime, configuration generation and independent download revision of every version. Receiving-only members can supply observations; this grants no event or configuration write. Each answer is an individual observation, not an atomic view across members. The requester bounds observation use to five seconds. Destructive cleanup additionally requires durable exclusion on every member; observation freshness alone grants no deletion permission.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /repositories/{repoKey}/downloads (the `ObserveRepositoryDownloads` operationId).
+func (c *ClientWithResponses) ObserveRepositoryDownloadsWithResponse(ctx context.Context, repoKey string, params *ObserveRepositoryDownloadsParams, body ObserveRepositoryDownloadsJSONRequestBody, reqEditors ...RequestEditorFn) (*ObserveRepositoryDownloadsResponse, error) {
+	rsp, err := c.ObserveRepositoryDownloads(ctx, repoKey, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseObserveRepositoryDownloadsResponse(rsp)
 }
 
 // GetPeerStatusWithResponse Read a peer's liveness and version
@@ -3761,6 +4616,272 @@ func ParsePutRepositoryConfigurationResponse(rsp *http.Response) (*PutRepository
 		response.Headers429 = &headers
 	case rsp.StatusCode == 503:
 		var headers PutRepositoryConfigurationResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseCoordinateRepositoryCleanupResponse parses an HTTP response from a CoordinateRepositoryCleanupWithResponse call
+func ParseCoordinateRepositoryCleanupResponse(rsp *http.Response) (*CoordinateRepositoryCleanupResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CoordinateRepositoryCleanupResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest CleanupCoordinationOutcome
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest PeerUnauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest PeerInternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers CoordinateRepositoryCleanupResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers CoordinateRepositoryCleanupResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseObserveRepositoryDownloadsResponse parses an HTTP response from a ObserveRepositoryDownloadsWithResponse call
+func ParseObserveRepositoryDownloadsResponse(rsp *http.Response) (*ObserveRepositoryDownloadsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ObserveRepositoryDownloadsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest CleanupDownloadObservation
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest PeerUnauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest PeerInternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers ObserveRepositoryDownloadsResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers ObserveRepositoryDownloadsResponse503Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {

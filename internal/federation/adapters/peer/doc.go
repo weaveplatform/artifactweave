@@ -17,6 +17,8 @@
 //     a Factory.
 //   - StatusServer: the pairing service's status answer (StatusService) and
 //     the release version; StatusRemote: a Factory.
+//   - RepositoryServer.Cleanup: the current-member observation and exclusion owner;
+//     CleanupRemote: the signing Factory.
 //
 // # Outputs
 //
@@ -29,7 +31,9 @@
 //     handler with the caller in its context, and its answer is signed:
 //     buffered, or streamed when the handler sets Content-Digest first.
 //     POST /pair is verified with the key its body presents.
+//
 //   - TargetURI reconstructs the URI a peer signed from the request.
+//
 //   - Client.Do signs each request, verifies each answer's signature and
 //     digest before returning it, bounds both bodies, and retries only safe
 //     and natural operations (decision 0043) after a connection failure or
@@ -37,6 +41,7 @@
 //     *UnverifiedAnswerError. Client.API wraps the generated client
 //     pkg/client/peer; WithAnswerKey and PairAnswerKey verify the answer to
 //     POST /pair with the key it presents.
+//
 //   - PairServer serves POST /pair, redeeming a pairing nonce for the
 //     instance whose identity the verified body presents (400 malformed, 401
 //     not signed by that identity, 403 a nonce that is unknown, expired or
@@ -44,11 +49,19 @@
 //     caller's record (204). PairRemote is the pairing service's transport
 //     (pairing.Remote): it calls both and sorts failures into unreachable,
 //     unverified and a status the issuer refused with.
+//
 //   - StatusServer serves GET /status, the verified caller's view of this
 //     instance (#1949). StatusRemote is the pairing service's status read
 //     (pairing.StatusRemote): an answer whose signature does not verify,
 //     and the peer's own 401, are pairing.ErrUnverified; any other unsigned
 //     answer is only its status.
+//
+//   - RepositoryServer serves bounded version download observations for
+//     current reciprocal members. CleanupRemote makes one signed attempt,
+//     enforces request/answer body bounds and returns no unverified facts.
+//     Coordination prepares durable barriers and releases only authenticated
+//     terminal outcomes at their applied frontier. Neither operation grants
+//     reverse event or configuration write.
 //
 // # References
 //
@@ -63,7 +76,8 @@
 // Implemented P13 (PEER-03): the server middleware and the signing client.
 // Implemented P13 (PEER-02): /pair and the pairing transport. Implemented
 // P13 (#1949): /status and the status read. The other operations behind
-// the middleware are PEER-04's, PEER-05's and FED-01's.
+// the middleware are PEER-04's, PEER-05's and FED-01's. FED-07 adds the
+// bounded cleanup observations and durable exclusion coordination.
 //
 // # Testing
 //

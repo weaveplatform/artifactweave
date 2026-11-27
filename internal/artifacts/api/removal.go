@@ -14,6 +14,7 @@ type RemovalRequest struct {
 	Item         IndexFile
 	Properties   map[string][]string
 	SkipTrashcan bool
+	Federation   FederatedRemovalPermit `json:"-"`
 }
 
 // RemovedItem records an actual committed candidate or format-owned companion.
@@ -39,7 +40,8 @@ type RemovalResult struct {
 
 // ItemRemoval rechecks the original credential, native Delete permission and
 // exact content/property/download snapshot under the shared publication guard.
-// Remote caches, folders and configured-member federated repositories are refused.
+// Remote caches and folders are refused. Configured federation members require
+// a freshly collected, locally fenced permit in addition to ordinary authority.
 //
 // Revalidate checks current policy/selection/comparator facts after the item is
 // locked. Record runs after normal item/trash/index/hook/event mutations to

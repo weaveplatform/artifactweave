@@ -19,6 +19,7 @@ type Store interface {
 	PushStore
 	PullStore
 	ExecutionStore
+	CleanupIntents() CleanupIntentStore
 	Peers() PeerStore
 	RequestNonces() RequestNonceStore
 	Resyncs() StreamResyncStore

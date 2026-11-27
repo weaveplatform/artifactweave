@@ -15,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/downloadadmission"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	swiftfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/swift"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -258,6 +259,19 @@ func (h handler) localManifest(
 	w.Header().Set("Content-Type", "text/x-swift")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, wanted))
 	w.Header().Set("Cache-Control", "private, no-store")
+	if r.Method == http.MethodGet {
+		configuration, err := h.k.DB().Repos().Get(r.Context(), it.RepoKey)
+		if err != nil {
+			h.k.Error(w, r, err)
+			return
+		}
+		done, err := downloadadmission.Begin(r.Context(), h.k.DB(), configuration, it)
+		if err != nil {
+			h.k.Error(w, r, err)
+			return
+		}
+		defer done()
+	}
 	itemkit.ServeContent(w, r, wanted, it.Created, bytes.NewReader(data))
 }
 

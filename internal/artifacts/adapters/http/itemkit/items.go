@@ -14,6 +14,7 @@ import (
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
+	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
@@ -140,6 +141,8 @@ func (s *Kit) ItemError(ctx context.Context, op string, err error) error {
 			"Checksum deploy failed: no stored content matches the checksum")
 	case errors.Is(err, item.ErrConflict):
 		return apierror.New(http.StatusConflict, err.Error())
+	case errors.Is(err, artifactsapi.ErrCleanupExcluded):
+		return apierror.New(http.StatusServiceUnavailable, "repository cleanup is in progress; retry the operation")
 	case errors.Is(err, item.ErrCollected):
 		// The deploy lost its content to a collection that ran beside it,
 		// and the message asks for the deploy again, so the 503 reports a
@@ -1274,6 +1277,11 @@ func (s *Kit) serveFile(
 	if s.redirect(w, r, st, f, p) {
 		return
 	}
+	done, admitted := s.admitHosted(w, r, st, f)
+	if !admitted {
+		return
+	}
+	defer done()
 	browserView(h, r, f.Repo, it.Name)
 	if content == nil {
 		content, _, err = s.Blobs.Open(ctx, it.Actual.SHA256)

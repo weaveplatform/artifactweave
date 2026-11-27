@@ -16,6 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/downloadadmission"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/registry"
@@ -77,6 +78,7 @@ func (g *Registry) getManifest(w http.ResponseWriter, r *http.Request, q Request
 }
 
 func (g *Registry) serveManifest(w http.ResponseWriter, r *http.Request, q Request, it model.Item) {
+	ctx := r.Context()
 	content, _, err := g.blobs.Open(r.Context(), it.Actual.SHA256)
 	if err != nil {
 		g.writeErr(w, r, err)
@@ -118,6 +120,14 @@ func (g *Registry) serveManifest(w http.ResponseWriter, r *http.Request, q Reque
 	}
 	if g.redirectManifest != nil && g.redirectManifest(w, r, q.Repo, it, mediaType) {
 		return
+	}
+	if r.Method == http.MethodGet {
+		done, err := downloadadmission.Begin(ctx, g.store, q.Repo, it)
+		if err != nil {
+			g.writeErr(w, r, err)
+			return
+		}
+		defer done()
 	}
 	http.ServeContent(w, r, "", it.Modified, content)
 }

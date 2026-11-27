@@ -604,6 +604,8 @@ var Table = []Operation{
 	{Service: "peer", Method: "POST", Pattern: "/artifactweave/peer/v1/pair", OperationID: "redeemPairing", Cost: "ordinary", Idempotency: "natural"},
 	{Service: "peer", Method: "GET", Pattern: "/artifactweave/peer/v1/repositories/{repoKey}", OperationID: "getRepositoryConfiguration", Cost: "ordinary", Idempotency: "safe"},
 	{Service: "peer", Method: "PUT", Pattern: "/artifactweave/peer/v1/repositories/{repoKey}", OperationID: "putRepositoryConfiguration", Cost: "ordinary", Idempotency: "natural"},
+	{Service: "peer", Method: "POST", Pattern: "/artifactweave/peer/v1/repositories/{repoKey}/cleanup-exclusions", OperationID: "coordinateRepositoryCleanup", Cost: "ordinary", Idempotency: "natural"},
+	{Service: "peer", Method: "POST", Pattern: "/artifactweave/peer/v1/repositories/{repoKey}/downloads", OperationID: "observeRepositoryDownloads", Cost: "ordinary", Idempotency: "safe"},
 	{Service: "peer", Method: "GET", Pattern: "/artifactweave/peer/v1/status", OperationID: "getPeerStatus", Cost: "ordinary", Idempotency: "safe"},
 	{Service: "peer", Method: "GET", Pattern: "/artifactweave/peer/v1/streams/{stream}/events", OperationID: "pullEvents", Cost: "ordinary", Idempotency: "natural", Pagination: "cursor"},
 	{Service: "peer", Method: "POST", Pattern: "/artifactweave/peer/v1/streams/{stream}/events", OperationID: "pushEvents", Cost: "ordinary", Idempotency: "natural"},

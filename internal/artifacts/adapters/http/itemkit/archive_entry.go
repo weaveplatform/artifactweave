@@ -101,6 +101,11 @@ func (s *Kit) getArchiveEntry(
 	}
 	setDisposition(h, FileDisposition(f.Repo, name, ItemDisposition))
 	r = quoteETag(withoutHeaders(r, "If-None-Match", "If-Modified-Since"), sums.SHA1)
+	done, admitted := s.admitHosted(w, r, st, f)
+	if !admitted {
+		return
+	}
+	defer done()
 	browserView(h, r, f.Repo, name)
 	content := &entryContent{
 		size: size,

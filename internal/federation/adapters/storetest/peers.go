@@ -27,6 +27,7 @@ func runPeers(t *testing.T, newStore Factory) {
 	t.Run("PairingNonces", func(t *testing.T) { testPairingNonces(t, newStore(t)) })
 	t.Run("PairingNonceRace", func(t *testing.T) { testPairingNonceRace(t, newStore(t)) })
 	t.Run("PeerProtocolVersion", func(t *testing.T) { testPeerProtocolVersion(t, newStore(t)) })
+	t.Run("PeerRevisions", func(t *testing.T) { testPeerRevisions(t, newStore(t)) })
 	t.Run("PeerLiveness", func(t *testing.T) { testPeerLiveness(t, newStore(t)) })
 	t.Run("PeerDelivery", func(t *testing.T) { testPeerDelivery(t, newStore(t)) })
 	t.Run("StreamResyncs", func(t *testing.T) { testStreamResyncs(t, newStore(t)) })

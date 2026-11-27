@@ -41,8 +41,9 @@ func (s store) Instance() instance.InstanceStore { return s.platform.Instance() 
 // application mounts them.
 type server struct {
 	peergen.UnimplementedStrict
-	pair   peeradapter.PairServer
-	status peeradapter.StatusServer
+	pair    peeradapter.PairServer
+	status  peeradapter.StatusServer
+	cleanup peeradapter.RepositoryServer
 }
 
 func (s server) GetPeerStatus(
@@ -61,6 +62,13 @@ func (s server) CancelPairing(
 	ctx context.Context, req peergen.CancelPairingRequestObject,
 ) (peergen.CancelPairingResponseObject, error) {
 	return s.pair.CancelPairing(ctx, req)
+}
+
+func (s server) ObserveRepositoryDownloads(ctx context.Context, req peergen.ObserveRepositoryDownloadsRequestObject) (peergen.ObserveRepositoryDownloadsResponseObject, error) {
+	if s.cleanup.Cleanup == nil {
+		return s.UnimplementedStrict.ObserveRepositoryDownloads(ctx, req)
+	}
+	return s.cleanup.ObserveRepositoryDownloads(ctx, req)
 }
 
 // instanceNode is one instance: its store, its pairing service over the
@@ -91,7 +99,7 @@ func (n *instanceNode) peers(t *testing.T) []model.Peer {
 	return ps
 }
 
-func newNode(t *testing.T) *instanceNode {
+func newNode(t *testing.T, observers ...peeradapter.CleanupReceiver) *instanceNode {
 	t.Helper()
 	shared := memtx.New()
 	st := store{Store: fedinmem.New(shared), platform: platforminmem.New(shared)}
@@ -114,10 +122,15 @@ func newNode(t *testing.T) *instanceNode {
 		RequestErrorHandlerFunc:  middleware.BindingError(http.StatusBadRequest),
 		ResponseErrorHandlerFunc: middleware.BindingError(http.StatusInternalServerError),
 	}
+	var observer peeradapter.CleanupReceiver
+	if len(observers) > 0 {
+		observer = observers[0]
+	}
 	peergen.HandlerWithOptions(
 		peergen.NewStrictHandlerWithOptions(server{
-			pair:   peeradapter.PairServer{Pairing: n.svc},
-			status: peeradapter.StatusServer{Status: n.svc, Version: "1.2.3"},
+			pair:    peeradapter.PairServer{Pairing: n.svc},
+			status:  peeradapter.StatusServer{Status: n.svc, Version: "1.2.3"},
+			cleanup: peeradapter.RepositoryServer{Cleanup: observer},
 		}, nil, opts),
 		peergen.ChiServerOptions{
 			BaseURL: peeradapter.Prefix, BaseRouter: r,

@@ -313,6 +313,16 @@ func (i items) putRow(ctx context.Context, it model.Item, statement string) (mod
 	if err != nil {
 		return it, err
 	}
+	if err := i.s.checkCleanupMutation(ctx, it.RepoKey, true); err != nil {
+		return it, err
+	}
+	if previous, err := i.Get(ctx, it.RepoKey, it.Cached, it.FullPath()); err == nil {
+		if err := i.s.checkCleanupItem(ctx, previous); err != nil {
+			return it, err
+		}
+	} else if !errors.Is(err, kernel.ErrNotFound) {
+		return it, err
+	}
 	typ := typeFile
 	if it.Folder {
 		typ = typeFolder
@@ -469,6 +479,9 @@ func (i items) Delete(
 ) (port.DeleteResult, error) {
 	res := port.DeleteResult{BlobRefs: map[string]int64{}}
 	err := i.s.Tx(ctx, func(ctx context.Context) error {
+		if err := i.s.checkCleanupMutation(ctx, repoKey, true); err != nil {
+			return err
+		}
 		change, err := storekit.PrepareStorageContent(ctx, i.s.storage, repoKey)
 		if err != nil {
 			return err //nolint:wrapcheck // storekit names the accounting boundary
@@ -488,6 +501,9 @@ func (i items) Delete(
 				where += " AND id = ?"
 				args = append(args, it.ID)
 			}
+		}
+		if err := i.s.checkCleanupDeletedItems(ctx, repoKey, where, args); err != nil {
+			return err
 		}
 		if err := i.s.itemVersionsChanged(ctx, where, args...); err != nil {
 			return err
@@ -583,6 +599,9 @@ func (i items) EnsureRoot(ctx context.Context, r model.Item) (model.Item, error)
 
 func (i items) DeleteRoot(ctx context.Context, repoKey string, cached bool) error {
 	return i.s.Tx(ctx, func(ctx context.Context) error {
+		if err := i.s.checkCleanupMutation(ctx, repoKey, true); err != nil {
+			return err
+		}
 		where := "repo_key = ? AND cached = ? AND path = ? AND name = ?"
 		args := []any{repoKey, cached, kernel.RootPath, kernel.RootPath}
 		if err := i.s.itemVersionsChanged(ctx, where, args...); err != nil {
@@ -693,6 +712,13 @@ func (i items) changeProperties(
 	write func(context.Context) error,
 ) error {
 	return i.s.Tx(ctx, func(ctx context.Context) error {
+		key, err := i.s.cleanupItemRepository(ctx, id)
+		if err != nil {
+			return err
+		}
+		if err := i.s.checkCleanupMutation(ctx, key, true); err != nil {
+			return err
+		}
 		if err := i.requireItem(ctx, id); err != nil {
 			return err
 		}
@@ -820,7 +846,7 @@ func (i items) RecordDownload(ctx context.Context, id int64, d port.Download) er
 		if err := i.requireItem(ctx, id); err != nil {
 			return err
 		}
-		if err := i.s.itemVersionsChanged(ctx, "id = ?", id); err != nil {
+		if err := i.s.itemVersionsDownloaded(ctx, id); err != nil {
 			return err
 		}
 		if _, err := i.s.Exec(
@@ -860,7 +886,7 @@ func (i items) PutStats(ctx context.Context, id int64, st model.ItemStats) error
 		if err := i.requireItem(ctx, id); err != nil {
 			return err
 		}
-		if err := i.s.itemVersionsChanged(ctx, "id = ?", id); err != nil {
+		if err := i.s.itemVersionsDownloaded(ctx, id); err != nil {
 			return err
 		}
 		_, err := i.s.Exec(

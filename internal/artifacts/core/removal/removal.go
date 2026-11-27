@@ -41,7 +41,7 @@ func validate(req api.RemovalRequest) error {
 	}
 	if f.ID <= 0 || f.Version.ID <= 0 || f.Version.Package.ID <= 0 || r.Key == "" ||
 		f.Path == "" || f.Path != strings.Trim(f.Path, "/") || f.Size < 0 || f.Cached ||
-		(r.Class != repo.Local && r.Class != repo.Federated) || r.HasFederatedMembers {
+		(r.Class != repo.Local && r.Class != repo.Federated) || r.HasFederatedMembers && req.Federation == nil {
 		return fmt.Errorf("removal requires an indexed local file: %w", kernel.ErrInvalid)
 	}
 	if _, _, _, err := kernel.SplitItemPath(f.Path); err != nil {
@@ -100,6 +100,9 @@ func (r remover) Remove(
 		if err := allowed(ctx, req.Item.Path, false, accessapi.ActionDelete); err != nil {
 			return err
 		}
+		if err := guardFederation(ctx, req); err != nil {
+			return err
+		}
 		configuration, err := r.repository(ctx, expected)
 		if err != nil {
 			return err
@@ -109,6 +112,9 @@ func (r remover) Remove(
 		}
 		if err := revalidate(ctx); err != nil {
 			return fmt.Errorf("current removal selection: %w", err)
+		}
+		if req.Federation != nil {
+			ctx = api.WithCleanupExclusion(ctx, req.Federation.Exclusion())
 		}
 		ctx = artifactevents.WithActor(ctx, principal.Name)
 		target := item.Target{Repo: configuration, Path: req.Item.Path, CheckCurrent: allowed}
@@ -121,12 +127,9 @@ func (r remover) Remove(
 		if err != nil {
 			return fmt.Errorf("remove selected file: %w", err)
 		}
-		out = api.RemovalResult{Files: result.Files, Bytes: result.Bytes, Items: make([]api.RemovedItem, 0, len(result.Removed))}
-		for _, removed := range result.Removed {
-			if removed.Folder {
-				return fmt.Errorf("indexed removal reached a folder: %w", kernel.ErrStore)
-			}
-			out.Items = append(out.Items, api.RemovedItem{ID: removed.ID, Path: removed.FullPath(), Size: removed.Size, SHA256: removed.Actual.SHA256})
+		out, err = removalResult(result)
+		if err != nil {
+			return err
 		}
 		// The owner can observe expected pruning without an inner use-case Tx
 		// marking this successful effect rollback-only on ErrNotFound. Never
@@ -141,10 +144,21 @@ func (r remover) Remove(
 		); err != nil {
 			return fmt.Errorf("record selected removal: %w", err)
 		}
-		return nil
+		return finalizeFederation(ctx, req)
 	})
 	if err != nil {
 		return api.RemovalResult{}, fmt.Errorf("guarded indexed removal: %w", err)
+	}
+	return out, nil
+}
+
+func removalResult(result port.DeleteResult) (api.RemovalResult, error) {
+	out := api.RemovalResult{Files: result.Files, Bytes: result.Bytes, Items: make([]api.RemovedItem, 0, len(result.Removed))}
+	for _, removed := range result.Removed {
+		if removed.Folder {
+			return api.RemovalResult{}, fmt.Errorf("indexed removal reached a folder: %w", kernel.ErrStore)
+		}
+		out.Items = append(out.Items, api.RemovedItem{ID: removed.ID, Path: removed.FullPath(), Size: removed.Size, SHA256: removed.Actual.SHA256})
 	}
 	return out, nil
 }
@@ -220,6 +234,29 @@ func (r remover) current(ctx context.Context, req api.RemovalRequest) error {
 	}
 	if !maps.EqualFunc(selected, expected.Properties, slices.Equal[[]string]) {
 		return fmt.Errorf("selected removal property values changed: %w", kernel.ErrConflict)
+	}
+	return nil
+}
+
+func guardFederation(ctx context.Context, req api.RemovalRequest) error {
+	if req.Federation == nil {
+		return nil
+	}
+	if err := req.Federation.Revalidate(ctx, req.Item.Version.Package.Repository.Key, req.Item.Version.ID); err != nil {
+		return fmt.Errorf("current federated removal permit: %w", err)
+	}
+	return nil
+}
+
+func finalizeFederation(ctx context.Context, req api.RemovalRequest) error {
+	if req.Federation == nil {
+		return nil
+	}
+	if err := req.Federation.Fresh(ctx); err != nil {
+		return fmt.Errorf("check federated removal publication: %w", err)
+	}
+	if err := req.Federation.Commit(ctx); err != nil {
+		return fmt.Errorf("commit federated removal outcome: %w", err)
 	}
 	return nil
 }

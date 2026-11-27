@@ -222,6 +222,9 @@ func (s *Store) Webhooks() ntfport.WebhookStore { return s.notifications.Webhook
 // Cleanup is the retention module's cleanup store.
 func (s *Store) Cleanup() retport.CleanupStore { return s.retention.Cleanup() }
 
+// CleanupExclusions shares artifact download admission and cleanup barriers.
+func (s *Store) CleanupExclusions() artapi.CleanupExclusions { return s.artifacts.CleanupExclusions() }
+
 // Archive is the retention module's archive store.
 func (s *Store) Archive() retport.ArchiveStore { return s.retention.Archive() }
 
@@ -236,6 +239,9 @@ func (s *Store) PullProgress() fedport.PullProgressStore { return s.federation.P
 
 // Executions returns durable single-replication dispatch state.
 func (s *Store) Executions() fedport.ExecutionProgressStore { return s.federation.Executions() }
+
+// CleanupIntents retains fenced coordinator outcomes across worker recovery.
+func (s *Store) CleanupIntents() fedport.CleanupIntentStore { return s.federation.CleanupIntents() }
 
 // Peers is the federation module's peer store.
 func (s *Store) Peers() fedport.PeerStore { return s.federation.Peers() }

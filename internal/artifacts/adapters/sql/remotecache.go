@@ -3,6 +3,7 @@ package sql
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/storekit"
@@ -43,14 +44,26 @@ func (r remoteRecords) Source(ctx context.Context, key string) (model.RemoteSour
 }
 
 func (r remoteRecords) PutSource(ctx context.Context, key string, s model.RemoteSourceState) error {
-	_, err := r.s.Exec(
-		ctx,
-		"write remote source",
-		dialect.Upsert("remote_sources", []string{"repo_key", "doc"}, []string{"repo_key"}),
-		key,
-		dialect.MustJSON(kernel.Normalise(s)),
-	)
-	return err
+	return r.s.Tx(ctx, func(ctx context.Context) error {
+		previous, err := r.Source(ctx, key)
+		if err != nil && !errors.Is(err, kernel.ErrNotFound) {
+			return err
+		}
+		if err == nil && (previous.Source.Repository != s.Source.Repository || previous.Source.Generation != s.Source.Generation) {
+			if err := r.s.checkCleanupMutation(ctx, key, false); err != nil {
+				return err
+			}
+		}
+
+		_, err = r.s.Exec(
+			ctx,
+			"write remote source",
+			dialect.Upsert("remote_sources", []string{"repo_key", "doc"}, []string{"repo_key"}),
+			key,
+			dialect.MustJSON(kernel.Normalise(s)),
+		)
+		return err
+	})
 }
 
 func (r remoteRecords) Entry(

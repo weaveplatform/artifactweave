@@ -740,3 +740,14 @@ func (m *Module) remotePolicyKey(ctx context.Context) ([]byte, error) {
 	}
 	return key, nil
 }
+
+// CleanupExclusions serializes hosted responses and coordinated cleanup through
+// the metadata store shared by every serving process.
+func (m *Module) CleanupExclusions() artifactsapi.CleanupExclusions {
+	if store, ok := m.store.(interface {
+		CleanupExclusions() artifactsapi.CleanupExclusions
+	}); ok {
+		return store.CleanupExclusions()
+	}
+	return nil
+}

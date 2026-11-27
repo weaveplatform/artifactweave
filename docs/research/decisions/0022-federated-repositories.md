@@ -115,6 +115,16 @@ copy (`configSync`); a member that cannot be reached is reported as unavailable 
   then unsupported peers, errors/unavailability, active/pending full sync, and lag.
   A fresh event in flight is healthy; lag above one minute is delayed (artifactweave
   monitoring policy, not a measured JFrog threshold).
+- Cleanup policy CRUD remains available. A receiver does not execute cleanup
+  locally or originate cleanup deletion events, while ordinary inbound
+  tombstones still apply. This specific rule comes from the current
+  [federated cleanup guide](https://docs.jfrog.com/artifactory/docs/how-to-configure-cleanup-policies-for-federated-repositories),
+  checked 2026-11-27, not a 7.161.26 runtime capture. Receiving-only direction
+  is never bypassed to make a cleanup deletion propagate.
+  Proven self-only bidirectional membership retains local selection equivalence.
+  Applying the receiving-only restriction to an isolated self-only receiver is
+  [I], with its exact runtime answer deferred to the
+  [P19 comparison](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-7209136116).
 - The peer relationship enforces the same direction when it was paired with
   `federated-repo/r` (0021), whatever the repository says.
 
@@ -163,6 +173,30 @@ as 7.161.26's `CentralConfigServiceImpl.getFilteredDescriptor` and
 XML import/replacement remains P36. FED-03 does not add repository entries to
 that export or claim an XML repository round trip.
 
+**Coordinated cleanup.** The 2026-11-27 product choice requires durable member
+exclusion before destructive cleanup (0010/0021). Repository lifetime and immutable
+version IDs bind hidden active admissions, barriers and per-file coordinator
+intents. Preparing the repository-wide barrier drains all existing hosted
+responses in that repository, including readers indexed under another version
+that a native companion effect may mutate. Other repositories remain available.
+Unknown readers/outcomes and unavailable peers retain affected cleanup; barriers
+have no timeout expiry. Native companions share one atomic removal and
+committed replication watermark. Per-member terminal acknowledgements allow
+healthy participants to settle independently and survive lost replies followed
+by repository replacement. Ordered inbound content remains permitted, while
+ordinary writes and repository/configuration replacement cannot evade the barrier.
+Member redirects are accounted through their 302 response; arbitrary subsequent
+direct object-store use is outside member accounting.
+
+**Cleanup timestamps.** Comparing a peer's recorded download with the local
+policy clock includes a conservative five-minute allowance, matching the
+accepted current signature clock skew in 0021. A slow peer therefore cannot
+make a near-cutoff download appear old enough merely through that uncertainty.
+Unknown or implausibly future observations retain content. This allowance only
+moves the timestamp comparison toward recent use: it never extends a local
+observation/publication expiry, proves historical clock accuracy, or establishes
+an atomic view across members. It is an artifactweave comparison choice, not a
+captured JFrog peer contract.
 
 **Operations.**
 

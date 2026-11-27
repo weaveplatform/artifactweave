@@ -27,7 +27,8 @@ caller one of its members. FED-01 serves `PUT /repositories/{repoKey}`,
 and reads every paired peer's status periodically (**Wire contract** below), and FED-04
 ([#1932](https://github.com/weaveplatform/artifactweave/issues/1932)) adds `POST
 streams/{stream}/resync`, through which a member's `fullSync` asks another to resynchronise
-from it, so every peer operation is served.
+from it, completing those peer operations. The FED-07 extension below uses the coordinated-exclusion product choice
+accepted on 2026-11-27; implementation and qualification remain in progress.
 P37 owns cross-vendor synchronization and separate cold-instance contracts; P40 owns
 Mission Control/bridge/estate integration. [0042](0042-capability-scope-and-supersession.md)
 replaces permanent scope cuts; [research 10](../10-scope-and-tiers.md) records current
@@ -209,6 +210,21 @@ leaves it out. Its operations:
 | `GET /blobs/{sha256}` | Pull one blob. |
 | `PUT /repositories/{repoKey}` | configSync ([0022](0022-federated-repositories.md)): the member creates or updates its copy. |
 | `GET /status` | The signed liveness and version read behind a peer's status and clock skew. |
+| `POST /repositories/{repoKey}/downloads` | FED-07 read-only observation of at most 64 logical versions. Current reciprocal membership and package type bind the fresh challenge and signed answer to repository lifetime, grant generation and recorded downloads; unavailable evidence retains content. |
+
+| `POST /repositories/{repoKey}/cleanup-exclusions` | Prepare an exact durable participant barrier, query its coordinator outcome, or release after an irreversible abort/applied committed watermark. Idempotent for the exact operation binding; unavailable or ambiguous peers retain exclusion. |
+
+The cleanup operations are authored under
+[FED-07 #1798](https://github.com/weaveplatform/artifactweave/issues/1798), not yet
+merged or finally qualified. Collection uses one bounded attempt per member.
+Coordination persists per-file intent/outcome and participant barriers; signatures
+prove request/answer binding and origin while durable barriers exclude subsequent
+member downloads. No metadata transaction spans a peer call. A receiving-only
+member can report reads and participate in exclusion without gaining reverse
+event/configuration-write authority. The product owner selected prevention of
+the download/delete race on 2026-11-27; the five-second observation window cannot
+replace exclusion. Decision [0010](0010-retention-trash-and-gc.md) records recovery,
+publication and member-redirect boundaries.
 
 Every request declares `Artifactweave-Peer-Protocol`, `Date`, `Signature` and
 `Signature-Input`, and `Content-Digest` when it has a body; the signature covers

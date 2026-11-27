@@ -27,6 +27,7 @@ type RepositoryServer struct {
 	Reader   interface {
 		Configuration(context.Context, model.Peer, string) (map[string]any, error)
 	}
+	Cleanup CleanupReceiver
 }
 
 // PutRepositoryConfiguration creates or updates this instance's copy of the

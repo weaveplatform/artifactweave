@@ -36,6 +36,6 @@ tags:
   - name: blobs
     description: Content that events and snapshot entries reference, fetched by SHA-256.
   - name: repositories
-    description: Federated repository configuration sent to every member.
+    description: Federated repository configuration and bounded cleanup observations and durable cleanup exclusion.
   - name: status
     description: The signed liveness and version read behind a peer's status.

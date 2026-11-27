@@ -116,6 +116,38 @@ index archived_items.archived_items_policy CREATE INDEX archived_items_policy ON
 index archived_items.archived_items_sha1 CREATE INDEX archived_items_sha1 ON archived_items USING btree (sha1)
 index archived_items.archived_items_sha256 CREATE INDEX archived_items_sha256 ON archived_items USING btree (sha256)
 sequence archived_items.archived_items_id_seq AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE OWNED BY archived_items.id
+table artifact_cleanup_admission_versions
+column artifact_cleanup_admission_versions.admission_id text COLLATE "C" NOT NULL
+column artifact_cleanup_admission_versions.version_id bigint NOT NULL
+constraint artifact_cleanup_admission_versions.artifact_cleanup_admission_versions_admission_id_fkey FOREIGN KEY (admission_id) REFERENCES artifact_cleanup_admissions(id) ON DELETE CASCADE
+constraint artifact_cleanup_admission_versions.artifact_cleanup_admission_versions_pkey PRIMARY KEY (admission_id, version_id)
+index artifact_cleanup_admission_versions.artifact_cleanup_admission_versions_pkey CREATE UNIQUE INDEX artifact_cleanup_admission_versions_pkey ON artifact_cleanup_admission_versions USING btree (admission_id, version_id)
+index artifact_cleanup_admission_versions.artifact_cleanup_admission_versions_version CREATE INDEX artifact_cleanup_admission_versions_version ON artifact_cleanup_admission_versions USING btree (version_id, admission_id)
+table artifact_cleanup_admissions
+column artifact_cleanup_admissions.id text COLLATE "C" NOT NULL
+column artifact_cleanup_admissions.repo_key text COLLATE "C" NOT NULL
+column artifact_cleanup_admissions.incarnation text COLLATE "C" NOT NULL
+column artifact_cleanup_admissions.item_id bigint NOT NULL
+column artifact_cleanup_admissions.repository_wide boolean NOT NULL
+constraint artifact_cleanup_admissions.artifact_cleanup_admissions_pkey PRIMARY KEY (id)
+constraint artifact_cleanup_admissions.artifact_cleanup_admissions_repo_key_fkey FOREIGN KEY (repo_key) REFERENCES repositories(key) ON DELETE CASCADE
+index artifact_cleanup_admissions.artifact_cleanup_admissions_pkey CREATE UNIQUE INDEX artifact_cleanup_admissions_pkey ON artifact_cleanup_admissions USING btree (id)
+index artifact_cleanup_admissions.artifact_cleanup_admissions_repo_item CREATE INDEX artifact_cleanup_admissions_repo_item ON artifact_cleanup_admissions USING btree (repo_key, item_id)
+table artifact_cleanup_reservations
+column artifact_cleanup_reservations.owner text COLLATE "C" NOT NULL
+column artifact_cleanup_reservations.id text COLLATE "C" NOT NULL
+column artifact_cleanup_reservations.binding text NOT NULL
+column artifact_cleanup_reservations.closed boolean NOT NULL
+constraint artifact_cleanup_reservations.artifact_cleanup_reservations_pkey PRIMARY KEY (owner, id)
+index artifact_cleanup_reservations.artifact_cleanup_reservations_pkey CREATE UNIQUE INDEX artifact_cleanup_reservations_pkey ON artifact_cleanup_reservations USING btree (owner, id)
+table artifact_cleanup_state
+column artifact_cleanup_state.repo_key text COLLATE "C" NOT NULL
+column artifact_cleanup_state.barrier text NOT NULL DEFAULT '{}'::text
+column artifact_cleanup_state.admitted_at bigint
+column artifact_cleanup_state.admission_revision text COLLATE "C" NOT NULL DEFAULT 'initial'::text
+constraint artifact_cleanup_state.artifact_cleanup_state_pkey PRIMARY KEY (repo_key)
+constraint artifact_cleanup_state.artifact_cleanup_state_repo_key_fkey FOREIGN KEY (repo_key) REFERENCES repositories(key) ON DELETE CASCADE
+index artifact_cleanup_state.artifact_cleanup_state_pkey CREATE UNIQUE INDEX artifact_cleanup_state_pkey ON artifact_cleanup_state USING btree (repo_key)
 table blob_replicas
 column blob_replicas.sha256 text COLLATE "C" NOT NULL
 column blob_replicas.member text COLLATE "C" NOT NULL
@@ -464,6 +496,14 @@ column failed_blob_fetches.failures integer NOT NULL DEFAULT 0
 column failed_blob_fetches.last_error text NOT NULL DEFAULT ''::text
 constraint failed_blob_fetches.failed_blob_fetches_pkey PRIMARY KEY (stream, sha256)
 index failed_blob_fetches.failed_blob_fetches_pkey CREATE UNIQUE INDEX failed_blob_fetches_pkey ON failed_blob_fetches USING btree (stream, sha256)
+table federated_cleanup_intents
+column federated_cleanup_intents.id text COLLATE "C" NOT NULL
+column federated_cleanup_intents.revision bigint NOT NULL
+column federated_cleanup_intents.document text NOT NULL
+constraint federated_cleanup_intents.federated_cleanup_intents_document_check CHECK ((length(document) <= 4194304))
+constraint federated_cleanup_intents.federated_cleanup_intents_pkey PRIMARY KEY (id)
+constraint federated_cleanup_intents.federated_cleanup_intents_revision_check CHECK ((revision > 0))
+index federated_cleanup_intents.federated_cleanup_intents_pkey CREATE UNIQUE INDEX federated_cleanup_intents_pkey ON federated_cleanup_intents USING btree (id)
 table federation_item_stamps
 column federation_item_stamps.repo_key text COLLATE "C" NOT NULL
 column federation_item_stamps.path text COLLATE "C" NOT NULL
@@ -672,6 +712,10 @@ column package_versions.created_at bigint
 column package_versions.last_downloaded_at bigint
 column package_versions.metadata text
 column package_versions.mutation_revision text COLLATE "C" NOT NULL DEFAULT 'initial'::text
+column package_versions.download_revision text COLLATE "C" NOT NULL DEFAULT 'initial'::text
+column package_versions.admitted_at bigint
+column package_versions.admission_revision text COLLATE "C" NOT NULL DEFAULT 'initial'::text
+constraint package_versions.package_versions_download_revision_check CHECK ((download_revision <> ''::text))
 constraint package_versions.package_versions_mutation_revision_check CHECK ((mutation_revision <> ''::text))
 constraint package_versions.package_versions_package_id_fkey FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE CASCADE
 constraint package_versions.package_versions_pkey PRIMARY KEY (id)
@@ -733,6 +777,10 @@ column peers.edge_role boolean NOT NULL DEFAULT false
 column peers.delivery text NOT NULL DEFAULT 'push'::text
 column peers.clock_skew_ms bigint NOT NULL DEFAULT 0
 column peers.receives_federation_only boolean NOT NULL DEFAULT false
+column peers.grant_revision text COLLATE "C" NOT NULL DEFAULT 'initial'::text
+column peers.failure_revision text COLLATE "C" NOT NULL DEFAULT 'initial'::text
+constraint peers.peers_failure_revision_check CHECK ((failure_revision <> ''::text))
+constraint peers.peers_grant_revision_check CHECK ((grant_revision <> ''::text))
 constraint peers.peers_pkey PRIMARY KEY (instance_id)
 index peers.peers_pkey CREATE UNIQUE INDEX peers_pkey ON peers USING btree (instance_id)
 table permission_grants

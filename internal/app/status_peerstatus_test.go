@@ -8,21 +8,26 @@ package app
 // header: 400, before its signature is read, whoever sends it.
 
 const (
-	stPeerStatus     = "GET /artifactweave/peer/v1/status"
-	stPeerStatusURL  = "/artifactweave/peer/v1/status"
-	stPeerRepoConfig = "PUT /artifactweave/peer/v1/repositories/{repoKey}"
-	stPeerRepoURL    = "/artifactweave/peer/v1/repositories/libs-fed"
-	stPeerRepoBody   = `{"configuration":{"key":"libs-fed","rclass":"federated"}}`
+	stPeerDownloads     = "POST /artifactweave/peer/v1/repositories/{repoKey}/downloads"
+	stPeerDownloadsURL  = "/artifactweave/peer/v1/repositories/libs-fed/downloads"
+	stPeerDownloadsBody = `{"sourceRepository":"libs-fed","packageType":"npm","challenge":"fresh-unique-challenge","versions":[{"package":"widget","version":"1"}]}`
+	stPeerStatus        = "GET /artifactweave/peer/v1/status"
+	stPeerStatusURL     = "/artifactweave/peer/v1/status"
+	stPeerRepoConfig    = "PUT /artifactweave/peer/v1/repositories/{repoKey}"
+	stPeerRepoURL       = "/artifactweave/peer/v1/repositories/libs-fed"
+	stPeerRepoBody      = `{"configuration":{"key":"libs-fed","rclass":"federated"}}`
 )
 
 var peerStatusStatusPart = statusPart{
-	generated: map[string]bool{stPeerStatus: true, stPeerRepoConfig: true},
+	generated: map[string]bool{stPeerStatus: true, stPeerRepoConfig: true, stPeerDownloads: true},
 	rows: func() []statusCase {
 		return []statusCase{
 			{stPeerStatus, stPeerStatusURL, "", "", 400},
 			{stPeerStatus, stPeerStatusURL, "admin", "", 400},
 			{stPeerRepoConfig, stPeerRepoURL, "", stPeerRepoBody, 400},
 			{stPeerRepoConfig, stPeerRepoURL, "admin", stPeerRepoBody, 400},
+			{stPeerDownloads, stPeerDownloadsURL, "", stPeerDownloadsBody, 400},
+			{stPeerDownloads, stPeerDownloadsURL, "admin", stPeerDownloadsBody, 400},
 		}
 	},
 }
@@ -34,6 +39,7 @@ var peerStatusMatrixPart = matrixPart{
 			// included.
 			{route: stPeerStatus, path: stPeerStatusURL, who: noCredentials, ok: 400, open: true},
 			{route: stPeerRepoConfig, path: stPeerRepoURL, body: stPeerRepoBody, who: noCredentials, ok: 400, open: true},
+			{route: stPeerDownloads, path: stPeerDownloadsURL, body: stPeerDownloadsBody, who: noCredentials, ok: 400, open: true},
 		}
 	},
 }

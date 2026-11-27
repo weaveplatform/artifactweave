@@ -54,6 +54,7 @@ func afterPackage(p *model.CleanupProgress) {
 
 func afterVersion(p *model.CleanupProgress) {
 	p.FileAfter, p.Reason = "", ""
+	p.Federation = nil
 	if p.VersionDone {
 		afterPackage(p)
 	} else {
@@ -138,8 +139,10 @@ func (x Executor) discoverCandidates(ctx context.Context, e model.CleanupExecuti
 	entries := make([]model.CleanupEntry, 0, len(page.Items)+1)
 	if p.FileAfter == "" {
 		next.Version = page.Version
+		next.Federation = page.Federation
 	}
-	if p.FileAfter != "" && (!sameVersionRevision(page.Version, p.Version) || !page.Version.LastDownloaded.Equal(p.Version.LastDownloaded)) {
+	if p.FileAfter != "" &&
+		(!sameVersionRevision(page.Version, p.Version) || !page.Version.LastDownloaded.Equal(p.Version.LastDownloaded) || !sameFederation(page.Federation, p.Federation)) {
 		page.Reason, page.Items = ReasonChanged, nil
 	}
 	if page.Reason != ReasonSelected {
@@ -172,6 +175,28 @@ func (x Executor) discoverCandidates(ctx context.Context, e model.CleanupExecuti
 		if page.Next == "" {
 			next.Phase = model.CleanupRemoving
 		}
+	}
+	if page.Reason == ReasonSelected && page.Federation != nil {
+		proof := *page.Federation
+		previous := fence
+		fence = func(ctx context.Context) error {
+			if err := previous(ctx); err != nil {
+				return err
+			}
+			return s.service.Federation.Fresh(ctx, proof)
+		}
+		return x.withCaller(ctx, e.Credential, func(ctx context.Context, authority Policy) error {
+			if !authority.Allows(e.Policy.ProjectKey) {
+				return &authorityRefusal{kernel.ErrForbidden}
+			}
+			if err := s.service.Federation.Guard(ctx, proof); err != nil {
+				return fmt.Errorf("guard discovered federation evidence: %w", err)
+			}
+			if err := x.unchangedVersion(ctx, next, s); err != nil {
+				return err
+			}
+			return x.publishDiscovery(ctx, e, p, next, entries, fence)
+		})
 	}
 	return x.publishDiscovery(ctx, e, p, next, entries, fence)
 }

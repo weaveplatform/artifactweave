@@ -604,3 +604,37 @@ lease stays held, and its eventual settlement cannot back off or park the fresh
 replay. Deletion cancels queued or in-flight retry publication.
 A newer event or normal full sync can supply content after cancellation; full sync
 repairs pending content even when its conflict stamp already matches the sender.
+
+## 12. Cleanup policy behavior across members
+
+The current [federated cleanup guide](https://docs.jfrog.com/artifactory/docs/how-to-configure-cleanup-policies-for-federated-repositories),
+checked 2026-11-27, documents these federation effects **[D]**, rather than a
+7.161.26 runtime observation:
+
+- Policy definitions stay local to each member. A cleanup run propagates its
+  deletion events through the federation; members do not run a second policy
+  to apply those deletions.
+- Receiving-only members apply propagated deletions but do not execute cleanup
+  policies locally or initiate outward cleanup deletions. This is consistent
+  with their event direction in section 6; policy CRUD remains available.
+- Dry-run content is the executing member's current content. A version absent
+  on that member is not added merely because a peer holds it.
+
+[I] Self-only local equivalence covers bidirectional membership. An isolated
+self entry configured as receiver remains ineligible for local cleanup here.
+The guide gives no topology exception, but that exact configuration is not a
+captured 7.161.26 runtime answer. The isolated case is registered for
+[P19 comparison](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-7209136116).
+
+The page's newer retention API examples do not replace this project's verified
+7.161.26 package-cleanup wire contract. The authenticated observation operation,
+its batching and failure handling are artifactweave protocol choices, not
+captured JFrog wire behavior. On 2026-11-27 the product owner chose coordinated
+exclusion to prevent the member download/delete race, superseding the earlier
+bounded-observation-only proposal. Durable hosted-response admissions and exact
+repository/version barriers provide exclusion; individually signed observations
+and timestamp freshness cannot. Committed removal releases participants only
+after their applied tombstone watermark, or an irreversible abort. A member's
+302 ends its accounted redirect operation; later direct object-store URL use is
+outside member accounting. See decisions 0010 and 0021 for the selected contract;
+implementation and qualification remain in progress.

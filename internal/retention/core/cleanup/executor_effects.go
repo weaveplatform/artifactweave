@@ -43,7 +43,9 @@ func (x Executor) removeStep(ctx context.Context, e model.CleanupExecution, p mo
 	if err != nil {
 		return fmt.Errorf("read next cleanup intent: %w", err)
 	}
-	_, err = x.Removal.Remove(ctx, artifactsapi.RemovalRequest{Credential: e.Credential, Item: entry.Snapshot, Properties: s.properties, SkipTrashcan: e.Policy.SkipTrashcan},
+	_, err = x.Removal.Remove(
+		ctx,
+		artifactsapi.RemovalRequest{Credential: e.Credential, Item: entry.Snapshot, Properties: s.properties, SkipTrashcan: e.Policy.SkipTrashcan, Federation: s.permit},
 		func(ctx context.Context) error { return x.unchangedVersion(ctx, p, s) },
 		func(ctx context.Context, result artifactsapi.RemovalResult) error {
 			return x.publish(ctx, e, p, fence, true, func(ctx context.Context, r *model.CleanupRun, next *model.CleanupProgress) error {
@@ -55,7 +57,8 @@ func (x Executor) removeStep(ctx context.Context, e model.CleanupExecution, p mo
 				next.Version.MutationRevision = result.VersionMutationRevision
 				return nil
 			})
-		})
+		},
+	)
 	return err //nolint:wrapcheck // guarded removal preserves its refusal classification
 }
 

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
+	federationapi "github.com/weaveplatform/artifactweave/internal/federation/api"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
@@ -48,6 +49,7 @@ type CandidatePage struct {
 	LeadFingerprint           string
 	Items                     []artifactsapi.IndexFile
 	Next                      string
+	Federation                *federationapi.CleanupEvidence `json:"-"`
 }
 
 func (s *Selection) needsLead() bool {
@@ -82,6 +84,9 @@ func (s *Selection) Candidates(ctx context.Context, ref artifactsapi.IndexVersio
 		Reason:         s.criteria.identityReason(versionIdentity(current)),
 	}
 	result, err := s.evaluateCandidates(ctx, out, page)
+	if err == nil {
+		result, err = s.federationCandidate(ctx, result)
+	}
 	if errors.Is(err, errCandidateChanged) {
 		out.Reason = ReasonChanged
 		return out, nil

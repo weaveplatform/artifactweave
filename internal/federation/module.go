@@ -12,6 +12,7 @@ import (
 	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/federation/adapters/pushhttp"
+	"github.com/weaveplatform/artifactweave/internal/federation/core/cleanup"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/federated"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/pairing"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/port"
@@ -35,13 +36,15 @@ type Store interface {
 // Deps supplies current authority and canonical repository configuration over
 // the same guarded transaction. Zone is the server's schedule timezone.
 type Deps struct {
-	Store          Store
-	Access         accessapi.API
-	Ownership      artifactsapi.ProjectRepositoryLookup
-	Lifetimes      artifactsapi.RepositoryLifetimes
-	Repositories   artifactsapi.Repositories
-	Zone           string
-	UserQueryLimit int
+	Store             Store
+	Access            accessapi.API
+	Ownership         artifactsapi.ProjectRepositoryLookup
+	Lifetimes         artifactsapi.RepositoryLifetimes
+	CleanupMetadata   artifactsapi.CleanupMetadata
+	CleanupExclusions func() artifactsapi.CleanupExclusions
+	Repositories      artifactsapi.Repositories
+	Zone              string
+	UserQueryLimit    int
 	// BaseURL is the installation's configured base URL, which stands in
 	// for the descriptor's urlBase as this instance's own federated member
 	// base when neither urlBase nor federatedRepoUrlBase is set.
@@ -91,6 +94,8 @@ type Module struct {
 	probeRemote   pairing.StatusRemote
 	probeInterval time.Duration
 	closed        bool
+	cleanup       *cleanup.Service
+	cleanupRemote cleanup.Remote
 }
 
 // New constructs the module without reading or writing its dependencies.
@@ -99,7 +104,11 @@ func New(d Deps) (*Module, error) {
 		return nil, errNoStore
 	}
 	d.streams = &streamRef{}
-	return &Module{deps: d}, nil
+	m := &Module{deps: d}
+	if store, ok := d.Store.(cleanup.Store); ok && d.CleanupMetadata != nil {
+		m.cleanup = &cleanup.Service{Store: store, Metadata: d.CleanupMetadata, OpenExclusions: d.CleanupExclusions, BaseURL: d.BaseURL, Remote: cleanupRemote{module: m}}
+	}
+	return m, nil
 }
 
 // Configurations supplies administration and the private configuration revision

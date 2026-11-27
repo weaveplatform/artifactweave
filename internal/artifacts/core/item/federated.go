@@ -21,19 +21,10 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 )
 
-type federatedKey struct{}
+// federated preserves the trusted ordered-application marker through native hooks.
+func federated(ctx context.Context) context.Context { return artifactevents.WithRemote(ctx) }
 
-// federated marks a context that applies another member's change: nothing
-// the item service does under it is reported to the feed, the hooks' own
-// calls into an item service included.
-func federated(ctx context.Context) context.Context {
-	return context.WithValue(ctx, federatedKey{}, true)
-}
-
-func isFederated(ctx context.Context) bool {
-	v, _ := ctx.Value(federatedKey{}).(bool)
-	return v
-}
+func isFederated(ctx context.Context) bool { return artifactevents.IsRemote(ctx) }
 
 // feed reports it, as it is after a change, to the store's ItemFeed. A
 // remote cache, a repository root and a change applied from another member

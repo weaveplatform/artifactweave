@@ -569,6 +569,8 @@ func apiReviewPolicy(e *apiReviewOperation) {
 	apiReviewLoggers(e)
 	apiReviewLDAPTest(e)
 	apiReviewLDAPGroups(e)
+	apiReviewCleanupObservation(e)
+	apiReviewCleanupCoordination(e)
 	if cleanupPolicy {
 		e.Admission += "; current platform/project administration refreshed under the project guard before disclosure/publication; project administrators require own-project collection filter"
 	}
@@ -578,6 +580,26 @@ func apiReviewPolicy(e *apiReviewOperation) {
 			e.Retry += "; optional key replays the committed integer trigger under current policy/project authority; dryRun participates in the fingerprint; unkeyed admissions remain distinct"
 		}
 	}
+}
+
+// The read-only peer POST has no configuration/content effect. Current
+// membership and the signed transport, rather than user credentials, guard it.
+func apiReviewCleanupObservation(e *apiReviewOperation) {
+	if strings.HasPrefix(e.State, "stub:") || e.OperationID != "observeRepositoryDownloads" {
+		return
+	}
+	e.Family = "federated-cleanup-observation"
+	e.Effects = "read-only bounded metadata observation; no artifact, policy, or cleanup-run mutation; current reciprocal membership and grant checked under the repository lifetime fence"
+	e.Retry = "safe read with a fresh challenge; cleanup makes one attempt per member and retains content on unavailable or unverifiable evidence"
+	e.Pagination = "one explicit batch of 1–64 logical versions; no file or blob traversal cursor; missing versions are unavailable; bounded reply body"
+	e.Admission += "; paired request-bound signature, current federation grant and enabled reciprocal repository membership"
+	e.Evidence = append(
+		e.Evidence,
+		"internal/federation/adapters/peer/cleanup.go",
+		"internal/federation/core/cleanup/receiver.go",
+		"internal/federation/adapters/peer/cleanup_test.go",
+		"test/peers/federated_cleanup_test.go",
+	)
 }
 
 // apiReviewLDAPTest: the connection test (#1833) asks the directory and
@@ -1446,4 +1468,21 @@ func TestUnitAPIReviewKeepsOperationEvidence(t *testing.T) {
 				c.id, e.State, e.Effects, e.Admission, e.Evidence)
 		}
 	}
+}
+
+func apiReviewCleanupCoordination(e *apiReviewOperation) {
+	if strings.HasPrefix(e.State, "stub:") || e.OperationID != "coordinateRepositoryCleanup" {
+		return
+	}
+	e.Family = "federated-cleanup-exclusion"
+	e.Effects = "durable participant barrier, terminal reservation identity, and bounded coordinator outcome lookup; no artifact deletion; release requires irreversible abort or applied committed repository watermark"
+	e.Retry = "idempotent for an immutable owner/operation/repository/version binding; no expiry-based release; unavailable or ambiguous outcome retains exclusion"
+	e.Pagination = "one explicit batch of 1–64 immutable version identities; bounded signed request/reply; no blob traversal"
+	e.Admission += "; paired request-bound signature, current federation grant, enabled reciprocal repository binding and coordinator outcome proof"
+	e.Evidence = append(
+		e.Evidence,
+		"internal/federation/core/cleanup/coordination.go",
+		"internal/federation/core/cleanup/coordination_receiver.go",
+		"internal/federation/adapters/peer/cleanup.go",
+	)
 }

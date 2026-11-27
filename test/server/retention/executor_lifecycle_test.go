@@ -46,6 +46,7 @@ type cleanupExecutorFixture struct {
 	policies    cleanup.Service
 	executor    cleanup.Executor
 	queue       *work.Queue
+	blobs       *fs.Store
 	ids         []int64
 	now         time.Time
 }
@@ -139,6 +140,7 @@ func newCleanupExecutorFixture(t *testing.T, db harness.Store) *cleanupExecutorF
 	blobs := storekit.Get[*fs.Store](t)(fs.New(t.TempDir()))
 	queue := storekit.Get[*work.Queue](t)(work.New(db, work.Options{}))
 	f.queue = queue
+	f.blobs = blobs
 	artStore, ok := db.(artifactsmodule.Store)
 	if !ok {
 		t.Fatal("executor fixture has no artifacts store")
