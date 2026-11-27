@@ -113,7 +113,7 @@ jobs:
       # goreleaser's sboms step shells out to syft, which the runner lacks;
       # without it the release fails after building the archives and attaches
       # nothing.
-      - uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+      - uses: anchore/sbom-action/download-syft@dfcb83b97731532d72be422cbc51ee64adb6fd56 # v0.24.4
 
       # buildx builds both platforms of the image; QEMU lets the amd64 runner
       # assemble the arm64 one.
