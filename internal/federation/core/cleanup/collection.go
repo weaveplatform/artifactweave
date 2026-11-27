@@ -35,6 +35,13 @@ func (f *failureFence) current(id, grant string, now time.Time) uint64 {
 		delete(f.epochs, key)
 		return 0
 	}
+	// A fresh scope can still reference this failure generation throughout its
+	// own window. Retain an actively observed epoch until that window can end;
+	// pruning by the original failure time would reset a current fence to zero.
+	if !value.at.IsZero() && now.After(value.at) {
+		value.at = now
+		f.epochs[key] = value
+	}
 	return value.value
 }
 
