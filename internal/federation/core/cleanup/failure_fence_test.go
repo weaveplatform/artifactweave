@@ -16,7 +16,11 @@ func TestUnitFailureFenceExpiresOnlyBeyondObservationWindow(t *testing.T) {
 	if !fence.changed([]api.CleanupMember{member}, base.Add(Window-time.Nanosecond)) {
 		t.Fatal("a pre-failure observation regained authority inside its valid window")
 	}
-	if fence.current(member.Instance, member.Grant, base.Add(Window+time.Nanosecond)) != 0 {
+	lastUse := base.Add(Window + time.Nanosecond)
+	if fence.current(member.Instance, member.Grant, lastUse) == 0 {
+		t.Fatal("an actively observed failure generation expired inside its new window")
+	}
+	if fence.current(member.Instance, member.Grant, lastUse.Add(Window+time.Nanosecond)) != 0 {
 		t.Fatal("expired process-local failure retained an unused entry")
 	}
 	// Relationship churn cannot retain all historic grant keys. Every old

@@ -18,7 +18,6 @@ import (
 	retapi "github.com/weaveplatform/artifactweave/internal/retention/api"
 	"github.com/weaveplatform/artifactweave/internal/retention/core/cleanup"
 	"github.com/weaveplatform/artifactweave/internal/retention/core/model"
-	retport "github.com/weaveplatform/artifactweave/internal/retention/core/port"
 )
 
 var (
@@ -51,23 +50,6 @@ func (r refusalNativeBoundary) Remove(
 	return artifactsapi.RemovalResult{}, r.cause
 }
 
-type refusalDurableSnapshot struct {
-	Run      model.CleanupRun
-	Progress model.CleanupProgress
-	Entries  []model.CleanupEntry
-}
-
-func refusalSnapshot(t *testing.T, f *cleanupExecutorFixture, run int64) refusalDurableSnapshot {
-	t.Helper()
-	rows, _, err := f.db.Cleanup().Entries(f.ctx, retport.CleanupEntryQuery{RunID: run}, kernel.Page{Limit: 100})
-	storekit.Must(t, err)
-	return refusalDurableSnapshot{
-		storekit.Get[model.CleanupRun](t)(f.db.Cleanup().Run(f.ctx, run)),
-		storekit.Get[model.CleanupProgress](t)(f.db.Cleanup().Progress(f.ctx, run)),
-		rows,
-	}
-}
-
 func refusalFence(f *cleanupExecutorFixture, item work.WorkItem) func(context.Context) error {
 	return func(ctx context.Context) error {
 		_, err := f.db.WorkQueue().GuardLease(ctx, item.Kind, item.Key, item.Generation)
@@ -75,9 +57,9 @@ func refusalFence(f *cleanupExecutorFixture, item work.WorkItem) func(context.Co
 	}
 }
 
-func requireRefusalUnchanged(t *testing.T, f *cleanupExecutorFixture, before refusalDurableSnapshot) {
+func requireRefusalUnchanged(t *testing.T, f *cleanupExecutorFixture, before cleanupDurableState) {
 	t.Helper()
-	storekit.Same(t, "unpublished refusal preserves run/continuation/outcome set", before, refusalSnapshot(t, f, before.Run.ID))
+	storekit.Same(t, "unpublished refusal preserves run/continuation/outcome set", before, cleanupDurableSnapshot(t, f, before.Run.ID))
 	f.preserved(t)
 }
 
@@ -86,7 +68,7 @@ func requireAllNativeDenials(t *testing.T, f *cleanupExecutorFixture, run model.
 	recovered := f.executor
 	recovered.Removal = refusalNativeBoundary{ItemRemoval: recovered.Removal, cause: kernel.ErrForbidden}
 	storekit.Must(t, recovered.Execute(f.ctx, item))
-	current := refusalSnapshot(t, f, run.ID)
+	current := cleanupDurableSnapshot(t, f, run.ID)
 	if current.Run.Status != retapi.RunCompletedWithErrors || current.Run.TotalItems != 2 || current.Run.CleanedItems != 0 || current.Run.CleanedSize != 0 {
 		t.Fatal("native refusal recovery invented successful effects", current.Run)
 	}
@@ -114,7 +96,7 @@ func TestAccCleanupRefusalSkipPublicationFaultsPreserveOutcomes(t *testing.T) {
 			remote.err = errRefusalNativeStorage
 			_, err := f.executor.Step(f.ctx, run.ID, refusalFence(f, item))
 			storekit.Must(t, err)
-			before := refusalSnapshot(t, f, run.ID)
+			before := cleanupDurableSnapshot(t, f, run.ID)
 			if before.Progress.Phase != model.CleanupSkipping || before.Progress.Reason != string(cleanup.ReasonFederationUnknown) {
 				t.Fatal("real unavailable member did not enter conservative skip recovery", before.Progress)
 			}
@@ -137,7 +119,7 @@ func TestAccCleanupRefusalSkipPublicationFaultsPreserveOutcomes(t *testing.T) {
 			}
 			requireRefusalUnchanged(t, f, before)
 			storekit.Must(t, f.executor.Execute(f.ctx, item))
-			finished := refusalSnapshot(t, f, run.ID)
+			finished := cleanupDurableSnapshot(t, f, run.ID)
 			if finished.Run.Status != retapi.RunCompleted || finished.Run.TotalItems != 2 || finished.Run.CleanedItems != 0 {
 				t.Fatal("unavailable member retry invented cleanup success", finished.Run)
 			}
@@ -163,7 +145,7 @@ func TestAccCleanupNativeDenialPublicationFaultsRetainPendingItems(t *testing.T)
 		t.Run(operation, func(t *testing.T) {
 			f := newCleanupExecutorFixture(t, inmem.New())
 			run, item := f.selected(t)
-			before := refusalSnapshot(t, f, run.ID)
+			before := cleanupDurableSnapshot(t, f, run.ID)
 			denied, hit := false, false
 			faultStore := cleanupExecutionBoundaryStore{
 				CleanupExecutionStore: f.store,
@@ -211,7 +193,7 @@ func TestAccCleanupIndependentNativeDenialsPreserveFailedVersion(t *testing.T) {
 		}
 	}
 	storekit.Must(t, denied.Execute(f.ctx, item))
-	finished := refusalSnapshot(t, f, run.ID)
+	finished := cleanupDurableSnapshot(t, f, run.ID)
 	if finished.Run.Status != retapi.RunCompletedWithErrors || finished.Run.CleanedItems != 0 || finished.Run.TotalItems != 2 {
 		t.Fatal("independent denials became successful deletion", finished.Run)
 	}
@@ -300,7 +282,7 @@ func TestAccCleanupRefusalRechecksCurrentAuthorityBeforeReporting(t *testing.T) 
 		for _, boundary := range []string{"authority revoked", "project lookup unavailable"} {
 			t.Run(string(phase)+"/"+boundary, func(t *testing.T) {
 				f, run, item := newRefusalAuthorityFixture(t, phase, boundary == "project lookup unavailable")
-				before := refusalSnapshot(t, f, run.ID)
+				before := cleanupDurableSnapshot(t, f, run.ID)
 				refused, hit := false, false
 				faulty := f.executor
 				if phase == model.CleanupRemoving {
@@ -345,7 +327,7 @@ func TestAccCleanupRefusalRechecksCurrentAuthorityBeforeReporting(t *testing.T) 
 func TestAccCleanupFinalRefusalGuardOutageRetainsRecoverableRun(t *testing.T) {
 	f := newCleanupExecutorFixture(t, inmem.New())
 	run, item := f.selected(t)
-	before := refusalSnapshot(t, f, run.ID)
+	before := cleanupDurableSnapshot(t, f, run.ID)
 	failed, hit := false, false
 	faulty := f.executor
 	faulty.Removal = refusalNativeBoundary{ItemRemoval: faulty.Removal, cause: errRefusalNativeStorage, refused: func() { failed = true }}
@@ -369,7 +351,7 @@ func TestAccCleanupFinalRefusalGuardOutageRetainsRecoverableRun(t *testing.T) {
 	recovered := f.executor
 	recovered.Removal = refusalNativeBoundary{ItemRemoval: recovered.Removal, cause: errRefusalNativeStorage}
 	storekit.Must(t, recovered.Execute(f.ctx, item))
-	finished := refusalSnapshot(t, f, run.ID)
+	finished := cleanupDurableSnapshot(t, f, run.ID)
 	if finished.Run.Status != retapi.RunFailed || finished.Run.CleanedItems != 0 || finished.Run.CleanedSize != 0 {
 		t.Fatal("failure guard recovery invented successful removal", finished.Run)
 	}

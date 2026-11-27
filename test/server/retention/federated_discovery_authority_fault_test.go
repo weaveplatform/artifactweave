@@ -350,24 +350,29 @@ func newPublicDiscoveryFixture(t *testing.T, phase model.CleanupPhase, setup fun
 	return discoveryRunFixture{}
 }
 
-type discoveryDurableSnapshot struct {
+type cleanupDurableState struct {
 	Run      model.CleanupRun
 	Progress model.CleanupProgress
 	Entries  []model.CleanupEntry
 }
 
-func (f discoveryRunFixture) snapshot(t *testing.T) discoveryDurableSnapshot {
+func cleanupDurableSnapshot(t *testing.T, f *cleanupExecutorFixture, run int64) cleanupDurableState {
 	t.Helper()
-	entries, _, err := f.db.Cleanup().Entries(f.ctx, retport.CleanupEntryQuery{RunID: f.run.ID}, kernel.Page{Limit: 100})
+	entries, _, err := f.db.Cleanup().Entries(f.ctx, retport.CleanupEntryQuery{RunID: run}, kernel.Page{Limit: 100})
 	storekit.Must(t, err)
-	return discoveryDurableSnapshot{
-		storekit.Get[model.CleanupRun](t)(f.db.Cleanup().Run(f.ctx, f.run.ID)),
-		storekit.Get[model.CleanupProgress](t)(f.db.Cleanup().Progress(f.ctx, f.run.ID)),
+	return cleanupDurableState{
+		storekit.Get[model.CleanupRun](t)(f.db.Cleanup().Run(f.ctx, run)),
+		storekit.Get[model.CleanupProgress](t)(f.db.Cleanup().Progress(f.ctx, run)),
 		entries,
 	}
 }
 
-func (f discoveryRunFixture) unchanged(t *testing.T, before discoveryDurableSnapshot) {
+func (f discoveryRunFixture) snapshot(t *testing.T) cleanupDurableState {
+	t.Helper()
+	return cleanupDurableSnapshot(t, f.cleanupExecutorFixture, f.run.ID)
+}
+
+func (f discoveryRunFixture) unchanged(t *testing.T, before cleanupDurableState) {
 	t.Helper()
 	storekit.Same(t, "failed discovery preserves run/cursor/private candidate set", before, f.snapshot(t))
 	f.preserved(t)
