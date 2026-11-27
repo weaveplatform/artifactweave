@@ -12,7 +12,12 @@ func federationMonitorMatrix() []matrixRow {
 	const base = "/artifactory/api/federation/"
 	result := []matrixRow{}
 	for _, suffix := range []string{"state", "inconsistentRepos", "status/mirrorsLag", "status/unavailableMirrors", "status/stateList", "status/stateSummary", "rtfs", "migration/status"} {
-		result = append(result, at("GET "+base+suffix, "", administrators, 200))
+		status := 200
+		// These fixtures have no configured federation base URL.
+		if suffix == "status/stateList" || suffix == "status/stateSummary" {
+			status = 400
+		}
+		result = append(result, at("GET "+base+suffix, "", administrators, status))
 	}
 	create := func(t *testing.T, f *matrixFixture, p string) {
 		t.Helper()
@@ -39,9 +44,14 @@ func federationMonitorStatusRows() []statusCase {
 	result := []statusCase{}
 	for _, suffix := range []string{"state", "inconsistentRepos", "status/mirrorsLag", "status/unavailableMirrors", "status/stateList", "status/stateSummary", "rtfs", "migration/status"} {
 		route := "GET " + base + suffix
+		status := 200
+		// These fixtures have no configured federation base URL.
+		if suffix == "status/stateList" || suffix == "status/stateSummary" {
+			status = 400
+		}
 		result = append(
 			result,
-			statusCase{route, base + suffix, "admin", "", 200},
+			statusCase{route, base + suffix, "admin", "", status},
 			statusCase{route, base + suffix, "user", "", 403},
 			statusCase{route, base + suffix, "", "", 401},
 		)
