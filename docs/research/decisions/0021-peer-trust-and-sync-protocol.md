@@ -4,8 +4,8 @@ Checked against: Artifactory 7.161.32 and the 7.161.26 source ([research 40](../
 
 Status: Accepted
 
-Implementation status (2026-11-24): **partly implemented P13**. The decision below describes
-intended behavior. The peer API's wire contract is specified
+Implementation status (2026-11-27): **peer tasks delivered; P13 qualification pending**.
+The decision below records the protocol contract. The peer API's wire contract is specified
 ([PEER-01](https://github.com/weaveplatform/artifactweave/issues/1925), **Wire contract**
 below): `api/src/peer/` generates its server and client. The signed transport is
 implemented ([PEER-03](https://github.com/weaveplatform/artifactweave/issues/1927),

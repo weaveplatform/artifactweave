@@ -4,7 +4,7 @@ Checked against: Artifactory 7.161.32 and the 7.161.26 source ([research 40](../
 
 Status: Accepted
 
-Implementation status (2026-11-26): **in progress, P13**. Members and
+Implementation status (2026-11-27): **feature delivery in progress; P13 qualification pending**. Members and
 configuration sync are implemented (FED-01, [#1930](https://github.com/weaveplatform/artifactweave/issues/1930)):
 member checks against paired peers, `federatedRepoUrlBase`, configSync over the
 peer API, `migrate`, `convertToLocal`, `replaceUrl` and `updateMemberUrl`. Change
@@ -15,9 +15,10 @@ Full sync and the member operations are implemented (FED-04,
 [#1932](https://github.com/weaveplatform/artifactweave/issues/1932)): the repository's
 snapshot and reconciler, `fullSync`, `forceFullSync`, `recovery`, `reconnect`,
 `removeMember`, `prioritization` and `propagateCreatedTime`. The
-rest of the decision below describes intended behavior that later P13 tasks
-implement; their generated API stubs and storage models do not implement it yet.
-Receiver members and receiving-only trust are implemented by FED-03 (#1933).
+remaining cleanup contract belongs to FED-07 (#1798). Receiver members and
+receiving-only trust are implemented by FED-03 (#1933); status and RTFS-only
+answers by FED-05 (#1934), and failed-binary operations by FED-06 (#1935).
+These merged features do not themselves satisfy integrated epic acceptance.
 P37 owns vendor federation/RTFS interoperability and migration contracts. [0042](0042-capability-scope-and-supersession.md)
 replaces permanent scope cuts; [research 10](../10-scope-and-tiers.md) records current
 availability.

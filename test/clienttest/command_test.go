@@ -58,7 +58,8 @@ func TestUnitJFIsolatesDeveloperStateBetweenScenarios(t *testing.T) {
 			if err := json.Unmarshal(out, &got); err != nil {
 				t.Fatal(err)
 			}
-			for key, want := range map[string]string{"cwd": dir, "JFROG_CLI_HOME_DIR": home, "JFROG_CLI_DEPENDENCIES_DIR": filepath.Join(home, "dependencies"), "JFROG_CLI_TEMP_DIR": filepath.Join(home, "tmp"), "JFROG_CLI_REPORT_USAGE": "false", "JFROG_CLI_AVOID_NEW_VERSION_WARNING": "true"} {
+			assertWorkingDirectory(t, got["cwd"], dir)
+			for key, want := range map[string]string{"JFROG_CLI_HOME_DIR": home, "JFROG_CLI_DEPENDENCIES_DIR": filepath.Join(home, "dependencies"), "JFROG_CLI_TEMP_DIR": filepath.Join(home, "tmp"), "JFROG_CLI_REPORT_USAGE": "false", "JFROG_CLI_AVOID_NEW_VERSION_WARNING": "true"} {
 				if got[key] != want {
 					t.Errorf("child %s=%q, want %q", key, got[key], want)
 				}
@@ -119,11 +120,29 @@ func TestUnitRegistryClientsUsePrivateCredentials(t *testing.T) {
 	if err := json.Unmarshal(out, &got); err != nil {
 		t.Fatal(err)
 	}
-	if got["DOCKER_CONFIG"] != config || got["cwd"] != dir || got["COSIGN_PASSWORD"] != "" || got["COSIGN_YES"] != "true" {
+	assertWorkingDirectory(t, got["cwd"], dir)
+	if got["DOCKER_CONFIG"] != config || got["COSIGN_PASSWORD"] != "" || got["COSIGN_YES"] != "true" {
 		t.Fatal("registry tool borrowed developer credentials or interactive settings")
 	}
 	docker := Docker(t.Context(), dir, config, []string{"pull", "fixture"})
 	if docker.Dir != dir || !slices.Equal(docker.Args[1:], []string{"--config", config, "pull", "fixture"}) {
 		t.Fatal("Docker did not receive the private registry credentials")
+	}
+}
+
+// Getwd may canonicalize /tmp or a runner's directory junction. Compare the
+// directory identities so an alias is accepted while a different cwd fails.
+func assertWorkingDirectory(t *testing.T, got, want string) {
+	t.Helper()
+	actual, err := os.Stat(got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected, err := os.Stat(want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !os.SameFile(actual, expected) {
+		t.Fatalf("client used a different working directory: %q", got)
 	}
 }

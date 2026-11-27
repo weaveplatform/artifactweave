@@ -33,8 +33,16 @@ func testPeerProtocol(t *testing.T, driver peers.Driver) {
 			}
 		}
 	}
+	checkHeaders := func(header http.Header) {
+		var encoded bytes.Buffer
+		if err := header.Write(&encoded); err != nil {
+			t.Fatal(err)
+		}
+		assertProtocolRedacted(t, encoded.Bytes(), keys)
+	}
 	pairForProof := func(issuer, redeemer *peers.Instance, use string) {
-		status, body := issuer.Do(t, http.MethodPost, stPairing+use, "")
+		status, header, body := issuer.DoHeader(t, http.MethodPost, stPairing+use, "", nil)
+		checkHeaders(header)
 		assertProtocolRedacted(t, []byte(body), keys)
 		var token struct {
 			Value string `json:"pairing_token"`
@@ -59,7 +67,8 @@ func testPeerProtocol(t *testing.T, driver peers.Driver) {
 			t.Fatal("pairing token omitted nonce")
 		}
 		sensitive = append(sensitive, claims.Nonce)
-		status, body = redeemer.Do(t, http.MethodPut, stPairing+use, tokenBody(token.Value))
+		status, header, body = redeemer.DoHeader(t, http.MethodPut, stPairing+use, tokenBody(token.Value), nil)
+		checkHeaders(header)
 		assertProtocolRedacted(t, []byte(body), append(slices.Clone(keys), sensitive...))
 		if status != http.StatusOK || strings.TrimSpace(body) != `{"message":"Trust with service federated-repo was established successfully"}` {
 			t.Fatal("pairing redemption failed")
@@ -120,6 +129,7 @@ func testPeerProtocol(t *testing.T, driver peers.Driver) {
 			if resp.StatusCode != want {
 				t.Fatalf("peer response status %d, want %d", resp.StatusCode, want)
 			}
+			checkHeaders(resp.Header)
 			assertProtocolRedacted(t, body, append(slices.Clone(keys), sensitive...))
 			if signed {
 				msg := corepeer.Message{Method: req.Method, TargetURI: req.URL.String(), Header: req.Header}

@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -220,7 +221,7 @@ func qualifyDockerClients(t *testing.T, all []*peers.Instance, origin *peers.Ins
 	dir := t.TempDir()
 	var layer bytes.Buffer
 	tw := tar.NewWriter(&layer)
-	content := "peer " + origin.Name
+	content := "peer " + origin.Name + " " + origin.URL
 	if err := tw.WriteHeader(&tar.Header{Name: "qualification.txt", Mode: 0o644, Size: int64(len(content))}); err != nil {
 		t.Fatal(err)
 	}
@@ -258,15 +259,38 @@ func qualifyDockerClients(t *testing.T, all []*peers.Instance, origin *peers.Ins
 	cleanup(ref(origin))
 	run(docker("push", ref(origin)), true)
 	for _, in := range all {
-		eventually(t, in, "Docker manifest", func() (bool, string) {
-			status, _, _ := in.DoHeader(
-				t,
-				http.MethodGet,
-				fmt.Sprintf("/v2/native-docker/qualification/manifests/origin%d", index),
-				"",
-				http.Header{"Accept": []string{"application/vnd.docker.distribution.manifest.v2+json"}},
-			)
-			return status == 200, fmt.Sprint(status)
+		eventually(t, in, "complete Docker image graph", func() (bool, string) {
+			status, _, body := in.DoHeader(t, http.MethodGet,
+				fmt.Sprintf("/v2/native-docker/qualification/manifests/origin%d", index), "",
+				http.Header{"Accept": []string{"application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.manifest.v1+json"}})
+			if status == http.StatusNotFound {
+				return false, "manifest not delivered"
+			}
+			var manifest struct {
+				Config struct {
+					Digest string `json:"digest"`
+				} `json:"config"`
+				Layers []struct {
+					Digest string `json:"digest"`
+				} `json:"layers"`
+			}
+			if status != http.StatusOK || json.Unmarshal([]byte(body), &manifest) != nil || manifest.Config.Digest != image || len(manifest.Layers) == 0 {
+				t.Fatalf("Docker manifest invalid or failed: status %d", status)
+			}
+			digests := []string{manifest.Config.Digest}
+			for _, layer := range manifest.Layers {
+				digests = append(digests, layer.Digest)
+			}
+			for _, digest := range digests {
+				status, _, _ = in.DoHeader(t, http.MethodHead, "/v2/native-docker/qualification/blobs/"+digest, "", nil)
+				if status == http.StatusNotFound {
+					return false, "image blob not delivered"
+				}
+				if status != http.StatusOK {
+					t.Fatalf("Docker blob readiness returned %d", status)
+				}
+			}
+			return true, "all referenced blobs available"
 		})
 		login(in)
 		run(docker("pull", ref(in)), true)
