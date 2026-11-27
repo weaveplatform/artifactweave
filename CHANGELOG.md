@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.5.0](https://github.com/weaveplatform/artifactweave/compare/v0.4.0...v0.5.0) (2026-11-27)
+
+
+### Features
+
+* **access:** add optional npm and Terraform browser login ([#1978](https://github.com/weaveplatform/artifactweave/issues/1978)) ([d33c22d](https://github.com/weaveplatform/artifactweave/commit/d33c22d7a48864f8ea456e7a57459d1832072eea))
+* **federation:** add receivers and bound failed-binary listing ([#1966](https://github.com/weaveplatform/artifactweave/issues/1966)) ([80650f3](https://github.com/weaveplatform/artifactweave/commit/80650f3d2e0f7d77211bdfa923ff0c2b404db296))
+* **federation:** converge federated repository changes across members ([#1959](https://github.com/weaveplatform/artifactweave/issues/1959)) ([8bc122f](https://github.com/weaveplatform/artifactweave/commit/8bc122f3dff730839dcbe69a1d08594b290607e6))
+* **federation:** list, replay and delete failed binaries ([#1967](https://github.com/weaveplatform/artifactweave/issues/1967)) ([5b59084](https://github.com/weaveplatform/artifactweave/commit/5b59084fd63a549a201048ede80643bf2e7d9723))
+* **federation:** pair instances through service trust ([#1945](https://github.com/weaveplatform/artifactweave/issues/1945)) ([14bed96](https://github.com/weaveplatform/artifactweave/commit/14bed9648a87af19d175eeac2bd7acb1a2b3edc3))
+* **federation:** report federation status and lag ([#1972](https://github.com/weaveplatform/artifactweave/issues/1972)) ([05eae44](https://github.com/weaveplatform/artifactweave/commit/05eae4473cae77c3fe0d086f96ffb67a42126270))
+* **federation:** run full sync, recovery and member operations ([#1961](https://github.com/weaveplatform/artifactweave/issues/1961)) ([e17a6f1](https://github.com/weaveplatform/artifactweave/commit/e17a6f1b13fb010a850588c269f8e96dd36b0571)), closes [#1932](https://github.com/weaveplatform/artifactweave/issues/1932)
+* **federation:** validate members and sync federated repository configuration ([#1953](https://github.com/weaveplatform/artifactweave/issues/1953)) ([10a7aa6](https://github.com/weaveplatform/artifactweave/commit/10a7aa617921fa32a5000e931c433205ab4d0483))
+* **peer:** deliver ordered event streams between peers ([#1952](https://github.com/weaveplatform/artifactweave/issues/1952)) ([b848dff](https://github.com/weaveplatform/artifactweave/commit/b848dff1c1637f3eb407a07b52d4fcf01b2f7a78))
+* **peer:** resynchronise a stream from a snapshot ([#1957](https://github.com/weaveplatform/artifactweave/issues/1957)) ([e997f05](https://github.com/weaveplatform/artifactweave/commit/e997f0526a1f37c0b82c1df60a577c48f71b7a5b))
+* **peer:** serve peer status and refresh peer liveness ([#1960](https://github.com/weaveplatform/artifactweave/issues/1960)) ([d735936](https://github.com/weaveplatform/artifactweave/commit/d7359360572e8b87136538e8fee1a91d5ee80aee))
+* **peer:** sign and verify peer requests ([#1944](https://github.com/weaveplatform/artifactweave/issues/1944)) ([8e10f50](https://github.com/weaveplatform/artifactweave/commit/8e10f500535179cf93ec3b15854dd09e7369e9dc))
+* **peer:** specify the artifactweave peer API ([#1939](https://github.com/weaveplatform/artifactweave/issues/1939)) ([c351e33](https://github.com/weaveplatform/artifactweave/commit/c351e33fe9f8955361a297e660d34ee453f13c12)), closes [#1925](https://github.com/weaveplatform/artifactweave/issues/1925)
+
+
+### Bug Fixes
+
+* **federation:** validate every blob reference size ([#1971](https://github.com/weaveplatform/artifactweave/issues/1971)) ([d995200](https://github.com/weaveplatform/artifactweave/commit/d995200fd49011486e58ae1b02f029595f0a73d5))
+* **peers:** bound SQLite fixture admission for instrumented contention ([#1975](https://github.com/weaveplatform/artifactweave/issues/1975)) ([dada25a](https://github.com/weaveplatform/artifactweave/commit/dada25ae33d6d68f66cf0790d7d258138eb23416))
+* **release:** bump the minor version for features and count from 0.4.0 ([#1948](https://github.com/weaveplatform/artifactweave/issues/1948)) ([23308a4](https://github.com/weaveplatform/artifactweave/commit/23308a408a220843a10081f47b7c4fb5fc3feb73)), closes [#1947](https://github.com/weaveplatform/artifactweave/issues/1947)
+
 ## [0.4.0](https://github.com/weaveplatform/artifactweave/compare/v0.3.0...v0.4.0) (2026-11-24)
 
 
