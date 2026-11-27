@@ -31,6 +31,12 @@ const instanceConfigEnv = "ARTIFACTWEAVE_PEER_INSTANCE_CONFIG"
 // runtime, router and production costs, until Start closes its standard
 // input.
 func RunInstance(t *testing.T) {
+	RunInstanceWith(t, app.Run)
+}
+
+// RunInstanceWith keeps RunInstance's strict configuration and stdin shutdown
+// while allowing a fixture to register its stream before production serving.
+func RunInstanceWith(t *testing.T, run func(context.Context, config.Config, *slog.Logger) error) {
 	path := os.Getenv(instanceConfigEnv)
 	if path == "" {
 		return
@@ -49,7 +55,7 @@ func RunInstance(t *testing.T) {
 		stop()
 	}()
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	if err := app.Run(ctx, cfg, log); err != nil {
+	if err := run(ctx, cfg, log); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -90,9 +96,9 @@ func testCommand(ctx context.Context, test, coverDir string, env ...string) (*ex
 // output in log, and returns its standard input, whose closing stops it, and
 // a function that kills it. done closes once it has exited and *exit holds
 // its result.
-func startProcess(log *os.File, path string, done chan struct{}, exit *error) (io.WriteCloser, func(), error) {
+func startProcess(log *os.File, test, path string, done chan struct{}, exit *error) (io.WriteCloser, func(), error) {
 	ctx, kill := context.WithCancel(context.Background())
-	cmd, collect, err := TestCommand(ctx, InstanceTest, instanceConfigEnv+"="+path)
+	cmd, collect, err := TestCommand(ctx, test, instanceConfigEnv+"="+path)
 	if err != nil {
 		kill()
 		_ = log.Close()

@@ -1361,6 +1361,77 @@ Qualification:
   `terraformbackend` ([the 35 resources in research 40](../research/40-federated-repositories-7x.md#9-terraform-exit-set))
   apply, plan clean, destroy.
 
+
+### P13 qualification record
+
+Baseline: main `d33c22d7a48864f8ea456e7a57459d1832072eea` (2026-11-27).
+PR #1979 was rejected and closed. Its implementation and green runs do not qualify
+this replacement. Existing merged feature delivery is retained; integrated phase
+acceptance remains **pending**. The replacement starts from main in an independent
+Artifactweave clone outside Infraweave, with its own Git metadata and build areas.
+
+The table maps every task to its merged owner and executable proof. Test names
+ending in `SQLite/Postgres` denote both explicitly named entry points. Existing
+server/component proof and new process proof have different scopes; neither is
+silently substituted for the other. New tests in the replacement remain unmerged
+until its PR is accepted.
+
+| Task | Merged delivery | Executable evidence |
+|---|---|---|
+| PEER-01 | [#1939](https://github.com/weaveplatform/artifactweave/pull/1939), [`c351e33f`](https://github.com/weaveplatform/artifactweave/commit/c351e33fe9f8955361a297e660d34ee453f13c12) | Generated peer spec and API-ledger checks |
+| PEER-02 | [#1945](https://github.com/weaveplatform/artifactweave/pull/1945), [`14bed964`](https://github.com/weaveplatform/artifactweave/commit/14bed9648a87af19d175eeac2bd7acb1a2b3edc3) | TestAccPairingSQLite/Postgres; TestAccPeerProtocolSQLite/Postgres |
+| PEER-03 | [#1944](https://github.com/weaveplatform/artifactweave/pull/1944), [`8e10f500`](https://github.com/weaveplatform/artifactweave/commit/8e10f500535179cf93ec3b15854dd09e7369e9dc) | TestAccPeerProtocolSQLite/Postgres; TestAccPeerLivenessSQLite/Postgres |
+| PEER-04 | [#1952](https://github.com/weaveplatform/artifactweave/pull/1952), [`b848dff1`](https://github.com/weaveplatform/artifactweave/commit/b848dff1c1637f3eb407a07b52d4fcf01b2f7a78) | TestAccStreamsSQLite/Postgres; TestAccPeerStreamSQLite/Postgres |
+| PEER-05 | [#1957](https://github.com/weaveplatform/artifactweave/pull/1957), [`e997f052`](https://github.com/weaveplatform/artifactweave/commit/e997f0526a1f37c0b82c1df60a577c48f71b7a5b) | TestAccStreamResyncSQLite/Postgres; TestAccPeerStreamSQLite/Postgres |
+| FED-01 | [#1953](https://github.com/weaveplatform/artifactweave/pull/1953), [`10a7aa61`](https://github.com/weaveplatform/artifactweave/commit/10a7aa617921fa32a5000e931c433205ab4d0483) | TestAccFederatedMembersSQLite/Postgres; provider federated-repositories scenario |
+| FED-02 | [#1959](https://github.com/weaveplatform/artifactweave/pull/1959), [`8bc122f3`](https://github.com/weaveplatform/artifactweave/commit/8bc122f3dff730839dcbe69a1d08594b290607e6) | TestAccFederatedSyncSQLite/Postgres; TestAccFederatedFormatsSQLite/Postgres; TestAccPeerClientsSQLite/Postgres |
+| FED-03 | [#1966](https://github.com/weaveplatform/artifactweave/pull/1966), [`80650f3d`](https://github.com/weaveplatform/artifactweave/commit/80650f3d2e0f7d77211bdfa923ff0c2b404db296) | TestAccFederatedReceiverSQLite/Postgres; TestAccFederatedReceiverPullSQLite/Postgres |
+| FED-04 | [#1961](https://github.com/weaveplatform/artifactweave/pull/1961), [`e17a6f1b`](https://github.com/weaveplatform/artifactweave/commit/e17a6f1b13fb010a850588c269f8e96dd36b0571) | TestAccFederatedFullSyncSQLite/Postgres |
+| FED-05 | [#1972](https://github.com/weaveplatform/artifactweave/pull/1972), [`05eae447`](https://github.com/weaveplatform/artifactweave/commit/05eae4473cae77c3fe0d086f96ffb67a42126270) | TestAccFederatedMonitoringSQLite/Postgres |
+| FED-06 | [#1967](https://github.com/weaveplatform/artifactweave/pull/1967), [`5b59084f`](https://github.com/weaveplatform/artifactweave/commit/5b59084fd63a549a201048ede80643bf2e7d9723) | TestAccFailedFederatedBinariesSQLite/Postgres |
+| QUA-01 | [#1940](https://github.com/weaveplatform/artifactweave/pull/1940), [`de14ca11`](https://github.com/weaveplatform/artifactweave/commit/de14ca115d05288c8d90e863f8edb4b28e59656a) | TestAccPeersHarnessSQLite/Postgres; required acceptance-peers coverage artifact |
+| QUA-02 | [#1973](https://github.com/weaveplatform/artifactweave/pull/1973), [`1ff38529`](https://github.com/weaveplatform/artifactweave/commit/1ff385296bd341ca40e68d53f04d10db5d7cd10f) | make terraform TERRAFORM_MODE=apply; p13-provider-evidence.json |
+| FED-07 | **Pending [#1798](https://github.com/weaveplatform/artifactweave/issues/1798)** | Coordinated cleanup/download admission qualification belongs to that delivery; no phase acceptance before it merges and is rerun |
+| QUA-03 | **Replacement [#1937](https://github.com/weaveplatform/artifactweave/issues/1937), unmerged** | New process/client/API cases below, literal `make gate`, and actual merged-main full workflow |
+
+Additional prerequisites are consumed through main: #1968/#1971 validates every
+blob reference's declared size; #1969/#1970 isolates subprocess coverage;
+#1974/#1975 repairs fixture admission budgets without changing production defaults;
+#1976/#1977 requires actual 404s for absence. Their failure evidence remains
+historical evidence, not a replacement qualification pass.
+
+**Exit criteria, epic acceptance and user decisions**
+
+| Requirement | Executable evidence / disposition |
+|---|---|
+| Three instances, writes/deletes/properties from every origin, native resolutions everywhere (EPIC-FED) | `TestAccFederatedSyncSQLite/Postgres`, `TestAccPeerClientsSQLite/Postgres`; JF generic upload/download/property/delete, npm publish/pack, Maven deploy/cold resolve and Docker push/pull |
+| Partition beyond configured retention, truthful status, full-sync repair and continued delivery (EPIC-FED) | `TestAccFederatedFullSyncSQLite/Postgres`, `TestAccFederatedMonitoringSQLite/Postgres`; the live stream case inspects actual scheduler pruning and subsequent snapshot fallback |
+| Pairwise trust, `/r`, pairings and cancellation (EPIC-PEER) | `TestAccPeerProtocolSQLite/Postgres`, existing pairing and receiver suites |
+| Signed requests and required signed responses; live replay/skew/tampering/version refusals (EPIC-PEER) | `TestAccPeerProtocolSQLite/Postgres`; authenticated version refusals retain signatures, preauthentication refusals are unsigned |
+| Exactly-once ordered test-stream application through stopped receiver, partition, restart, pull and pruning/snapshot (EPIC-PEER) | `TestAccPeerStreamSQLite/Postgres`; exact applied histories and production scheduler progress, with existing `streamtest.Kind` and the shared production serving lifecycle |
+| Keys and sensitive protocol material (EPIC-PEER; user clarification) | Private keys never appear in responses, logs or evidence. Required `Signature`/`Signature-Input` headers and protocol-required pairing responses remain. Logs, public refusal bodies and exported evidence redact pairing secrets and signature material; protocol suite checks live responses and logs |
+| Receiving-only behavior and operation refusals (user decision; EPIC-FED) | Existing receiver/pull suites: incoming changes converge, local writes remain local, no outgoing replication, invalid full-sync/member operations refused |
+| Failed-binary list/replay/delete and receiver-safe behavior (EPIC-FED) | `TestAccFailedFederatedBinariesSQLite/Postgres` and receiver suites |
+| Cleanup protects recent, in-flight and newly admitted downloads (user decision; EPIC-FED) | **Pending #1798**: coordinated exclusion, execution revalidation and fail-closed deletion when required coordination is unavailable; a five-second observation window is insufficient |
+| Provider 12.11.14: 35 resources over 34 kinds (user decision; EPIC-QUA) | Existing provider scenario applies, refreshes to an empty plan, reads back and destroys with three members; retain its sanitized `p13-provider-evidence.json` |
+| Provider exclusions (user decision) | `docker_v1` is superseded; `releasebundles` belongs to P15; `terraformbackend` is refused and has no federated provider resource |
+| Six types without provider resources (user decision) | `TestAccFederatedAPIExitSQLite/Postgres`: `pub`, `nix`, `machinelearning`, `bazelmodules`, `luarocks`, `agentpackages`, repository API creation plus item/property/delete convergence from every origin |
+| Member validation, configSync and RTFS-only answers (EPIC-FED) | Existing members/monitoring suites and provider scenario; runtime contract remains ADR 0022 |
+| Required multi-instance lane contributes coverage (EPIC-QUA) | `acceptance-peers` runs all peer scenarios, requires pinned client prerequisites on Linux and uploads `cover-accept-peers`; child exits and coverage errors fail the lane |
+| Final workflow, local gate and unchanged 95/90 floors (EPIC-QUA) | **Pending** literal quiet-window `make gate` and no-input full workflow on actual merged main after #1798 and replacement delivery; record exact commit/run/job IDs, counts and expected skips |
+| Independent epic acceptance | EPIC-PEER #1921, EPIC-FED #1922 and EPIC-QUA #1923 remain open independently of child delivery; maintainer owns review, merge and closure |
+
+**Receiving phases.** P14 owns Access Federation and `pfed`/`grid` topology;
+P19/#216 owns live vendor comparison, with no early trial in P13; P37 owns
+cross-vendor federation/RTFS interoperability and cold-instance migration;
+P40 owns Mission Control/bridge/estate integration. These are receiving owners,
+not silently omitted P13 acceptance criteria.
+
+**Qualification provenance.** Replacement local and hosted results must identify
+the tested revision, exact command, pass/failure/skip counts and retained evidence.
+A PR-head pass is not merged-main phase acceptance. No final P13 gate or epic
+acceptance is claimed by this record while the prerequisites above remain pending.
+
 ## P14: Platform federation and topology
 
 Decision: [0025](../research/decisions/0025-platform-federation-and-topology.md).

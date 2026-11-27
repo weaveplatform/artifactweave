@@ -280,3 +280,13 @@ test analysis outcomes. A matching API envelope is not equivalent to scanning.
 - P41 checks the whole expanded inventory, including migrations for superseded
   interfaces. No capability may disappear through an unowned "later", a green schema
   parity run, a successful repository CRUD test or a product rename.
+
+### P13 qualification status
+
+The [P13 requirement-to-evidence record](plan.md#p13-qualification-record) maps
+all peer/federation tasks, exit criteria and accepted user decisions to their
+merged owners and executable proof. PR #1979 is rejected; its runs do not qualify
+the replacement. FED-07/#1798 and actual merged-main full qualification remain
+pending. Child delivery does not close EPIC-PEER, EPIC-FED or EPIC-QUA.
+P14 owns Access Federation/topology, P19 live vendor comparison, P37 cross-vendor
+synchronization/migration and P40 Mission Control/estate integration.

@@ -34,6 +34,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/internal/platform/cdn/cdntest"
 	"github.com/weaveplatform/artifactweave/pkg/containertest"
+	"github.com/weaveplatform/artifactweave/test/clienttest"
 )
 
 // testMasterKey is a fixed key so scenarios are reproducible; it protects
@@ -1121,30 +1122,11 @@ func (w *world) runJFIn(args, sub string) error {
 			"-Dmaven.repo.local.tail=" + repository,
 		}, argv[1:]...)...)
 	}
-	cmd := exec.Command(os.Getenv("ARTIFACTWEAVE_JF_BIN"), argv...)
-	// Relative file specs resolve against the scenario's files, so an
-	// upload of "org/*" keeps the tree's layout under the target.
-	cmd.Dir = w.dir
+	dir := w.dir
 	if sub != "" {
-		cmd.Dir = filepath.Join(w.dir, sub)
+		dir = filepath.Join(dir, sub)
 	}
-	cmd.Env = append(
-		os.Environ(),
-		"JFROG_CLI_HOME_DIR="+home,
-		"JFROG_CLI_DEPENDENCIES_DIR="+filepath.Join(home, "dependencies"),
-		// Unset, parallel runs on one machine share $TMPDIR/jfrog-<user>/builds.
-		"JFROG_CLI_TEMP_DIR="+filepath.Join(home, "tmp"),
-		"JFROG_CLI_REPORT_USAGE=false",
-		// The CLI's own update check calls GitHub; tests stay offline.
-		"JFROG_CLI_AVOID_NEW_VERSION_WARNING=true",
-		"CI=true",
-	)
-	if w.dockerConfig != "" {
-		// jf docker push and pull run the docker client, which reads the
-		// scenario's docker login from here.
-		cmd.Env = append(cmd.Env, "DOCKER_CONFIG="+w.dockerConfig)
-	}
-	cmd.Env = append(cmd.Env, w.jfEnv...)
+	cmd := clienttest.JF(w.t.Context(), dir, home, w.dockerConfig, w.jfEnv, argv)
 	w.markCommand()
 	out, err := cmd.CombinedOutput()
 	w.body = out

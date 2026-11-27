@@ -59,7 +59,7 @@
       ]
     },
     {
-      "path": "test/acceptance/steps_test.go",
+      "path": "test/clienttest/command.go",
       "contains": [
         "JFROG_CLI_HOME_DIR=",
         "JFROG_CLI_TEMP_DIR="

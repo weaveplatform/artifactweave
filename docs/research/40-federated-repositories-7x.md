@@ -509,6 +509,15 @@ exercises section 10 separately. The sanitized `p13-provider-evidence.json` reco
 35 resource outcomes and exclusions; it contains neither state nor member credentials.
 This is configuration qualification; content convergence remains the multi-instance exit.
 
+P13 qualification status (2026-11-27): the [requirement-to-evidence record](../implementation/plan.md#p13-qualification-record)
+keeps provider configuration proof separate from live content/client proof and
+actual merged-main phase acceptance. `TestAccFederatedAPIExitSQLite/Postgres`
+qualifies the six types above through repository creation and item/property/delete
+convergence. `TestAccPeerClientsSQLite/Postgres` qualifies representative native
+clients. These replacement cases do not inherit rejected PR #1979's results.
+Cleanup qualification requires #1798's coordinated exclusion, including active and
+new downloads; unavailable required coordination must prevent deletion.
+
 ## 10. An unpaired member in a Terraform run
 
 This answers the "Federated repository plans" question in [12](12-open-questions.md).

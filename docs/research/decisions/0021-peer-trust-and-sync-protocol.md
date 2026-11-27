@@ -33,6 +33,10 @@ Mission Control/bridge/estate integration. [0042](0042-capability-scope-and-supe
 replaces permanent scope cuts; [research 10](../10-scope-and-tiers.md) records current
 availability.
 
+Qualification status (2026-11-27): feature delivery is distinct from independent
+EPIC-PEER acceptance. PR #1979 is rejected. The [P13 qualification record](../../implementation/plan.md#p13-qualification-record)
+maps the replacement's live process tests and pending merged-main evidence.
+
 ## Context
 
 Federated repositories, Distribution to edges, Access Federation and the topology views
@@ -155,12 +159,18 @@ role from repository configuration or relax receiving authorization.
 
 **Transport.** Peer traffic is HTTPS on the normal listener under the
 `/artifactweave/peer/v1/` prefix, which is artifactweave's own API, specified in its own
-OpenAPI document and versioned independently of the JFrog surfaces. Every request and
-every response is signed with HTTP Message Signatures (RFC 9421) using the sender's
+OpenAPI document and versioned independently of the JFrog surfaces. Every peer request and every response to an authenticated request is signed with HTTP Message Signatures (RFC 9421) using the sender's
 Ed25519 key over the method, target path, `Content-Digest`, `Date` and a nonce. The
 receiver rejects unknown keys, a clock skew above five minutes and replayed nonces
 (cached for the skew window). TLS certificates are verified normally; peer signatures are
 an additional layer, not a substitute for TLS.
+
+The owner's P13 clarification retains required `Signature` and `Signature-Input`
+headers and protocol-required pairing responses. Private keys never appear in
+responses, logs or evidence. Pairing secrets and signature material are redacted
+from logs, public refusal bodies and exported evidence. Refusals before caller
+authentication remain unsigned. This does not remove authentication headers from
+successful peer responses or authenticated error responses.
 
 As implemented (PEER-03, `internal/federation/core/peer` and
 `internal/federation/adapters/peer`):

@@ -394,8 +394,22 @@ jobs:
       - name: Download Go modules
         uses: ./.github/actions/go-mod-download
 
+      - name: Prepare pinned Maven tools
+        uses: ./.github/actions/maven-tools
+
+      - name: Install pinned JFrog CLI
+        uses: ./.github/actions/jfrog-cli
+
+      - name: Build pinned peer client images
+        run: |
+          docker build -t artifactweave-peer-node -f test/acceptance/clients/node.Dockerfile test/acceptance/clients
+          docker build -t artifactweave-peer-maven -f test/acceptance/clients/maven.Dockerfile test/acceptance/clients
+
       - name: Multi-instance scenarios (race, shuffle, coverage)
         env:
+          ARTIFACTWEAVE_REQUIRE_DOCKER: '1'
+          ARTIFACTWEAVE_NODE_IMAGE: artifactweave-peer-node
+          ARTIFACTWEAVE_MAVEN_IMAGE: artifactweave-peer-maven
           ARTIFACTWEAVE_TEST_PROCESS_LOG_DIR: ${{ runner.temp }}/peer-logs
         run: |
           mkdir -p cover/accept-peers

@@ -22,6 +22,13 @@ P37 owns vendor federation/RTFS interoperability and migration contracts. [0042]
 replaces permanent scope cuts; [research 10](../10-scope-and-tiers.md) records current
 availability.
 
+Qualification status (2026-11-27): receiver, status and failed-binary feature
+owners are merged; independent EPIC-FED acceptance is pending. FED-07/#1798 must
+use coordinated exclusion covering in-flight and newly admitted downloads;
+unavailable required coordination prevents deletion. A recently observed timestamp
+alone does not authorize deletion. The [P13 qualification record](../../implementation/plan.md#p13-qualification-record)
+maps delivery, executable proof and remaining phase acceptance separately.
+
 ## Context
 
 [0003](0003-repository-model.md) originally accepted `rclass: federated` only as a

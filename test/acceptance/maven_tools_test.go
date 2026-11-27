@@ -1,16 +1,13 @@
 package acceptance
 
 import (
-	"encoding/json"
-	"errors"
-	"fmt"
-	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/weaveplatform/artifactweave/test/clienttest"
 )
 
 // mavenToolRepository gives each scenario a verified, private copy of only the
@@ -55,76 +52,10 @@ func (w *world) seedMavenExtractor() error {
 	return nil
 }
 
-func seedMavenTools(args ...string) error {
-	cache := os.Getenv("ARTIFACTWEAVE_MAVEN_TOOLS")
-	if cache == "" {
-		return errors.New("maven tools are not prepared: run test/acceptance/clients/maven-tools.py prepare and set ARTIFACTWEAVE_MAVEN_TOOLS")
-	}
-	argv := append([]string{
-		filepath.Join(repoRoot, "test", "acceptance", "clients", "maven-tools.py"),
-		"seed", "--cache", cache,
-	}, args...)
-	if out, err := exec.Command("python3", argv...).CombinedOutput(); err != nil {
-		return fmt.Errorf("seed Maven tools: %w: %s", err, out)
-	}
-	return nil
-}
-
-// mavenToolLock is the set of paths the committed manifest allows in a tool
-// repository; a read error yields nil, which every check then rejects.
-func mavenToolLock() []string {
-	data, err := os.ReadFile(filepath.Join(repoRoot, "test", "acceptance", "clients", "maven-tools.lock.json"))
-	if err != nil {
-		return nil
-	}
-	var lock struct {
-		Repository map[string]string `json:"repository"`
-	}
-	if json.Unmarshal(data, &lock) != nil {
-		return nil
-	}
-	names := make([]string, 0, len(lock.Repository))
-	for name := range lock.Repository {
-		names = append(names, name)
-	}
-	slices.Sort(names)
-	return names
-}
-
-// checkMavenToolRepository runs before every client invocation, including a
-// later cold head in the same scenario. The tail must hold exactly the
-// manifest's tools: a product file there would answer a resolution that the
-// scenario asserts came from the registry, and a deny list of namespaces
-// would miss a new fixture group.
+func seedMavenTools(args ...string) error { return clienttest.SeedMavenTools(repoRoot, args...) }
+func mavenToolLock() []string             { return clienttest.MavenToolLock(repoRoot) }
 func checkMavenToolRepository(repository string, allowed []string) error {
-	if len(allowed) == 0 {
-		return errors.New("maven tool manifest is unreadable or empty")
-	}
-	var found []string
-	err := filepath.WalkDir(repository, func(path string, entry fs.DirEntry, err error) error {
-		if err != nil || entry.IsDir() {
-			return err
-		}
-		name, err := filepath.Rel(repository, path)
-		if err != nil {
-			return err
-		}
-		found = append(found, filepath.ToSlash(name))
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("inspect Maven tool repository: %w", err)
-	}
-	slices.Sort(found)
-	for _, name := range found {
-		if _, ok := slices.BinarySearch(allowed, name); !ok {
-			return fmt.Errorf("maven tool repository holds %s, which is not a pinned tool", name)
-		}
-	}
-	if len(found) != len(allowed) {
-		return fmt.Errorf("maven tool repository holds %d of %d pinned tools", len(found), len(allowed))
-	}
-	return nil
+	return clienttest.CheckMavenToolRepository(repository, allowed)
 }
 
 func TestUnitMavenToolsRejectAnythingButPinnedTools(t *testing.T) {
@@ -192,18 +123,7 @@ func TestUnitMavenToolsRequirePreparation(t *testing.T) {
 }
 
 func (w *world) mavenClientArgs(args string) []string {
-	argv := w.clientArgs(strings.ReplaceAll(args, "{m2}", "/m2"))
-	for i, arg := range argv {
-		if arg == "-Dmaven.repo.local=/m2" {
-			// deploy writes remote metadata even without install. Keep that
-			// product state in a head, never in the read-only tool supply.
-			argv[i] = "-Dmaven.repo.local=/work/maven-publisher"
-		}
-	}
-	return append([]string{
-		"-B", "--no-transfer-progress", "--global-settings", "/work/maven-tools-settings.xml",
-		"-Dmaven.repo.local=/work/maven-publisher", "-Dmaven.repo.local.tail=/m2",
-	}, argv...)
+	return clienttest.MavenArgs(w.clientArgs(strings.ReplaceAll(args, "{m2}", "/m2")))
 }
 
 func TestUnitMavenProductHeadsStaySeparateFromTools(t *testing.T) {

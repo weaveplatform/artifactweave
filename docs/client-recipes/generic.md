@@ -58,7 +58,7 @@ These are the pinned client definitions and executable evidence from which this 
 - Client pin: [.github/actions/jfrog-cli/action.yml](../../.github/actions/jfrog-cli/action.yml).
 - Evidence: [test/acceptance/features/round_trip.feature](../../test/acceptance/features/round_trip.feature).
 - Evidence: [test/acceptance/features/tokens.feature](../../test/acceptance/features/tokens.feature).
-- Evidence: [test/acceptance/steps_test.go](../../test/acceptance/steps_test.go).
+- Evidence: [test/clienttest/command.go](../../test/clienttest/command.go).
 - Evidence: [test/acceptance/features/proxy_redirects.feature](../../test/acceptance/features/proxy_redirects.feature).
 - Evidence: [test/acceptance/proxy_redirect_steps_test.go](../../test/acceptance/proxy_redirect_steps_test.go).
 - Evidence: [test/acceptance/features/ntlm_proxy.feature](../../test/acceptance/features/ntlm_proxy.feature).
