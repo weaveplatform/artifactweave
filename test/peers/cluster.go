@@ -57,6 +57,9 @@ const (
 	// the production Argon2id hash of the seeded administrator and the
 	// production RSA signing key, on three instances at once.
 	readyTimeout = 3 * time.Minute
+	// sqliteAdmissionTimeout covers race/coverage-slowed writer contention
+	// in these multi-process fixtures; app admission tests retain the runtime default.
+	sqliteAdmissionTimeout = 5 * time.Second
 	// stopTimeout is longer than app.Run's two ten-second drains, so an
 	// instance that shuts down as serve does is never killed.
 	stopTimeout = 30 * time.Second
@@ -609,6 +612,7 @@ type instanceConfig struct {
 	Log        map[string]string `yaml:"log"`
 	Remote     map[string]any    `yaml:"remote"`
 	Federation map[string]string `yaml:"federation,omitempty"`
+	API        map[string]string `yaml:"api,omitempty"`
 }
 
 func (in *Instance) start(origins []string) error {
@@ -630,8 +634,11 @@ func (in *Instance) startOnce(origins []string) error {
 	}
 	in.addr = addr
 	database := map[string]string{"driver": string(SQLite)}
+	var api map[string]string
 	if in.dsn != "" {
 		database = map[string]string{"driver": string(Postgres), "dsn": in.dsn}
+	} else {
+		api = map[string]string{"budget_timeout": sqliteAdmissionTimeout.String()}
 	}
 	federation := map[string]string{}
 	if in.probe > 0 {
@@ -648,6 +655,7 @@ func (in *Instance) startOnce(origins []string) error {
 		Log:        map[string]string{"level": "debug", "format": "text"},
 		Remote:     map[string]any{"allowed_private_origins": origins},
 		Federation: federation,
+		API:        api,
 	})
 	if err != nil {
 		return err
