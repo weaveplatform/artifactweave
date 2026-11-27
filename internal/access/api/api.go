@@ -10,6 +10,7 @@ type API struct {
 	Authenticator   Authenticator
 	Authorizer      Authorizer
 	Tokens          Tokens
+	NativeLogin     NativeLogin
 	Keys            Keys
 	Identity        Identity
 	Restrictions    Restrictions

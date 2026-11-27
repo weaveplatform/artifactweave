@@ -130,3 +130,7 @@ virtual:
 federation:
   outbox_retention: 72h
   peer_probe_interval: 90s
+
+native_login:
+  enabled: true
+  origin: https://login.example.com

@@ -84,6 +84,7 @@ func buildModules(cfg config.Config, d moduleDeps) (modules, error) {
 	}
 	acc, err := access.New(access.Deps{
 		Store: d.store, Authenticator: d.auth, Tokens: d.tokens,
+		NativeRepository:    nativeRepository(d.store),
 		ProjectRepositories: repos.NewProjectRepositoryReader(d.store),
 		Settings:            cfg.Access(),
 		Log:                 d.logging.Logger("artifactweave.access"),

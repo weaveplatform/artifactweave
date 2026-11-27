@@ -17,6 +17,8 @@ import (
 // environments.global_limit.
 func (c Config) Access() accessapi.Settings {
 	return accessapi.Settings{
+		NativeLoginEnabled: c.NativeLogin.Enabled, NativeLoginOrigin: c.NativeLogin.Origin,
+		NativeLoginTokenExpiry: c.NPM.LoginTokenExpiry,
 		AllowBasicAuthTokens:   c.Token.AllowBasicAuth,
 		GlobalEnvironmentLimit: c.Environments.GlobalLimit,
 	}

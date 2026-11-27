@@ -169,6 +169,7 @@ func Protocols(d Deps) []pkgroute.Protocol {
 			pypihttp.Options{Format: d.FormatSettings.PyPI, RemoteSources: d.RemoteSources},
 		),
 		terraformhttp.Protocol(terraformhttp.Options{
+			LoginOrigin:     nativeLoginOrigin(d.Access.Settings),
 			Authenticator:   d.Access.Authenticator,
 			Authorizer:      d.Access.Authorizer,
 			KeyPairs:        d.Access.Keys,
@@ -220,4 +221,11 @@ func npmAccounts(d Deps) npmhttp.Accounts {
 		Tokens:      d.Access.Tokens,
 		TokenExpiry: d.NPMLoginTokenExpiry,
 	}
+}
+
+func nativeLoginOrigin(s accessapi.Settings) string {
+	if s.NativeLoginEnabled {
+		return s.NativeLoginOrigin
+	}
+	return ""
 }

@@ -163,6 +163,7 @@ func TestUnitFileCoversEveryKey(t *testing.T) {
 			NPMLogin:       NPMLogin{LoginTokenExpiry: 48 * time.Hour},
 			NPMTag:         NPMTag{TagLatestByPublish: true},
 		},
+		NativeLogin:  NativeLogin{Enabled: true, Origin: "https://login.example.com"},
 		Token:        Token{AllowBasicAuth: true},
 		Deploy:       Deploy{EnforceIdenticalChecksumDeploy: true},
 		Environments: Environments{GlobalLimit: 30},

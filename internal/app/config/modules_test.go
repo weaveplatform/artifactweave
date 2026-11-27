@@ -44,7 +44,7 @@ func TestUnitModuleSettingsFromConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 	if diff := cmp.Diff(
-		accessapi.Settings{AllowBasicAuthTokens: true, GlobalEnvironmentLimit: 30},
+		accessapi.Settings{AllowBasicAuthTokens: true, GlobalEnvironmentLimit: 30, NativeLoginTokenExpiry: 48 * time.Hour, NativeLoginEnabled: true, NativeLoginOrigin: "https://login.example.com"},
 		cfg.Access(),
 	); diff != "" {
 		t.Errorf("Access (-want +got):\n%s", diff)

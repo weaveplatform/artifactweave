@@ -117,8 +117,8 @@ func TestUnitNew(t *testing.T) {
 		t.Fatal(err)
 	}
 	api := m.API()
-	if unset := contracts(api); !reflect.DeepEqual(unset, []string{"Authenticator", "Tokens"}) {
-		t.Errorf("without services, nil contracts = %v; want [Authenticator Tokens]", unset)
+	if unset := contracts(api); !reflect.DeepEqual(unset, []string{"Authenticator", "Tokens", "NativeLogin"}) {
+		t.Errorf("without services, nil contracts = %v; want [Authenticator Tokens NativeLogin]", unset)
 	}
 	if api.Authenticator != nil || api.Tokens != nil {
 		t.Error("an absent service is a non-nil interface")

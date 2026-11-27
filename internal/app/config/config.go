@@ -103,6 +103,7 @@ type Config struct {
 	Work              Work             `yaml:"work"`
 	Build             Build            `yaml:"build"`
 	NPM               NPM              `yaml:"npm"`
+	NativeLogin       NativeLogin      `yaml:"native_login"`
 	Token             Token            `yaml:"token"`
 	Deploy            Deploy           `yaml:"deploy"`
 	Environments      Environments     `yaml:"environments"`
@@ -473,6 +474,8 @@ func loadFile(cfg *Config, path string) error {
 
 // keys lists every settable dotted key. Order matters only for determinism.
 var keys = append(append([]string{
+	"native_login.enabled",
+	"native_login.origin",
 	"listen",
 	"base_url",
 	"data_dir",
@@ -571,6 +574,8 @@ func set(cfg *Config, key, value string) error {
 	switch key {
 	case "listen":
 		cfg.Listen = value
+	case "native_login.origin":
+		cfg.NativeLogin.Origin = value
 	case "base_url":
 		cfg.BaseURL = value
 	case "data_dir":
@@ -625,6 +630,7 @@ func set(cfg *Config, key, value string) error {
 // of set's switch, where every case adds to a complexity gocyclo caps.
 func boolKeys(cfg *Config) map[string]*bool {
 	return map[string]*bool{
+		"native_login.enabled":                                         &cfg.NativeLogin.Enabled,
 		"cran.archive_mover_enabled":                                   &cfg.Cran.ArchiveMoverEnabled,
 		"docker.subdomain_match":                                       &cfg.Docker.SubdomainMatch,
 		"search.limit_anonymous_users_only":                            &cfg.Search.LimitAnonymousUsersOnly,
@@ -854,6 +860,7 @@ func (c Config) Validate() error {
 		errs = append(errs, fmt.Errorf("%w: npm.login_token_expiry %s must be more than zero",
 			ErrInvalidValue, c.NPM.LoginTokenExpiry))
 	}
+	errs = append(errs, c.NativeLogin.validate()...)
 	return errors.Join(errs...)
 }
 

@@ -19,6 +19,7 @@ import (
 	"github.com/weaveplatform/artifactweave/api"
 	accessmodule "github.com/weaveplatform/artifactweave/internal/access"
 	accesshttp "github.com/weaveplatform/artifactweave/internal/access/adapters/http"
+	nativeloginhttp "github.com/weaveplatform/artifactweave/internal/access/adapters/http/login"
 	accessldap "github.com/weaveplatform/artifactweave/internal/access/adapters/ldap"
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
@@ -143,6 +144,9 @@ var _ RouterStore = (*appsql.Store)(nil)
 // Artifactory 7.x's default. The caller owns every store and service here
 // and closes them only after the handler has drained.
 type RouterConfig struct {
+	// NativeLoginEnabled and NativeLoginOrigin configure optional browser approval.
+	NativeLoginEnabled bool
+	NativeLoginOrigin  string
 	// RequestLimits owns shared request rates and this process's concurrency
 	// permits. Nil disables limits for embedders; the application wires them.
 	RequestLimits *apilimit.Service
@@ -369,8 +373,11 @@ func withAccess(cfg RouterConfig) RouterConfig {
 	// there is no error for New's callers to see.
 	if m, err := accessmodule.New(accessmodule.Deps{
 		Store: cfg.Store, Authenticator: cfg.Auth, Tokens: cfg.Tokens,
+		NativeRepository:    nativeRepository(cfg.Store),
 		ProjectRepositories: repos.NewProjectRepositoryReader(cfg.Store),
 		Settings: accessapi.Settings{
+			NativeLoginEnabled: cfg.NativeLoginEnabled, NativeLoginOrigin: cfg.NativeLoginOrigin,
+			NativeLoginTokenExpiry: cfg.NPMLoginTokenExpiry,
 			AllowBasicAuthTokens:   cfg.AllowBasicAuthTokens,
 			GlobalEnvironmentLimit: cfg.GlobalEnvironmentLimit,
 		},
@@ -388,7 +395,7 @@ func withAccess(cfg RouterConfig) RouterConfig {
 // contract added to the API must be added here too; TestUnitWithAccess fails
 // until it is.
 func accessUnset(a accessapi.API) bool {
-	return a.Authenticator == nil && a.Authorizer == nil && a.Tokens == nil &&
+	return a.Authenticator == nil && a.Authorizer == nil && a.Tokens == nil && a.NativeLogin == nil &&
 		a.Keys == nil && a.Identity == nil && a.Restrictions == nil &&
 		a.Projects == nil && a.Grants == nil && a.AnonymousAccess == nil && a.LDAP == nil &&
 		a.LDAPGroups == nil &&
@@ -810,6 +817,10 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	if cfg.RequestLimits != nil {
 		r.Use(limiter.limitIngress(limits))
 	}
+	nativeLogin := nativeloginhttp.Handler{}
+	if cfg.Access.Settings.NativeLoginEnabled {
+		nativeLogin = nativeloginhttp.Handler{Service: cfg.Access.NativeLogin, Origin: cfg.Access.Settings.NativeLoginOrigin}
+	}
 	mounted := append(artifactshttp.Protocols(artifactsDeps(cfg)), cfg.Protocols...)
 	if cfg.Auth != nil {
 		r.Use(
@@ -819,7 +830,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			// challenged whether anonymous access is on or off.
 			kit.ForceAuthentication,
 			accesshttp.Authenticate(
-				newAuthnOptions(cfg.Auth, cfg.Store, cfg.Access.Authorizer, skipsAuthentication(mounted)),
+				newAuthnOptions(cfg.Auth, cfg.Store, cfg.Access.Authorizer, skipsAuthentication(mounted), nativeLogin.Public),
 			),
 		)
 	}
@@ -839,6 +850,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	r.NotFound(notFound)
 	r.MethodNotAllowed(methodNotAllowed)
 
+	nativeLogin.Mount(r)
 	// Hand-written routes go first so they win over anything a generated mux
 	// might later claim for the same prefix.
 	r.Get("/artifactory/api/system/ping", sysAPI.ArtifactoryPing())

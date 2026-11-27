@@ -51,6 +51,7 @@ var aqlCapture = os.Getenv("ARTIFACTWEAVE_AQL_CAPTURE")
 
 // world is one scenario's state.
 type world struct {
+	nativeLogin       *nativeLoginFixture
 	replicationPeer   *world
 	quotaMail         *quotaMailReceiver
 	quotaMailID       string
@@ -195,6 +196,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	w.registerSingleReplication(sc)
 	w.registerDocker(sc)
 	w.registerClients(sc)
+	w.registerNativeLogin(sc)
 	w.registerDebian(sc)
 	w.registerLuaRocks(sc)
 	w.registerBower(sc)
@@ -345,10 +347,16 @@ func (w *world) start() error {
 	w.dataDir = dataDir
 	w.url = "http://127.0.0.1:" + strconv.Itoa(port)
 	publicURL := w.url
+	if w.nativeLogin != nil {
+		publicURL = w.nativeLogin.front.URL
+	}
 	if host := os.Getenv("ARTIFACTWEAVE_ACCEPT_DOCKER_HOST"); host != "" {
 		publicURL = "http://" + host + ":" + strconv.Itoa(port)
 	} else if runtime.GOOS == "darwin" && (os.Getenv("ARTIFACTWEAVE_CHEF_DESKTOP") == "1" || os.Getenv("ARTIFACTWEAVE_FROGML_DESKTOP") == "1" || os.Getenv("ARTIFACTWEAVE_ANSIBLE_DESKTOP") == "1" || os.Getenv("ARTIFACTWEAVE_CARGO_DESKTOP") == "1" || os.Getenv("ARTIFACTWEAVE_VSCODE_DESKTOP") == "1" || os.Getenv("ARTIFACTWEAVE_GITLFS_DESKTOP") == "1" || os.Getenv("ARTIFACTWEAVE_VAGRANT_DESKTOP") == "1") {
 		publicURL = strings.Replace(publicURL, "127.0.0.1", "host.docker.internal", 1)
+	}
+	if w.nativeLogin != nil {
+		publicURL = w.nativeLogin.front.URL
 	}
 	w.server = exec.Command(
 		binary,
@@ -374,6 +382,9 @@ func (w *world) start() error {
 		"ARTIFACTWEAVE_TOKEN_ALLOW_BASIC_AUTH=true",
 	)
 	w.server.Env = append(w.server.Env, w.env...)
+	if w.nativeLogin != nil {
+		w.server.Env = append(w.server.Env, fmt.Sprintf("ARTIFACTWEAVE_NATIVE_LOGIN_ENABLED=%t", w.nativeLogin.enabled), "ARTIFACTWEAVE_NATIVE_LOGIN_ORIGIN="+w.nativeLogin.front.URL)
+	}
 	if coverDir != "" {
 		w.server.Env = append(w.server.Env, "GOCOVERDIR="+coverDir)
 	}
