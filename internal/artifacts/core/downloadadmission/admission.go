@@ -38,17 +38,18 @@ func Begin(ctx context.Context, store any, configuration repo.Config, item model
 			slog.ErrorContext(bounded, "complete hosted download admission", "error", err)
 		}
 	}
-	// Resolve and admission are separate short operations. An overwrite retains
-	// the item ID, so refuse a snapshot whose bytes changed before membership was
-	// captured; otherwise an old blob could be served under a new version's pin.
+	// The caller may already have opened and checked an immutable snapshot.
+	// A same-ID overwrite must not reopen it or substitute different bytes.
+	// Preparation drains every admission in the repository, independently of
+	// current version links, so that selected snapshot remains protected.
+	// Recheck identity and item kind without replacing the caller's snapshot.
 	reader, ok := store.(interface{ Items() port.ItemStore })
 	if !ok {
 		done()
 		return nil, kernel.ErrStore
 	}
 	current, err := reader.Items().GetByID(ctx, item.ID)
-	if err != nil || current.RepoKey != item.RepoKey || current.Cached != item.Cached || current.Folder != item.Folder || current.Actual != item.Actual ||
-		current.Size != item.Size {
+	if err != nil || current.RepoKey != item.RepoKey || current.Cached != item.Cached || current.Folder != item.Folder {
 		done()
 		if err != nil {
 			return nil, fmt.Errorf("recheck admitted item: %w", err)

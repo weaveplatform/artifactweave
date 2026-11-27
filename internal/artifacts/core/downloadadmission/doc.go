@@ -15,7 +15,7 @@
 //
 // # Outputs
 //
-// A completion function after durable admission and item-snapshot revalidation,
+// A completion function after durable admission and item-identity revalidation,
 // or a refusal before response bytes. Remote cached and folder responses need
 // no hosted-file admission here. Public counters and statistics opt-outs keep
 // their separate owner and meaning.
@@ -26,7 +26,9 @@
 // migration and a stale local snapshot cannot evade a current barrier.
 // Completion runs independently of request cancellation. Failed or missing
 // completion leaves an ambiguous durable admission; no timer expires it.
-// The caller owns response I/O and invokes completion only after it ends.
+// The caller owns its checked immutable snapshot and response I/O, and invokes
+// completion only after it ends. A same-ID overwrite does not reopen that blob;
+// preparation drains all repository admissions regardless of version links.
 //
 // # References
 //

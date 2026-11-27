@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
@@ -14,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/pkgindex"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/terraform/terraformtest"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 	"github.com/weaveplatform/artifactweave/internal/platform/testkit/storekit"
 )
@@ -134,6 +136,85 @@ func TestUnitHostedAdmissionBeforeResponse(t *testing.T) {
 			}
 			if stats.DownloadCount != wantCount {
 				t.Fatalf("private admission changed public counts: %d, want %d", stats.DownloadCount, wantCount)
+			}
+		})
+	}
+}
+
+// A checked public-export snapshot is not reopened after a same-ID overwrite.
+// Its durable admission still excludes cleanup of another indexed version,
+// including when the original local repository migrates before admission.
+func TestUnitHostedSelectedSnapshotExclusion(t *testing.T) {
+	key, err := terraformtest.NewKey()
+	storekit.Must(t, err)
+	for _, test := range []struct {
+		name                  string
+		migrate, barrierFirst bool
+	}{
+		{name: "federated_admission_wins"},
+		{name: "migrated_admission_wins", migrate: true},
+		{name: "federated_barrier_wins", barrierFirst: true},
+		{name: "migrated_barrier_wins", migrate: true, barrierFirst: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			w := kittest.New(t, inmem.New())
+			ctx := t.Context()
+			configuration := *repo.Defaults(&repo.Config{Key: "rpm-snapshot", Class: repo.Federated, PackageType: repo.RPM})
+			if test.migrate {
+				configuration.Class = repo.Local
+			}
+			storekit.Must(t, w.Store.Repos().Create(ctx, configuration))
+			original := w.Put(t, configuration, false, "repodata/repomd.xml.key", []byte(key.Public))
+			payload := w.Put(t, configuration, false, "package.rpm", []byte("indexed fixture"))
+			pkg := storekit.Get[model.Package](t)(w.Store.Packages().Ensure(ctx, model.Package{RepoKey: configuration.Key, Type: repo.RPM, Name: "package"}))
+			version := storekit.Get[model.PackageVersion](t)(w.Store.Packages().PutVersion(ctx, model.PackageVersion{PackageID: pkg.ID, Version: "1"}))
+			storekit.Must(t, w.Store.Packages().LinkFile(ctx, model.VersionFile{VersionID: version.ID, ItemID: payload.ID}))
+			exclusions := w.Store.CleanupExclusions()
+			var ref api.CleanupExclusion
+			blobs := &publicExportBlobs{Store: w.Blobs}
+			blobs.afterOpen = func() {
+				w.Put(t, configuration, false, "repodata/repomd.xml.key", []byte(key.Private))
+				current := configuration
+				if test.migrate {
+					current.Class = repo.Federated
+					storekit.Must(t, w.Store.Repos().Update(ctx, current))
+				}
+				repository := storekit.Get[api.CleanupRepository](t)(pkgindex.NewCleanupMetadata(w.Store).Repository(ctx, current.Key))
+				ref = api.CleanupExclusion{
+					ID: "selected-snapshot", Owner: "coordinator", Repository: current.Key,
+					Incarnation: repository.Incarnation, Generation: repository.Generation,
+					Versions: []api.CleanupVersionIdentity{{DownloadVersion: api.DownloadVersion{Package: pkg.Name, Version: version.Version}, ID: version.ID}},
+				}
+				if test.barrierFirst {
+					storekit.Must(t, exclusions.Prepare(ctx, ref))
+				}
+			}
+			var duringResponse error
+			response := &admissionWriter{ResponseRecorder: httptest.NewRecorder(), before: func() {
+				if !test.barrierFirst {
+					duringResponse = exclusions.Prepare(ctx, ref)
+				}
+			}}
+			w.Kit(itemkit.Deps{Blobs: blobs}).GetItem(response, kittest.Request(t, http.MethodGet, "/artifactory/"+configuration.Key+"/repodata/repomd.xml.key"))
+			want := http.StatusOK
+			if test.barrierFirst {
+				want = http.StatusServiceUnavailable
+			}
+			if response.Code != want {
+				t.Fatalf("selected snapshot status%d want%d (bytes withheld)", response.Code, want)
+			}
+			if blobs.opens != 1 || blobs.closes != 1 || strings.Contains(response.Body.String(), "PRIVATE KEY") {
+				t.Fatal("selected snapshot was reopened, leaked private material or lost its reader")
+			}
+			if !test.barrierFirst {
+				if response.Body.String() != key.Public || !errors.Is(duringResponse, api.ErrCleanupExcluded) {
+					t.Fatal("selected public snapshot did not retain its repository-wide admission")
+				}
+				storekit.Must(t, exclusions.Prepare(ctx, ref))
+			}
+			current := storekit.Get[model.Item](t)(w.Store.Items().GetByID(ctx, original.ID))
+			if current.Actual.SHA256 == original.Actual.SHA256 {
+				t.Fatal("replacement control did not change the stored bytes")
 			}
 		})
 	}
