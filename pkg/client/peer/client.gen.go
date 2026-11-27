@@ -91,6 +91,7 @@ type BlobReference struct {
 
 // CleanupCoordinationOutcome defines model for CleanupCoordinationOutcome.
 type CleanupCoordinationOutcome struct {
+	// Exclusion Required within this object. Exact echoed participant binding.
 	Exclusion CleanupExclusion `json:"exclusion"`
 
 	// State Required within this object. Durable coordinator state, or acknowledged participant preparation.
@@ -106,8 +107,10 @@ type CleanupCoordinationOutcomeState string
 // CleanupCoordinationRequest defines model for CleanupCoordinationRequest.
 type CleanupCoordinationRequest struct {
 	// Action Required within this object. Prepare closes admissions, outcome reads irreversible state, release verifies the outcome and applied frontier.
-	Action    CleanupCoordinationRequestAction `json:"action"`
-	Exclusion CleanupExclusion                 `json:"exclusion"`
+	Action CleanupCoordinationRequestAction `json:"action"`
+
+	// Exclusion Required within this object. Exact durable participant binding.
+	Exclusion CleanupExclusion `json:"exclusion"`
 
 	// PackageType Required within this object. Expected repository package type.
 	PackageType string `json:"packageType"`

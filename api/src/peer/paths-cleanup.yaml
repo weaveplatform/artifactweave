@@ -197,7 +197,8 @@ components:
           maxLength: 64
         exclusion:
           description: Required within this object. Exact durable participant binding.
-          $ref: '#/components/schemas/CleanupExclusion'
+          allOf:
+            - $ref: '#/components/schemas/CleanupExclusion'
     CleanupCoordinationOutcome:
       type: object
       required: [state, watermark, exclusion]
@@ -213,7 +214,8 @@ components:
           minimum: 0
         exclusion:
           description: Required within this object. Exact echoed participant binding.
-          $ref: '#/components/schemas/CleanupExclusion'
+          allOf:
+            - $ref: '#/components/schemas/CleanupExclusion'
 paths:
   /repositories/{repoKey}/downloads:
     post:
