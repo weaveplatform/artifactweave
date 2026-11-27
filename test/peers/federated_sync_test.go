@@ -66,7 +66,7 @@ func federate(t *testing.T, all []*peers.Instance, key, packageType string) {
 }
 
 // eventually polls cond on in until it holds, within syncWait.
-func eventually(t *testing.T, in *peers.Instance, what string, cond func() (bool, string)) {
+func eventually(t testing.TB, in *peers.Instance, what string, cond func() (bool, string)) {
 	t.Helper()
 	deadline := time.Now().Add(syncWait)
 	for {
@@ -81,17 +81,25 @@ func eventually(t *testing.T, in *peers.Instance, what string, cond func() (bool
 	}
 }
 
-// file reads in's file at repository path p: its content, or ok false
-// while there is none.
-func file(t *testing.T, in *peers.Instance, p string) (string, bool) {
+// file reads in's file at repository path p. Only a 404 proves absence;
+// authorization, admission and other HTTP errors fail the scenario.
+func file(t testing.TB, in *peers.Instance, p string) (string, bool) {
 	t.Helper()
 	status, body := in.Do(t, http.MethodGet, "/artifactory/"+p, "")
-	return body, status == http.StatusOK
+	switch status {
+	case http.StatusOK:
+		return body, true
+	case http.StatusNotFound:
+		return body, false
+	default:
+		t.Fatalf("GET /artifactory/%s on %s: %d %s, want 200 or 404", p, in.Name, status, body)
+		return "", false
+	}
 }
 
 // awaitFile waits until every instance in ins serves p with want, or
 // serves nothing at p when want is empty.
-func awaitFile(t *testing.T, ins []*peers.Instance, p, want string) {
+func awaitFile(t testing.TB, ins []*peers.Instance, p, want string) {
 	t.Helper()
 	for _, in := range ins {
 		eventually(t, in, p+" as "+want, func() (bool, string) {
@@ -105,7 +113,7 @@ func awaitFile(t *testing.T, ins []*peers.Instance, p, want string) {
 }
 
 // absent checks that no instance of ins received p within quiet.
-func absent(t *testing.T, ins []*peers.Instance, p string) {
+func absent(t testing.TB, ins []*peers.Instance, p string) {
 	t.Helper()
 	time.Sleep(quiet)
 	for _, in := range ins {

@@ -46,6 +46,10 @@
 //     (failed_binaries_test.go): source outage, replay, SHA-1 deletion,
 //     superseded content and full-sync repair after task cancellation; the other P13
 //     tickets add theirs.
+//   - Shared file assertions (file_assertions_test.go): only HTTP 404 proves
+//     absence; authorization, server and transport failures fail the scenario.
+//     A real SQLite instance holds generic and Maven files while controlled
+//     responses exercise file, awaitFile and absent, including 200/404 controls.
 //
 // # References
 //
