@@ -3,6 +3,7 @@ package inmem
 import (
 	"cmp"
 	"context"
+	"crypto/rand"
 	"fmt"
 	"slices"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/federation/core/model"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/port"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/instance"
 	"github.com/weaveplatform/artifactweave/internal/platform/tx/memtx"
 )
 
@@ -62,6 +64,7 @@ func (p peerStore) Put(ctx context.Context, peer model.Peer) error {
 		}
 		peer.ClockSkew = peer.ClockSkew.Truncate(time.Millisecond)
 		p.t().Put(peer.InstanceID, peer)
+		p.revisions().Put(peer.InstanceID, port.PeerRevision{Grant: rand.Text(), Failure: "initial"})
 		return nil
 	})
 }
@@ -91,6 +94,7 @@ func (p peerStore) List(ctx context.Context, f port.PeerFilter) ([]model.Peer, e
 
 func (p peerStore) Delete(ctx context.Context, instanceID string) error {
 	return p.s.Do(ctx, func() error {
+		p.revisions().Del(instanceID)
 		if !p.t().Del(instanceID) {
 			return memtx.NotFound("peer", instanceID)
 		}
@@ -104,6 +108,11 @@ func (p peerStore) SetProtocolVersion(ctx context.Context, instanceID string, ma
 		if !ok {
 			return memtx.NotFound("peer", instanceID)
 		}
+		if major != instance.ProtocolVersion {
+			revision, _ := p.revisions().Get(instanceID)
+			revision.Failure = rand.Text()
+			p.revisions().Put(instanceID, revision)
+		}
 		peer.ProtocolVersion = major
 		p.t().Put(instanceID, peer)
 		return nil
@@ -115,6 +124,11 @@ func (p peerStore) SetLiveness(ctx context.Context, instanceID string, l model.L
 		peer, ok := p.t().Get(instanceID)
 		if !ok {
 			return memtx.NotFound("peer", instanceID)
+		}
+		if l.Status != model.PeerOnline {
+			revision, _ := p.revisions().Get(instanceID)
+			revision.Failure = rand.Text()
+			p.revisions().Put(instanceID, revision)
 		}
 		// The SQL store keeps the skew in whole milliseconds.
 		peer.Status, peer.LastSeen, peer.ClockSkew = l.Status, l.LastSeen, l.ClockSkew.Truncate(time.Millisecond)

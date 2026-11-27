@@ -9,6 +9,7 @@ import (
 	"time"
 
 	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
+	federationapi "github.com/weaveplatform/artifactweave/internal/federation/api"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/schedule"
 	"github.com/weaveplatform/artifactweave/internal/platform/work"
@@ -39,8 +40,10 @@ type RepositoryReader interface {
 // and authority inside Store's transaction, before policy/schedule locks.
 // Guard acquires that same guard for a worker's revision admission. Neither
 // callback performs network I/O; run admission through WithPolicy also remains
-// inside the transaction. Selection is metadata-only; CLN-04 owns execution.
+// inside the transaction. Selection reads metadata in short transactions and
+// collects federated peer evidence outside them; CLN-04 owns execution.
 type Service struct {
+	Federation         federationapi.Cleanup
 	Store              port.Store
 	Schedules          schedule.Store
 	Repositories       RepositoryReader

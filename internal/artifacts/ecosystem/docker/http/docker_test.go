@@ -18,7 +18,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
-	"github.com/weaveplatform/artifactweave/internal/artifacts/core/registry"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/baseurl"
@@ -880,7 +879,7 @@ func (f faultyRepos) List(ctx context.Context, filter port.RepoFilter) ([]repo.C
 }
 
 type faultyStore struct {
-	registry.Store
+	Store
 	repos faultyRepos
 }
 

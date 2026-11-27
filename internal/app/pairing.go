@@ -42,6 +42,7 @@ func (rt *Runtime) openFederation(ctx context.Context, st PeerClientStore, queue
 		log = rt.Logging.Logger("artifactweave.federation")
 	}
 	rt.Federation.OpenConfigSync(peeradapter.ConfigRemote{Factory: f}, log)
+	rt.Federation.OpenCleanup(peeradapter.CleanupRemote{Factory: f})
 	rt.Federation.OpenLiveness(peeradapter.StatusRemote{Factory: f}, o.probeInterval)
 	if _, err := rt.Federation.OpenStreams(federation.StreamOptions{
 		Blobs: o.blobs, Remote: peeradapter.StreamRemote{Factory: f}, Queue: queue, Retention: o.retention,

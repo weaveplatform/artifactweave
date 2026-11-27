@@ -34,6 +34,14 @@ func (UnimplementedStrict) PutRepositoryConfiguration(context.Context, PutReposi
 	return nil, apierror.ErrNotImplemented
 }
 
+func (UnimplementedStrict) CoordinateRepositoryCleanup(context.Context, CoordinateRepositoryCleanupRequestObject) (CoordinateRepositoryCleanupResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) ObserveRepositoryDownloads(context.Context, ObserveRepositoryDownloadsRequestObject) (ObserveRepositoryDownloadsResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
 func (UnimplementedStrict) GetPeerStatus(context.Context, GetPeerStatusRequestObject) (GetPeerStatusResponseObject, error) {
 	return nil, apierror.ErrNotImplemented
 }

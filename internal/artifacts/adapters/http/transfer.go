@@ -16,6 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/downloadadmission"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
@@ -430,6 +431,14 @@ func (s ArtifactoryAPI) downloadFolderArchive(w http.ResponseWriter, r *http.Req
 		middleware.HeadLengthUnknown(w)
 		w.WriteHeader(http.StatusOK)
 		return
+	}
+	for _, file := range files {
+		done, err := downloadadmission.Begin(ctx, st, c, file)
+		if err != nil {
+			httpkit.WriteErr(w, r, s.ItemError(ctx, "admit folder download", err))
+			return
+		}
+		defer done()
 	}
 	w.WriteHeader(http.StatusOK)
 	if err := s.Items(st).ArchiveFiles(ctx, files, p, kind, sums, w); err != nil {

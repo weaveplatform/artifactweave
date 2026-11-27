@@ -1,5 +1,5 @@
-// Package api will be the federation module's published interface: peers,
-// federated repositories, replications, topology and the module's events.
+// Package api publishes federation's cross-module cleanup observation contract.
+// Other peer, repository, replication and topology contracts remain planned.
 //
 // # Role
 //
@@ -8,12 +8,13 @@
 //
 // # Inputs
 //
-// None yet. An api package declares contracts; its callers are other modules
-// and the gateways.
+// Bounded current-scope and version identities. Callers are other modules and
+// the gateways; no adapter or owner implementation is imported.
 //
 // # Outputs
 //
-// None yet. Planned (target layout, line 333): federation.go with the Peers,
+// Cleanup exposes bounded observations and local publication fences. Other
+// planned contracts (target layout, line 333) are federation.go with the Peers,
 // FederatedRepos, Replications and Topology contracts, and events.go.
 //
 // # References
@@ -40,5 +41,5 @@
 //
 // # Status
 //
-// Placeholder: implemented by P11, P13, P14, P37.
+// Cleanup is implemented by P13 FED-07. Other contracts remain with P13/P14/P37.
 package api

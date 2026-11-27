@@ -481,6 +481,9 @@ func federatedAPIs(cfg RouterConfig) (federationhttp.FederatedAPI, federationpee
 	if r, err := cfg.Federation.Receiver(); err == nil {
 		receiver.Receiver, receiver.Reader = r, r
 	}
+	if cleanup := cfg.Federation.CleanupReceiver(); cleanup != nil {
+		receiver.Cleanup = cleanup
+	}
 	return ops, receiver
 }
 
@@ -1670,6 +1673,17 @@ func (s peerService) GetRepositoryConfiguration(
 	return s.repos.GetRepositoryConfiguration(ctx, req) //nolint:wrapcheck // the peer adapter owns the answer
 }
 
+// ObserveRepositoryDownloads returns bounded signed download evidence.
+func (s peerService) ObserveRepositoryDownloads(
+	ctx context.Context,
+	req peergen.ObserveRepositoryDownloadsRequestObject,
+) (peergen.ObserveRepositoryDownloadsResponseObject, error) {
+	if s.repos.Cleanup == nil {
+		return s.UnimplementedStrict.ObserveRepositoryDownloads(ctx, req) //nolint:wrapcheck // the generated 501 response
+	}
+	return s.repos.ObserveRepositoryDownloads(ctx, req) //nolint:wrapcheck // the peer adapter owns response errors
+}
+
 // GetPeerStatus answers a peer's signed liveness and version read (#1949);
 // without a pairing service it keeps the 501 stub.
 func (s peerService) GetPeerStatus(
@@ -1762,3 +1776,14 @@ var (
 	_ gridgen.StrictServerInterface         = gridService{}
 	_ peergen.StrictServerInterface         = peerService{}
 )
+
+// CoordinateRepositoryCleanup delegates signed durable participant coordination.
+func (s peerService) CoordinateRepositoryCleanup(
+	ctx context.Context,
+	req peergen.CoordinateRepositoryCleanupRequestObject,
+) (peergen.CoordinateRepositoryCleanupResponseObject, error) {
+	if s.repos.Cleanup == nil {
+		return s.UnimplementedStrict.CoordinateRepositoryCleanup(ctx, req) //nolint:wrapcheck // the generated 501 response.
+	}
+	return s.repos.CoordinateRepositoryCleanup(ctx, req) //nolint:wrapcheck // the signed peer adapter owns response errors.
+}

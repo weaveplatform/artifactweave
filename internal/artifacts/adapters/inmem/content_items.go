@@ -90,6 +90,15 @@ func (i items) put(ctx context.Context, it model.Item, create bool) (model.Item,
 		return it, err
 	}
 	err = i.s.storageWrite(ctx, func(ctx context.Context) error {
+		if err := i.s.checkCleanupMutation(ctx, it.RepoKey, true); err != nil {
+			return err
+		}
+		if previous, found := i.byPath().Get(keyOf(it)); found {
+			existing, _ := i.t().Get(previous)
+			if err := i.s.checkCleanupItem(ctx, existing); err != nil {
+				return err
+			}
+		}
 		var after int64
 		if i.s.storage != nil {
 			// Validate before any path/row mutation. A caller may handle a
@@ -230,6 +239,9 @@ func (i items) Delete(
 ) (port.DeleteResult, error) {
 	res := port.DeleteResult{BlobRefs: map[string]int64{}}
 	err := i.s.storageWrite(ctx, func(ctx context.Context) error {
+		if err := i.s.checkCleanupMutation(ctx, repoKey, true); err != nil {
+			return err
+		}
 		change, err := storekit.PrepareStorageContent(ctx, i.s.storage, repoKey)
 		if err != nil {
 			return err //nolint:wrapcheck // storekit names the accounting boundary
@@ -248,7 +260,13 @@ func (i items) Delete(
 					(target.Folder && it.RepoKey == repoKey && it.Cached == cached && below(it.Path, full))
 			}
 		}
-		for _, it := range i.t().All(func(_ int64, it model.Item) bool { return match(it) }, nil) {
+		affected := i.t().All(func(_ int64, it model.Item) bool { return match(it) }, nil)
+		for _, it := range affected {
+			if err := i.s.checkCleanupItem(ctx, it); err != nil {
+				return err
+			}
+		}
+		for _, it := range affected {
 			res.Removed = append(res.Removed, it)
 			if it.Folder {
 				res.Folders++
@@ -321,7 +339,10 @@ func (i items) EnsureRoot(ctx context.Context, r model.Item) (model.Item, error)
 }
 
 func (i items) DeleteRoot(ctx context.Context, repoKey string, cached bool) error {
-	return i.s.Do(ctx, func() error {
+	return i.s.Tx(ctx, func(ctx context.Context) error {
+		if err := i.s.checkCleanupMutation(ctx, repoKey, true); err != nil {
+			return err
+		}
 		if id, ok := i.byPath().Get(keyOf(model.RootItem(repoKey, cached))); ok {
 			it, _ := i.t().Get(id)
 			i.remove(it)
@@ -464,7 +485,14 @@ func (i items) SetProperties(
 	if err := port.CheckPropertyKeys(props); err != nil {
 		return fmt.Errorf("properties of item %d: %w", id, err)
 	}
-	return i.s.Do(ctx, func() error {
+	return i.s.Tx(ctx, func(ctx context.Context) error {
+		existing, found := i.t().Get(id)
+		if !found {
+			return memtx.NotFound("item", id)
+		}
+		if err := i.s.checkCleanupMutation(ctx, existing.RepoKey, true); err != nil {
+			return err
+		}
 		if err := i.requireItem(id); err != nil {
 			return err
 		}
@@ -483,7 +511,14 @@ func (i items) PatchProperties(
 	if err := port.CheckPropertyKeys(set); err != nil {
 		return fmt.Errorf("properties of item %d: %w", id, err)
 	}
-	return i.s.Do(ctx, func() error {
+	return i.s.Tx(ctx, func(ctx context.Context) error {
+		existing, found := i.t().Get(id)
+		if !found {
+			return memtx.NotFound("item", id)
+		}
+		if err := i.s.checkCleanupMutation(ctx, existing.RepoKey, true); err != nil {
+			return err
+		}
 		if err := i.requireItem(id); err != nil {
 			return err
 		}
@@ -529,7 +564,7 @@ func (i items) RecordDownload(ctx context.Context, id int64, d port.Download) er
 			st.LastDownloaded, st.LastDownloadedBy = d.At, d.By
 		}
 		i.stats().Put(id, st)
-		i.versionsChanged(id)
+		i.versionsDownloaded(id)
 		return nil
 	})
 }
@@ -540,7 +575,7 @@ func (i items) PutStats(ctx context.Context, id int64, st model.ItemStats) error
 			return err
 		}
 		i.stats().Put(id, st)
-		i.versionsChanged(id)
+		i.versionsDownloaded(id)
 		return nil
 	})
 }

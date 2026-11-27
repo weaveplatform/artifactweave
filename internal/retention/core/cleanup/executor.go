@@ -8,6 +8,7 @@ import (
 	"time"
 
 	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/tx"
 	"github.com/weaveplatform/artifactweave/internal/platform/work"
@@ -59,7 +60,12 @@ func (x Executor) Execute(ctx context.Context, item work.WorkItem) error {
 	for {
 		done, err := x.Step(ctx, id, fence)
 		if err != nil {
-			if !item.FinalAttempt || ctx.Err() != nil {
+			var nativeFailure *federatedEffectFailure
+			// Uncertainty itself never exhausts into a false terminal outcome. A
+			// known rolled-back native fault retains the existing queue retry budget;
+			// its durable reference is settled before CleanupFailing can finish.
+			uncertain := errors.Is(err, work.ErrUnsettled) && !errors.As(err, &nativeFailure)
+			if !item.FinalAttempt || ctx.Err() != nil || uncertain {
 				return err
 			}
 			if failure := x.beginFailure(ctx, id, fence); failure != nil {
@@ -102,6 +108,9 @@ func (x Executor) Step(ctx context.Context, id int64, fence func(context.Context
 	if err != nil {
 		return false, fmt.Errorf("read cleanup run: %w", err)
 	}
+	if p.CleanupIntentID != "" {
+		return false, x.settleFederated(ctx, e, p, fence)
+	}
 	if r.Status.Terminal() {
 		return true, nil
 	}
@@ -114,9 +123,12 @@ func (x Executor) Step(ctx context.Context, id int64, fence func(context.Context
 		return false, err
 	}
 	authorized := false
-	if discoveryPhase(p.Phase) && !r.Started.IsZero() {
+	switch {
+	case p.Phase == model.CleanupRemoving && p.Repository.Class == repo.Federated && (p.Repository.HasFederatedMembers || p.Federation != nil):
+		authorized, err = x.removeFederated(ctx, e, p, selection, fence)
+	case discoveryPhase(p.Phase) && !r.Started.IsZero():
 		authorized, err = x.discover(ctx, e, p, selection, fence)
-	} else {
+	default:
 		err = x.withCaller(ctx, e.Credential, func(ctx context.Context, authority Policy) error {
 			authorized = true
 			return x.authorizedStep(ctx, e, p, selection, fence, authority)
@@ -215,6 +227,9 @@ func (x Executor) currentRun(ctx context.Context, e model.CleanupExecution) (mod
 }
 
 func (x Executor) failedStep(ctx context.Context, e model.CleanupExecution, p model.CleanupProgress, fence func(context.Context) error, authorized bool, err error) (bool, error) {
+	if errors.Is(err, work.ErrUnsettled) {
+		return false, err
+	}
 	var stop *stopRequired
 	if errors.As(err, &stop) {
 		return x.finish(ctx, e, p, fence, api.RunStopped, stop.reason)

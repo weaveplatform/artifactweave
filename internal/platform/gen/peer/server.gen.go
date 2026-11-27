@@ -23,6 +23,51 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// Defines values for CleanupCoordinationOutcomeState.
+const (
+	Aborted   CleanupCoordinationOutcomeState = "aborted"
+	Committed CleanupCoordinationOutcomeState = "committed"
+	Prepared  CleanupCoordinationOutcomeState = "prepared"
+	Preparing CleanupCoordinationOutcomeState = "preparing"
+)
+
+// Valid indicates whether the value is a known member of the CleanupCoordinationOutcomeState enum.
+func (e CleanupCoordinationOutcomeState) Valid() bool {
+	switch e {
+	case Aborted:
+		return true
+	case Committed:
+		return true
+	case Prepared:
+		return true
+	case Preparing:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CleanupCoordinationRequestAction.
+const (
+	Outcome CleanupCoordinationRequestAction = "outcome"
+	Prepare CleanupCoordinationRequestAction = "prepare"
+	Release CleanupCoordinationRequestAction = "release"
+)
+
+// Valid indicates whether the value is a known member of the CleanupCoordinationRequestAction enum.
+func (e CleanupCoordinationRequestAction) Valid() bool {
+	switch e {
+	case Outcome:
+		return true
+	case Prepare:
+		return true
+	case Release:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for UseCase.
 const (
 	FederatedRepo  UseCase = "federated-repo/*"
@@ -48,6 +93,147 @@ type BlobReference struct {
 
 	// Size Required within this object. Size of the content in bytes.
 	Size int64 `json:"size"`
+}
+
+// CleanupCoordinationOutcome defines model for CleanupCoordinationOutcome.
+type CleanupCoordinationOutcome struct {
+	// Exclusion Required within this object. Exact echoed participant binding.
+	Exclusion CleanupExclusion `json:"exclusion"`
+
+	// State Required within this object. Durable coordinator state, or acknowledged participant preparation.
+	State CleanupCoordinationOutcomeState `json:"state"`
+
+	// Watermark Required within this object. Final coordinator repository stream frontier for a committed operation; zero otherwise.
+	Watermark int64 `json:"watermark"`
+}
+
+// CleanupCoordinationOutcomeState Required within this object. Durable coordinator state, or acknowledged participant preparation.
+type CleanupCoordinationOutcomeState string
+
+// CleanupCoordinationRequest defines model for CleanupCoordinationRequest.
+type CleanupCoordinationRequest struct {
+	// Action Required within this object. Prepare closes admissions, outcome reads irreversible state, release verifies the outcome and applied frontier.
+	Action CleanupCoordinationRequestAction `json:"action"`
+
+	// Exclusion Required within this object. Exact durable participant binding.
+	Exclusion CleanupExclusion `json:"exclusion"`
+
+	// PackageType Required within this object. Expected repository package type.
+	PackageType string `json:"packageType"`
+
+	// SourceRepository Required within this object. Current reciprocal requester repository key.
+	SourceRepository string `json:"sourceRepository"`
+}
+
+// CleanupCoordinationRequestAction Required within this object. Prepare closes admissions, outcome reads irreversible state, release verifies the outcome and applied frontier.
+type CleanupCoordinationRequestAction string
+
+// CleanupDownload defines model for CleanupDownload.
+type CleanupDownload struct {
+	// AdmissionRevision Required within this object. Independent generation of all hosted download admissions including statistics opt-outs.
+	AdmissionRevision string `json:"admissionRevision"`
+
+	// AdmittedAt Required within this object. Latest hidden admission evidence, independent of public statistics.
+	AdmittedAt time.Time `json:"admittedAt"`
+
+	// Created Required within this object. The recorded creation instant, used conservatively when no download is known.
+	Created time.Time `json:"created"`
+
+	// Id Required within this object. The immutable version identity on this member.
+	Id int64 `json:"id"`
+
+	// LastDownloaded Required within this object. The latest recorded local, linked-item or known remote download; zero when absent.
+	LastDownloaded time.Time `json:"lastDownloaded"`
+
+	// Package Required within this object. Exact logical package name on this repository.
+	Package string `json:"package"`
+
+	// Revision Required within this object. The independent generation of recorded downloads for this version.
+	Revision string `json:"revision"`
+
+	// Version Required within this object. Exact logical version string on this member.
+	Version string `json:"version"`
+}
+
+// CleanupDownloadBatch defines model for CleanupDownloadBatch.
+type CleanupDownloadBatch struct {
+	// Challenge Required within this object. A fresh unpredictable challenge echoed in the signed answer.
+	Challenge string `json:"challenge"`
+
+	// PackageType Required within this object. The expected or observed repository package type, identical on both members.
+	PackageType string `json:"packageType"`
+
+	// SourceRepository Required within this object. The requester repository named by current reciprocal membership.
+	SourceRepository string `json:"sourceRepository"`
+
+	// Versions Required within this object. One bounded batch of logical version identities or observations.
+	Versions []CleanupVersion `json:"versions"`
+}
+
+// CleanupDownloadObservation defines model for CleanupDownloadObservation.
+type CleanupDownloadObservation struct {
+	// Challenge Required within this object. A fresh unpredictable challenge echoed in the signed answer.
+	Challenge string `json:"challenge"`
+
+	// Generation Required within this object. The current repository configuration generation on the responding member.
+	Generation string `json:"generation"`
+
+	// Grant Required within this object. The current reciprocal trust generation on the responding member.
+	Grant string `json:"grant"`
+
+	// Incarnation Required within this object. The current durable repository lifetime on the responding member.
+	Incarnation string `json:"incarnation"`
+
+	// Instance Required within this object. The responding member instance identity.
+	Instance string `json:"instance"`
+
+	// PackageType Required within this object. The expected or observed repository package type, identical on both members.
+	PackageType string `json:"packageType"`
+
+	// Versions Required within this object. One bounded batch of logical version identities or observations.
+	Versions []CleanupDownload `json:"versions"`
+}
+
+// CleanupExclusion defines model for CleanupExclusion.
+type CleanupExclusion struct {
+	// Generation Required within this object. Participant repository configuration generation.
+	Generation string `json:"generation"`
+
+	// Id Required within this object. Durable coordinator operation identity.
+	Id string `json:"id"`
+
+	// Incarnation Required within this object. Durable participant repository lifetime.
+	Incarnation string `json:"incarnation"`
+
+	// Owner Required within this object. Coordinator instance identity.
+	Owner string `json:"owner"`
+
+	// Repository Required within this object. Exact participant repository key.
+	Repository string `json:"repository"`
+
+	// Versions Required within this object. Exact bounded participant versions.
+	Versions []CleanupExclusionVersion `json:"versions"`
+}
+
+// CleanupExclusionVersion defines model for CleanupExclusionVersion.
+type CleanupExclusionVersion struct {
+	// Id Required within this object. Immutable member-local version identity.
+	Id int64 `json:"id"`
+
+	// Package Required within this object. Exact logical package name.
+	Package string `json:"package"`
+
+	// Version Required within this object. Exact logical version string.
+	Version string `json:"version"`
+}
+
+// CleanupVersion defines model for CleanupVersion.
+type CleanupVersion struct {
+	// Package Required within this object. Exact logical package name on this repository.
+	Package string `json:"package"`
+
+	// Version Required within this object. Exact logical version string on this member.
+	Version string `json:"version"`
 }
 
 // ErrorResponse The flat error envelope of every peer answer other than a success. Version 1.0; a later minor version may add fields, which callers ignore.
@@ -353,6 +539,42 @@ type PutRepositoryConfigurationParams struct {
 	ContentDigest PeerContentDigest `json:"Content-Digest"`
 }
 
+// CoordinateRepositoryCleanupParams defines parameters for CoordinateRepositoryCleanup.
+type CoordinateRepositoryCleanupParams struct {
+	// ArtifactweavePeerProtocol Required header parameter. The protocol version the sender speaks, as `<major>.<minor>`, for example `1.0`. A major version other than 1 answers 400 and is recorded on the sender's peer record. The answer carries the receiver's version in the same header.
+	ArtifactweavePeerProtocol PeerProtocol `json:"Artifactweave-Peer-Protocol"`
+
+	// Date Required header parameter. The time the sender signed the request, as an HTTP date (RFC 9110, section 5.6.7), covered by the signature. More than five minutes from the receiver's clock answers 401.
+	Date PeerDate `json:"Date"`
+
+	// Signature Required header parameter. The Ed25519 signature (RFC 9421) named in `Signature-Input`, for example `sig1=:<base64>:`. One that does not verify with the key recorded for its `keyid` answers 401.
+	Signature PeerSignature `json:"Signature"`
+
+	// SignatureInput Required header parameter. The signature's covered components and parameters (RFC 9421), for example `sig1=("@method" "@target-uri" "date" "content-digest");created=1700000000;keyid="jfrt@<uuid>";alg="ed25519";nonce="<random>"`. `keyid` is the sender's instance id; `content-digest` is covered exactly when the request has a body. A `nonce` the receiver has accepted within the last five minutes answers 401.
+	SignatureInput PeerSignatureInput `json:"Signature-Input"`
+
+	// ContentDigest Required header parameter. The SHA-256 digest of the request body (RFC 9530), for example `sha-256=:<base64>:`, covered by the signature. A digest that does not match the body answers 401.
+	ContentDigest PeerContentDigest `json:"Content-Digest"`
+}
+
+// ObserveRepositoryDownloadsParams defines parameters for ObserveRepositoryDownloads.
+type ObserveRepositoryDownloadsParams struct {
+	// ArtifactweavePeerProtocol Required header parameter. The protocol version the sender speaks, as `<major>.<minor>`, for example `1.0`. A major version other than 1 answers 400 and is recorded on the sender's peer record. The answer carries the receiver's version in the same header.
+	ArtifactweavePeerProtocol PeerProtocol `json:"Artifactweave-Peer-Protocol"`
+
+	// Date Required header parameter. The time the sender signed the request, as an HTTP date (RFC 9110, section 5.6.7), covered by the signature. More than five minutes from the receiver's clock answers 401.
+	Date PeerDate `json:"Date"`
+
+	// Signature Required header parameter. The Ed25519 signature (RFC 9421) named in `Signature-Input`, for example `sig1=:<base64>:`. One that does not verify with the key recorded for its `keyid` answers 401.
+	Signature PeerSignature `json:"Signature"`
+
+	// SignatureInput Required header parameter. The signature's covered components and parameters (RFC 9421), for example `sig1=("@method" "@target-uri" "date" "content-digest");created=1700000000;keyid="jfrt@<uuid>";alg="ed25519";nonce="<random>"`. `keyid` is the sender's instance id; `content-digest` is covered exactly when the request has a body. A `nonce` the receiver has accepted within the last five minutes answers 401.
+	SignatureInput PeerSignatureInput `json:"Signature-Input"`
+
+	// ContentDigest Required header parameter. The SHA-256 digest of the request body (RFC 9530), for example `sha-256=:<base64>:`, covered by the signature. A digest that does not match the body answers 401.
+	ContentDigest PeerContentDigest `json:"Content-Digest"`
+}
+
 // GetPeerStatusParams defines parameters for GetPeerStatus.
 type GetPeerStatusParams struct {
 	// ArtifactweavePeerProtocol Required header parameter. The protocol version the sender speaks, as `<major>.<minor>`, for example `1.0`. A major version other than 1 answers 400 and is recorded on the sender's peer record. The answer carries the receiver's version in the same header.
@@ -452,6 +674,12 @@ type RedeemPairingJSONRequestBody = PairRequest
 // PutRepositoryConfigurationJSONRequestBody defines body for PutRepositoryConfiguration for application/json ContentType.
 type PutRepositoryConfigurationJSONRequestBody = RepositoryConfiguration
 
+// CoordinateRepositoryCleanupJSONRequestBody defines body for CoordinateRepositoryCleanup for application/json ContentType.
+type CoordinateRepositoryCleanupJSONRequestBody = CleanupCoordinationRequest
+
+// ObserveRepositoryDownloadsJSONRequestBody defines body for ObserveRepositoryDownloads for application/json ContentType.
+type ObserveRepositoryDownloadsJSONRequestBody = CleanupDownloadBatch
+
 // PushEventsJSONRequestBody defines body for PushEvents for application/json ContentType.
 type PushEventsJSONRequestBody = EventBatch
 
@@ -475,6 +703,12 @@ type ServerInterface interface {
 	// PutRepositoryConfiguration Send a federated repository's configuration
 	// (PUT /repositories/{repoKey})
 	PutRepositoryConfiguration(w http.ResponseWriter, r *http.Request, repoKey string, params PutRepositoryConfigurationParams)
+	// CoordinateRepositoryCleanup Coordinate durable federated cleanup exclusion
+	// (POST /repositories/{repoKey}/cleanup-exclusions)
+	CoordinateRepositoryCleanup(w http.ResponseWriter, r *http.Request, repoKey string, params CoordinateRepositoryCleanupParams)
+	// ObserveRepositoryDownloads Observe a bounded batch of member version downloads
+	// (POST /repositories/{repoKey}/downloads)
+	ObserveRepositoryDownloads(w http.ResponseWriter, r *http.Request, repoKey string, params ObserveRepositoryDownloadsParams)
 	// GetPeerStatus Read a peer's liveness and version
 	// (GET /status)
 	GetPeerStatus(w http.ResponseWriter, r *http.Request, params GetPeerStatusParams)
@@ -523,6 +757,18 @@ func (_ Unimplemented) GetRepositoryConfiguration(w http.ResponseWriter, r *http
 // PutRepositoryConfiguration Send a federated repository's configuration
 // (PUT /repositories/{repoKey})
 func (_ Unimplemented) PutRepositoryConfiguration(w http.ResponseWriter, r *http.Request, repoKey string, params PutRepositoryConfigurationParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CoordinateRepositoryCleanup Coordinate durable federated cleanup exclusion
+// (POST /repositories/{repoKey}/cleanup-exclusions)
+func (_ Unimplemented) CoordinateRepositoryCleanup(w http.ResponseWriter, r *http.Request, repoKey string, params CoordinateRepositoryCleanupParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ObserveRepositoryDownloads Observe a bounded batch of member version downloads
+// (POST /repositories/{repoKey}/downloads)
+func (_ Unimplemented) ObserveRepositoryDownloads(w http.ResponseWriter, r *http.Request, repoKey string, params ObserveRepositoryDownloadsParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1212,6 +1458,298 @@ func (siw *ServerInterfaceWrapper) PutRepositoryConfiguration(w http.ResponseWri
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PutRepositoryConfiguration(w, r, repoKey, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CoordinateRepositoryCleanup operation middleware
+func (siw *ServerInterfaceWrapper) CoordinateRepositoryCleanup(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "repoKey" -------------
+	var repoKey string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "repoKey", chi.URLParam(r, "repoKey"), &repoKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "repoKey", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CoordinateRepositoryCleanupParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Artifactweave-Peer-Protocol" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Artifactweave-Peer-Protocol")]; found {
+		var ArtifactweavePeerProtocol PeerProtocol
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Artifactweave-Peer-Protocol", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Artifactweave-Peer-Protocol", valueList[0], &ArtifactweavePeerProtocol, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Artifactweave-Peer-Protocol", Err: err})
+			return
+		}
+
+		params.ArtifactweavePeerProtocol = ArtifactweavePeerProtocol
+
+	} else {
+		err := fmt.Errorf("Header parameter Artifactweave-Peer-Protocol is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Artifactweave-Peer-Protocol", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "Date" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Date")]; found {
+		var Date PeerDate
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Date", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Date", valueList[0], &Date, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Date", Err: err})
+			return
+		}
+
+		params.Date = Date
+
+	} else {
+		err := fmt.Errorf("Header parameter Date is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Date", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "Signature" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Signature")]; found {
+		var Signature PeerSignature
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Signature", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Signature", valueList[0], &Signature, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Signature", Err: err})
+			return
+		}
+
+		params.Signature = Signature
+
+	} else {
+		err := fmt.Errorf("Header parameter Signature is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Signature", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "Signature-Input" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Signature-Input")]; found {
+		var SignatureInput PeerSignatureInput
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Signature-Input", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Signature-Input", valueList[0], &SignatureInput, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Signature-Input", Err: err})
+			return
+		}
+
+		params.SignatureInput = SignatureInput
+
+	} else {
+		err := fmt.Errorf("Header parameter Signature-Input is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Signature-Input", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "Content-Digest" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Content-Digest")]; found {
+		var ContentDigest PeerContentDigest
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Content-Digest", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Content-Digest", valueList[0], &ContentDigest, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Content-Digest", Err: err})
+			return
+		}
+
+		params.ContentDigest = ContentDigest
+
+	} else {
+		err := fmt.Errorf("Header parameter Content-Digest is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Content-Digest", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CoordinateRepositoryCleanup(w, r, repoKey, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ObserveRepositoryDownloads operation middleware
+func (siw *ServerInterfaceWrapper) ObserveRepositoryDownloads(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "repoKey" -------------
+	var repoKey string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "repoKey", chi.URLParam(r, "repoKey"), &repoKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "repoKey", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ObserveRepositoryDownloadsParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Artifactweave-Peer-Protocol" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Artifactweave-Peer-Protocol")]; found {
+		var ArtifactweavePeerProtocol PeerProtocol
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Artifactweave-Peer-Protocol", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Artifactweave-Peer-Protocol", valueList[0], &ArtifactweavePeerProtocol, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Artifactweave-Peer-Protocol", Err: err})
+			return
+		}
+
+		params.ArtifactweavePeerProtocol = ArtifactweavePeerProtocol
+
+	} else {
+		err := fmt.Errorf("Header parameter Artifactweave-Peer-Protocol is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Artifactweave-Peer-Protocol", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "Date" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Date")]; found {
+		var Date PeerDate
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Date", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Date", valueList[0], &Date, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Date", Err: err})
+			return
+		}
+
+		params.Date = Date
+
+	} else {
+		err := fmt.Errorf("Header parameter Date is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Date", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "Signature" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Signature")]; found {
+		var Signature PeerSignature
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Signature", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Signature", valueList[0], &Signature, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Signature", Err: err})
+			return
+		}
+
+		params.Signature = Signature
+
+	} else {
+		err := fmt.Errorf("Header parameter Signature is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Signature", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "Signature-Input" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Signature-Input")]; found {
+		var SignatureInput PeerSignatureInput
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Signature-Input", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Signature-Input", valueList[0], &SignatureInput, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Signature-Input", Err: err})
+			return
+		}
+
+		params.SignatureInput = SignatureInput
+
+	} else {
+		err := fmt.Errorf("Header parameter Signature-Input is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Signature-Input", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "Content-Digest" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Content-Digest")]; found {
+		var ContentDigest PeerContentDigest
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Content-Digest", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Content-Digest", valueList[0], &ContentDigest, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Content-Digest", Err: err})
+			return
+		}
+
+		params.ContentDigest = ContentDigest
+
+	} else {
+		err := fmt.Errorf("Header parameter Content-Digest is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Content-Digest", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ObserveRepositoryDownloads(w, r, repoKey, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2054,6 +2592,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Put(options.BaseURL+"/repositories/{repoKey}", wrapper.PutRepositoryConfiguration)
 	})
 	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/repositories/{repoKey}/cleanup-exclusions", wrapper.CoordinateRepositoryCleanup)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/repositories/{repoKey}/downloads", wrapper.ObserveRepositoryDownloads)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/status", wrapper.GetPeerStatus)
 	})
 	r.Group(func(r chi.Router) {
@@ -2679,6 +3223,306 @@ func (response PutRepositoryConfiguration500JSONResponse) VisitPutRepositoryConf
 type PutRepositoryConfiguration503JSONResponse struct{ ServiceUnavailableJSONResponse }
 
 func (response PutRepositoryConfiguration503JSONResponse) VisitPutRepositoryConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CoordinateRepositoryCleanupRequestObject struct {
+	RepoKey string `json:"repoKey"`
+	Params  CoordinateRepositoryCleanupParams
+	Body    *CoordinateRepositoryCleanupJSONRequestBody
+}
+
+type CoordinateRepositoryCleanupResponseObject interface {
+	VisitCoordinateRepositoryCleanupResponse(w http.ResponseWriter) error
+}
+
+type CoordinateRepositoryCleanup200JSONResponse CleanupCoordinationOutcome
+
+func (response CoordinateRepositoryCleanup200JSONResponse) VisitCoordinateRepositoryCleanupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CoordinateRepositoryCleanup400JSONResponse ErrorResponse
+
+func (response CoordinateRepositoryCleanup400JSONResponse) VisitCoordinateRepositoryCleanupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CoordinateRepositoryCleanup401JSONResponse struct{ PeerUnauthorizedJSONResponse }
+
+func (response CoordinateRepositoryCleanup401JSONResponse) VisitCoordinateRepositoryCleanupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CoordinateRepositoryCleanup403JSONResponse ErrorResponse
+
+func (response CoordinateRepositoryCleanup403JSONResponse) VisitCoordinateRepositoryCleanupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CoordinateRepositoryCleanup404JSONResponse ErrorResponse
+
+func (response CoordinateRepositoryCleanup404JSONResponse) VisitCoordinateRepositoryCleanupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CoordinateRepositoryCleanup409JSONResponse ErrorResponse
+
+func (response CoordinateRepositoryCleanup409JSONResponse) VisitCoordinateRepositoryCleanupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CoordinateRepositoryCleanup429JSONResponse struct{ TooManyRequestsJSONResponse }
+
+func (response CoordinateRepositoryCleanup429JSONResponse) VisitCoordinateRepositoryCleanupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CoordinateRepositoryCleanup500JSONResponse struct{ PeerInternalErrorJSONResponse }
+
+func (response CoordinateRepositoryCleanup500JSONResponse) VisitCoordinateRepositoryCleanupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CoordinateRepositoryCleanup503JSONResponse struct{ ServiceUnavailableJSONResponse }
+
+func (response CoordinateRepositoryCleanup503JSONResponse) VisitCoordinateRepositoryCleanupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ObserveRepositoryDownloadsRequestObject struct {
+	RepoKey string `json:"repoKey"`
+	Params  ObserveRepositoryDownloadsParams
+	Body    *ObserveRepositoryDownloadsJSONRequestBody
+}
+
+type ObserveRepositoryDownloadsResponseObject interface {
+	VisitObserveRepositoryDownloadsResponse(w http.ResponseWriter) error
+}
+
+type ObserveRepositoryDownloads200JSONResponse CleanupDownloadObservation
+
+func (response ObserveRepositoryDownloads200JSONResponse) VisitObserveRepositoryDownloadsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ObserveRepositoryDownloads400JSONResponse ErrorResponse
+
+func (response ObserveRepositoryDownloads400JSONResponse) VisitObserveRepositoryDownloadsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ObserveRepositoryDownloads401JSONResponse struct{ PeerUnauthorizedJSONResponse }
+
+func (response ObserveRepositoryDownloads401JSONResponse) VisitObserveRepositoryDownloadsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ObserveRepositoryDownloads403JSONResponse ErrorResponse
+
+func (response ObserveRepositoryDownloads403JSONResponse) VisitObserveRepositoryDownloadsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ObserveRepositoryDownloads404JSONResponse ErrorResponse
+
+func (response ObserveRepositoryDownloads404JSONResponse) VisitObserveRepositoryDownloadsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ObserveRepositoryDownloads409JSONResponse ErrorResponse
+
+func (response ObserveRepositoryDownloads409JSONResponse) VisitObserveRepositoryDownloadsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ObserveRepositoryDownloads429JSONResponse struct{ TooManyRequestsJSONResponse }
+
+func (response ObserveRepositoryDownloads429JSONResponse) VisitObserveRepositoryDownloadsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ObserveRepositoryDownloads500JSONResponse struct{ PeerInternalErrorJSONResponse }
+
+func (response ObserveRepositoryDownloads500JSONResponse) VisitObserveRepositoryDownloadsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ObserveRepositoryDownloads503JSONResponse struct{ ServiceUnavailableJSONResponse }
+
+func (response ObserveRepositoryDownloads503JSONResponse) VisitObserveRepositoryDownloadsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -3398,6 +4242,12 @@ type StrictServerInterface interface {
 	// PutRepositoryConfiguration Send a federated repository's configuration
 	// (PUT /repositories/{repoKey})
 	PutRepositoryConfiguration(ctx context.Context, request PutRepositoryConfigurationRequestObject) (PutRepositoryConfigurationResponseObject, error)
+	// CoordinateRepositoryCleanup Coordinate durable federated cleanup exclusion
+	// (POST /repositories/{repoKey}/cleanup-exclusions)
+	CoordinateRepositoryCleanup(ctx context.Context, request CoordinateRepositoryCleanupRequestObject) (CoordinateRepositoryCleanupResponseObject, error)
+	// ObserveRepositoryDownloads Observe a bounded batch of member version downloads
+	// (POST /repositories/{repoKey}/downloads)
+	ObserveRepositoryDownloads(ctx context.Context, request ObserveRepositoryDownloadsRequestObject) (ObserveRepositoryDownloadsResponseObject, error)
 	// GetPeerStatus Read a peer's liveness and version
 	// (GET /status)
 	GetPeerStatus(ctx context.Context, request GetPeerStatusRequestObject) (GetPeerStatusResponseObject, error)
@@ -3601,6 +4451,74 @@ func (sh *strictHandler) PutRepositoryConfiguration(w http.ResponseWriter, r *ht
 	}
 }
 
+// CoordinateRepositoryCleanup operation middleware
+func (sh *strictHandler) CoordinateRepositoryCleanup(w http.ResponseWriter, r *http.Request, repoKey string, params CoordinateRepositoryCleanupParams) {
+	var request CoordinateRepositoryCleanupRequestObject
+
+	request.RepoKey = repoKey
+	request.Params = params
+
+	var body CoordinateRepositoryCleanupJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CoordinateRepositoryCleanup(ctx, request.(CoordinateRepositoryCleanupRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CoordinateRepositoryCleanup")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CoordinateRepositoryCleanupResponseObject); ok {
+		if err := validResponse.VisitCoordinateRepositoryCleanupResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ObserveRepositoryDownloads operation middleware
+func (sh *strictHandler) ObserveRepositoryDownloads(w http.ResponseWriter, r *http.Request, repoKey string, params ObserveRepositoryDownloadsParams) {
+	var request ObserveRepositoryDownloadsRequestObject
+
+	request.RepoKey = repoKey
+	request.Params = params
+
+	var body ObserveRepositoryDownloadsJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ObserveRepositoryDownloads(ctx, request.(ObserveRepositoryDownloadsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ObserveRepositoryDownloads")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ObserveRepositoryDownloadsResponseObject); ok {
+		if err := validResponse.VisitObserveRepositoryDownloadsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetPeerStatus operation middleware
 func (sh *strictHandler) GetPeerStatus(w http.ResponseWriter, r *http.Request, params GetPeerStatusParams) {
 	var request GetPeerStatusRequestObject
@@ -3754,158 +4672,189 @@ func (sh *strictHandler) GetSnapshot(w http.ResponseWriter, r *http.Request, str
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

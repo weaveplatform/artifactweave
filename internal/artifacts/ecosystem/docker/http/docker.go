@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
+	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
@@ -44,6 +45,13 @@ const RegistryHeader = "X-Artifactory-Docker-Registry"
 // prefix is Artifactory's own path to a repository's registry.
 const prefix = "/artifactory/api/docker/"
 
+// Store supplies registry writes and durable admission for hosted responses.
+// Declaring admission here keeps interface-embedding wrappers from dropping it.
+type Store interface {
+	registry.Store
+	CleanupExclusions() artifactsapi.CleanupExclusions
+}
+
 // Options configures a Registry.
 type Options struct {
 	// CurrentAccess refreshes verified credentials and policy inside the owning
@@ -54,7 +62,7 @@ type Options struct {
 	Sources *source.Service
 	// Store resolves repositories. Nil serves no repository, for tests of
 	// the router alone.
-	Store registry.Store
+	Store Store
 	// SubdomainMatch turns on the subdomain method. BaseURL must then be
 	// set: its host is the parent the repository subdomains sit under.
 	SubdomainMatch bool
@@ -106,7 +114,7 @@ type Endpoint func(w http.ResponseWriter, r *http.Request, q Request)
 type Registry struct {
 	currentAccess func(context.Context) (kernel.Principal, accessapi.Decider, error)
 	sources       *source.Service
-	store         registry.Store
+	store         Store
 	authenticated bool
 	// subdomains turns on the subdomain method; parent is the lower-cased
 	// host of Options.BaseURL, which parentHost uses when the request carries

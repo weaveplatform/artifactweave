@@ -13,6 +13,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/downloadadmission"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
@@ -120,7 +121,7 @@ func (g *Registry) findBlob(ctx context.Context, q Request, hex string) (model.I
 func (g *Registry) streamBlob(
 	w http.ResponseWriter,
 	r *http.Request,
-	_ repo.Config,
+	configuration repo.Config,
 	it model.Item,
 ) {
 	content, _, err := g.blobs.Open(r.Context(), it.Actual.SHA256)
@@ -132,6 +133,14 @@ func (g *Registry) streamBlob(
 	w.Header().Set("Content-Type", "application/octet-stream")
 	if notModified(w, r, it) {
 		return
+	}
+	if r.Method == http.MethodGet {
+		done, err := downloadadmission.Begin(r.Context(), g.store, configuration, it)
+		if err != nil {
+			g.writeErr(w, r, err)
+			return
+		}
+		defer done()
 	}
 	http.ServeContent(w, withoutValidators(r), "", it.Modified, content)
 }

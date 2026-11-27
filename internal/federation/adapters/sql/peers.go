@@ -2,6 +2,7 @@ package sql
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
 	"fmt"
 	"slices"
@@ -11,6 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/federation/core/model"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/port"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/instance"
 	"github.com/weaveplatform/artifactweave/internal/platform/sql/dialect"
 	retentionapi "github.com/weaveplatform/artifactweave/internal/retention/api"
 )
@@ -46,7 +48,7 @@ func (p peerStore) Put(ctx context.Context, peer model.Peer) error {
 		if _, err := p.s.Exec(
 			ctx,
 			"put peer "+peer.InstanceID,
-			dialect.Upsert("peers", strings.Split(peerCols, ", "), []string{"instance_id"}),
+			dialect.Upsert("peers", append(strings.Split(peerCols, ", "), "grant_revision", "failure_revision"), []string{"instance_id"}),
 			peer.InstanceID,
 			peer.BaseURL,
 			[]byte(peer.PublicKey),
@@ -60,6 +62,8 @@ func (p peerStore) Put(ctx context.Context, peer model.Peer) error {
 			string(delivery(peer.Delivery)),
 			peer.ClockSkew.Milliseconds(),
 			peer.ReceivesFederationOnly,
+			rand.Text(),
+			"initial",
 		); err != nil {
 			return err
 		}
@@ -182,11 +186,20 @@ func (p peerStore) Delete(ctx context.Context, instanceID string) error {
 }
 
 func (p peerStore) SetProtocolVersion(ctx context.Context, instanceID string, major int) error {
+	if major != instance.ProtocolVersion {
+		return p.s.ExecOne(ctx, "set incompatible peer protocol version",
+			"UPDATE peers SET protocol_version = ?, failure_revision = ? WHERE instance_id = ?", major, rand.Text(), instanceID)
+	}
 	return p.s.ExecOne(ctx, "set peer protocol version "+instanceID,
 		"UPDATE peers SET protocol_version = ? WHERE instance_id = ?", major, instanceID)
 }
 
 func (p peerStore) SetLiveness(ctx context.Context, instanceID string, l model.Liveness) error {
+	if l.Status != model.PeerOnline {
+		return p.s.ExecOne(ctx, "set failed peer liveness",
+			"UPDATE peers SET status = ?, last_seen_at = ?, clock_skew_ms = ?, failure_revision = ? WHERE instance_id = ?",
+			string(l.Status), dialect.Micros(l.LastSeen), l.ClockSkew.Milliseconds(), rand.Text(), instanceID)
+	}
 	return p.s.ExecOne(ctx, "set peer liveness "+instanceID,
 		"UPDATE peers SET status = ?, last_seen_at = ?, clock_skew_ms = ? WHERE instance_id = ?",
 		string(l.Status), dialect.Micros(l.LastSeen), l.ClockSkew.Milliseconds(), instanceID)

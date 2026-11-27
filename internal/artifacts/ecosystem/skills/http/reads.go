@@ -19,6 +19,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/downloadadmission"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	skillsfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/skills"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -632,6 +633,14 @@ func (h handler) singleFile(w http.ResponseWriter, r *http.Request) {
 				apierror.New(http.StatusInternalServerError, "invalid stored skill file"),
 			)
 			return
+		}
+		if r.Method == http.MethodGet {
+			done, err := downloadadmission.Begin(r.Context(), h.k.DB(), f.Repo, f.Item)
+			if err != nil {
+				h.k.Error(w, r, err)
+				return
+			}
+			defer done()
 		}
 		w.Header().Set("Content-Type", http.DetectContentType(content))
 		_, _ = w.Write(content)

@@ -16,6 +16,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
+	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
@@ -38,11 +39,13 @@ import (
 // documents, the work queue and the lease table, so a handler can hand DB()
 // on to the item service's, a format's and the package index's code
 // (item.Store, format.Store and pkgindex.Store). It names no access store:
-// protocols reach the access module through access/api. Each composite
-// store in app is a Store.
+// protocols reach the access module through access/api. Hosted responses also
+// require durable admission, including through interface-embedding wrappers.
+// Each composite store in app is a Store.
 type Store interface {
 	item.Store
 	port.Store
+	CleanupExclusions() artifactsapi.CleanupExclusions
 	Settings() settings.SettingsStore
 	Configs() configdoc.ConfigStore
 	WorkQueue() work.WorkQueue

@@ -7,6 +7,7 @@ import (
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
+	federationapi "github.com/weaveplatform/artifactweave/internal/federation/api"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/schedule"
 	"github.com/weaveplatform/artifactweave/internal/platform/work"
@@ -29,6 +30,7 @@ type Deps struct {
 	Repositories artifactsapi.ProjectRepositoryLookup
 	PackageIndex artifactsapi.PackageIndex
 	ItemRemoval  artifactsapi.ItemRemoval
+	Federation   federationapi.Cleanup
 	// Zone is the server's schedule timezone; empty means UTC.
 	Zone string
 }
@@ -54,6 +56,7 @@ func (m *Module) Policies() cleanup.Service {
 	s.Restore = d.restorePolicyCaller
 	s.Work = d.Store.WorkQueue()
 	s.PackageIndex = d.PackageIndex
+	s.Federation = d.Federation
 	if d.Access.Projects != nil {
 		s.Guard, s.ProjectExists = d.Access.Projects.Guard, d.Access.Projects.Exists
 		s.ProjectIncarnation = d.Access.Projects.Incarnation

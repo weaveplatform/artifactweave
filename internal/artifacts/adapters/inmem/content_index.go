@@ -186,7 +186,10 @@ func (p packages) Ensure(ctx context.Context, pkg model.Package) (model.Package,
 		)
 	}
 	var out model.Package
-	err := p.s.Do(ctx, func() error {
+	err := p.s.Tx(ctx, func(ctx context.Context) error {
+		if err := p.s.checkCleanupMutation(ctx, pkg.RepoKey, true); err != nil {
+			return err
+		}
 		if cur, ok := p.find(pkg.RepoKey, pkg.Name); ok {
 			out = cur
 			return nil
@@ -247,7 +250,10 @@ func (p packages) List(
 }
 
 func (p packages) Delete(ctx context.Context, id int64) error {
-	return p.s.Do(ctx, func() error {
+	return p.s.Tx(ctx, func(ctx context.Context) error {
+		if err := p.s.checkCleanupPackage(ctx, id); err != nil {
+			return err
+		}
 		if !p.t().Del(id) {
 			return memtx.NotFound("package", id)
 		}
@@ -263,6 +269,8 @@ func (p packages) Delete(ctx context.Context, id int64) error {
 func (p packages) removeVersion(id int64) {
 	p.versions().Del(id)
 	p.revisions().Del(id)
+	p.downloadRevisions().Del(id)
+	cleanupRecords(p).activity().Del(id)
 	p.files().DeleteWhere(func(f model.VersionFile, _ bool) bool { return f.VersionID == id })
 }
 
@@ -303,7 +311,10 @@ func (p packages) PutVersion(
 		return v, fmt.Errorf("put package version: version is required: %w", kernel.ErrInvalid)
 	}
 	var out model.PackageVersion
-	err := p.s.Do(ctx, func() error {
+	err := p.s.Tx(ctx, func(ctx context.Context) error {
+		if err := p.s.checkCleanupPackage(ctx, v.PackageID); err != nil {
+			return err
+		}
 		pkg, ok := p.t().Get(v.PackageID)
 		if !ok {
 			return memtx.NotFound("package", v.PackageID)
@@ -312,6 +323,9 @@ func (p packages) PutVersion(
 		for _, cur := range p.sorted(pkg.ID) {
 			if cur.Version == v.Version {
 				v.ID, v.OrderKey = cur.ID, cur.OrderKey
+				if !kernel.Normalise(v.LastDownloaded).Equal(cur.LastDownloaded) {
+					p.downloadChanged(cur.ID)
+				}
 			}
 		}
 		if v.ID == 0 {
@@ -357,7 +371,10 @@ func (p packages) Versions(ctx context.Context, packageID int64) ([]model.Packag
 }
 
 func (p packages) DeleteVersion(ctx context.Context, id int64) error {
-	return p.s.Do(ctx, func() error {
+	return p.s.Tx(ctx, func(ctx context.Context) error {
+		if err := p.s.checkCleanupVersion(ctx, id); err != nil {
+			return err
+		}
 		v, ok := p.versions().Get(id)
 		if !ok {
 			return memtx.NotFound("package version", id)
@@ -371,7 +388,10 @@ func (p packages) DeleteVersion(ctx context.Context, id int64) error {
 }
 
 func (p packages) LinkFile(ctx context.Context, f model.VersionFile) error {
-	return p.s.Do(ctx, func() error {
+	return p.s.Tx(ctx, func(ctx context.Context) error {
+		if err := p.s.checkCleanupVersion(ctx, f.VersionID); err != nil {
+			return err
+		}
 		if !p.versions().Has(f.VersionID) {
 			return memtx.NotFound("link file: package version", f.VersionID)
 		}
@@ -427,6 +447,7 @@ func (p packages) RecordVersionDownload(ctx context.Context, versionID int64, at
 		v.LastDownloaded = at
 		p.versions().Put(versionID, v)
 		p.versionChanged(versionID)
+		p.downloadChanged(versionID)
 		return nil
 	})
 }

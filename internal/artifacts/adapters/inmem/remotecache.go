@@ -3,6 +3,7 @@ package inmem
 import (
 	"cmp"
 	"context"
+	"errors"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/storekit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
@@ -41,7 +42,20 @@ func (r remoteRecords) Source(ctx context.Context, key string) (model.RemoteSour
 }
 
 func (r remoteRecords) PutSource(ctx context.Context, key string, s model.RemoteSourceState) error {
-	return r.s.Do(ctx, func() error { r.sources().Put(key, s); return nil })
+	return r.s.Tx(ctx, func(ctx context.Context) error {
+		previous, err := r.Source(ctx, key)
+		if err != nil && !errors.Is(err, kernel.ErrNotFound) {
+			return err
+		}
+		if err == nil && (previous.Source.Repository != s.Source.Repository || previous.Source.Generation != s.Source.Generation) {
+			if err := r.s.checkCleanupMutation(ctx, key, false); err != nil {
+				return err
+			}
+		}
+
+		r.sources().Put(key, s)
+		return nil
+	})
 }
 
 func (r remoteRecords) Entry(
