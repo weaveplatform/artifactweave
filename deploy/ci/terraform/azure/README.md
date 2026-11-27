@@ -77,7 +77,7 @@ zone per month (about $0.50) and stays, because its delegation does.
 
 | Name | Version |
 | ---- | ------- |
-| azurerm | 5.14.0 |
+| azurerm | 5.15.0 |
 
 ### Modules
 
